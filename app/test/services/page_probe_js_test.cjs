@@ -7,12 +7,16 @@ const source = fs.readFileSync(path.join(__dirname,
   '../../lib/services/page_probe.dart'), 'utf8');
 const script = source.match(/const responseCaptureScript = r'''([\s\S]*?)''';/)[1];
 
-function setup(origin, {subframe = false, brokenBridge = false} = {}) {
+function setup(origin, {subframe = false, brokenBridge = false, bridgeReady = true} = {}) {
   const messages = [];
   const calls = [];
   let lastPromise;
   let lastResponse;
   const jqHandlers = [];
+  const documentListeners = new Map();
+  const windowListeners = new Map();
+  const timers = new Map();
+  let nextTimer = 0;
   const jquery = () => ({on(name, callback) { jqHandlers.push({name, callback}); }});
   jquery.fn = {on() {}};
   class XHR {
@@ -26,10 +30,15 @@ function setup(origin, {subframe = false, brokenBridge = false} = {}) {
     }
   }
   const context = {
-    URL, Promise, WeakMap, XMLHttpRequest: XHR,
+    URL, Promise, WeakMap, WeakSet, XMLHttpRequest: XHR,
     jQuery: jquery,
-    document: {addEventListener() {}, removeEventListener() {}},
-    setInterval, clearInterval,
+    document: {
+      addEventListener(name, fn) { documentListeners.set(name, fn); },
+      removeEventListener(name) { documentListeners.delete(name); },
+    },
+    addEventListener(name, fn) { windowListeners.set(name, fn); },
+    setInterval(fn) { const id = ++nextTimer; timers.set(id, fn); return id; },
+    clearInterval(id) { timers.delete(id); },
     location: {origin, href: origin + '/query.html'},
     flutter_inappwebview: {callHandler(name, payload) {
       if (brokenBridge) return Promise.reject(new Error('bridge failed'));
@@ -45,10 +54,19 @@ function setup(origin, {subframe = false, brokenBridge = false} = {}) {
   };
   context.window = context;
   context.top = subframe ? {} : context;
+  const bridge = context.flutter_inappwebview;
+  if (!bridgeReady) delete context.flutter_inappwebview;
   const originalFetch = context.fetch;
   vm.runInNewContext(script, context);
   return {context, XHR, messages, calls, originalFetch,
-    jqHandlers, promise: () => lastPromise, response: () => lastResponse};
+    jqHandlers, promise: () => lastPromise, response: () => lastResponse,
+    scriptLoad() { documentListeners.get('load')?.({target: {tagName: 'SCRIPT'}}); },
+    ready() {
+      context.flutter_inappwebview = bridge;
+      windowListeners.get('flutterInAppWebViewPlatformReady')?.();
+    },
+    tick() { for (const fn of [...timers.values()]) fn(); },
+  };
 }
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
@@ -107,6 +125,72 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     'forward actual auth expiry without fabricated success');
   assert.equal(broadnet.messages.at(-1).payload.stage, 'raw');
 
+  // Reproduce the real site: WAF global jQuery and a separate webpack module 0.
+  const privateSite = setup('https://www.10099.com.cn');
+  const privateHandlers = [];
+  const privateJq = () => ({on(name, callback) { privateHandlers.push({name, callback}); }});
+  privateJq.fn = {on() {}, jquery: '3.6.0'};
+  let registered;
+  let runtimeReceiver;
+  let runtimeArgs;
+  const runtimeResult = {};
+  privateSite.context.webpackJsonp = function(...args) {
+    runtimeReceiver = this; runtimeArgs = args; registered = args[1];
+    return runtimeResult;
+  };
+  privateSite.scriptLoad(); // polyfill defines JSONP before vendor registers.
+  const module = {exports: {}};
+  const factoryResult = {};
+  let runs = 0;
+  let factoryReceiver;
+  let factoryArgs;
+  const modules = [function(...args) {
+    runs++; factoryReceiver = this; factoryArgs = args;
+    args[0].exports = privateJq;
+    return factoryResult;
+  }];
+  const receiver = {};
+  const chunkIds = [2];
+  const entryIds = [];
+  assert.equal(privateSite.context.webpackJsonp.call(receiver, chunkIds, modules, entryIds), runtimeResult);
+  assert.equal(runtimeReceiver, receiver);
+  assert.equal(runtimeArgs[0], chunkIds);
+  assert.equal(runtimeArgs[1], modules);
+  assert.equal(runtimeArgs[2], entryIds);
+  assert.equal(runs, 0, 'do not initialize website modules early');
+  const exports = module.exports;
+  const require = () => {};
+  assert.equal(registered[0].call(receiver, module, exports, require), factoryResult);
+  assert.equal(runs, 1, 'execute original factory exactly once');
+  assert.equal(factoryReceiver, receiver);
+  assert.deepEqual(factoryArgs, [module, exports, require]);
+  assert.equal(module.exports, privateJq);
+  assert.equal(privateHandlers.length, 1);
+  privateSite.scriptLoad();
+  privateSite.tick();
+  assert.equal(privateSite.jqHandlers.length, 1, 'deduplicate global instance');
+  assert.equal(privateHandlers.length, 1, 'deduplicate private instance');
+  privateHandlers[0].callback({}, officialXhr, settings, official);
+  assert.equal(privateSite.messages.at(-1).payload.stage, 'officialDecoded');
+  assert.deepEqual(JSON.parse(privateSite.messages.at(-1).payload.body), official);
+  assert.equal(officialXhr.responseJSON, official, 'retain official decoded object');
+
+  const delayed = setup('https://www.10099.com.cn', {bridgeReady: false});
+  delayed.jqHandlers[0].callback({}, officialXhr, settings, official);
+  assert.equal(delayed.messages.length, 0);
+  delayed.ready();
+  assert.equal(delayed.messages.length, 1, 'deliver early decoded result after native bridge readiness');
+  assert.deepEqual(JSON.parse(delayed.messages[0].payload.body), official);
+  delayed.ready();
+  assert.equal(delayed.messages.length, 1, 'ready event does not replay delivered results');
+  const bounded = setup('https://www.10099.com.cn', {bridgeReady: false});
+  for (let i = 0; i < 12; i++) {
+    bounded.jqHandlers[0].callback({}, {responseJSON: {index: i}, status: 200}, settings, {});
+  }
+  bounded.ready();
+  assert.equal(bounded.messages.length, 8, 'early response queue is bounded');
+  assert.equal(JSON.parse(bounded.messages[0].payload.body).index, 4);
+
   for (const fixture of [setup('https://evil.test'), setup('http://wx.10086.cn'),
     setup('https://wx.10086.cn', {subframe: true})]) {
     assert.equal(fixture.context.fetch, fixture.originalFetch, 'do not hook unauthorized contexts');
@@ -115,5 +199,5 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
   const response = await broken.context.fetch('/getNewMarginInfo');
   await settle();
   assert.equal(response, broken.response(), 'bridge errors do not affect requests');
-  console.log('PASS: fetch/XHR fidelity, bridge filtering, Broadnet allowlist, origin/frame guards');
+  console.log('PASS: fetch/XHR fidelity, private business jQuery, deferred bridge, bounded queue, origin/frame guards');
 })().catch(error => { console.error(error); process.exitCode = 1; });

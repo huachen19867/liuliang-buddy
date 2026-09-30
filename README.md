@@ -2,9 +2,9 @@
 
 一个面向中国移动和中国广电两张流量卡的安卓测试应用。首页采用奶油背景、圆润双色卡片与笑脸水滴，展示每张卡的剩余流量、查询时间、连接状态，以及通用和定向额度。号码验证由用户在运营商官方网页完成，成功会话尽量复用。
 
-当前版本 1.1.0+2：[GitHub 仓库](https://github.com/huachen19867/liuliang-app) · [安装包发布页](https://github.com/huachen19867/liuliang-app/releases/tag/v1.1.0)。私有仓库需要登录有访问权的 GitHub 账号。
+当前版本 1.1.1+3：[GitHub 仓库](https://github.com/huachen19867/liuliang-app) · [安装包发布页](https://github.com/huachen19867/liuliang-app/releases/tag/v1.1.1)。私有仓库需要登录有访问权的 GitHub 账号。
 
-已生成的安装包：artifacts/liuliang-buddy-debug.apk（约 85.4 MiB，Android 7.0 及以上 ARM64 手机）。APK 构建和 v2 签名检查通过，flutter analyze 无问题，24 项 Flutter 测试、5 项原生卡片测试及网页探针 Node 验证通过。尚未连接真实安卓手机，登录与实际余额仍需真机核对。
+已生成的安装包：artifacts/liuliang-buddy-debug.apk（约 85.3 MiB，Android 7.0 及以上 ARM64 手机）。APK 构建和 v2 签名检查通过，flutter analyze 无问题，28 项 Flutter 测试、5 项原生卡片测试及网页探针 Node 验证通过。广电监听修复还通过真实公开官网配合本地合成响应的 Chrome 验证，覆盖桥接延迟就绪；尚未连接真实安卓手机，登录与实际余额仍需真机核对。
 
 当前为待真机验证的测试版：移动响应读取与解密已实现；广电官网的真实查询接口、业务字段和 KB 单位已从公开页面核对，使用官网自身解密后的结果。没有真实账号登录验证，不保证各省份或套餐均可读取。运营商没有在调研中提供可稳定依赖的公开余额 API，官网改版或会话失效会影响自动查询。
 
@@ -18,6 +18,7 @@
 | app/lib/ui/dashboard_screen.dart | 可爱双卡首页与各种连接状态 |
 | app/lib/data/ | 数据模型及移动、广电响应解析 |
 | app/lib/services/page_probe.dart | 限定接口的响应观察、移动解码与广电会话脚本 |
+| app/lib/services/response_policy.dart | 广电明文成功结果回退与迟到原始响应门禁 |
 | app/lib/services/widget_bridge.dart | 桌面展示数据与原生通信 |
 | app/lib/ui/widget_preview_card.dart | 添加桌面卡片入口与样式示意 |
 | app/android/ | 安卓入口、权限、通知、自绘启动图标与原生桌面卡片 |
@@ -27,6 +28,7 @@
 | artifacts/liuliang-buddy-debug.apk | 已验证签名的个人测试安装包 |
 | artifacts/README.md | 输出版本、哈希、构建记录与签名检查索引 |
 | scripts/build-android.ps1 | 使用本工作区工具生成 ARM64 安卓调试包 |
+| scripts/test-broadnet-browser.cjs | Chrome 公开官网脚本与本地合成响应的桥接回归验证 |
 | docs/TECH_LOG.md | 需求、阶段进展、踩坑与复用方法 |
 | docs/PROTOCOL_RESEARCH.md | 官方协议证据与未验证范围 |
 | docs/DATA_NOTES.md | 余额类型、单位和解析约束 |
@@ -34,6 +36,7 @@
 | docs/THIRD_PARTY_NOTICES.md | 上游参考声明 |
 | docs/WIDGET_RESEARCH.md | Android AppWidget 官方参考、支持范围与实施边界 |
 | docs/RELEASE_1.1.0.md | 版本说明、验证与安装包哈希 |
+| docs/RELEASE_1.1.1.md | 广电查询修复、验证与安装包哈希 |
 | references/README.md | 下载的参考项目和公开页面索引 |
 | .tools/ | 本工作区构建依赖与缓存，不属于应用业务源码 |
 
@@ -52,6 +55,8 @@ node test/services/page_probe_js_test.cjs
 ```
 
 使用标准 Android 环境在 app/ 执行 `flutter build apk --debug --target-platform android-arm64`。本机 Gradle 官方下载与部分插件仓库的 TLS 连接曾失败，可在工作区根目录运行 `./scripts/build-android.ps1 -UseMirrors`；它使用本地经过官方 SHA-256 核验的 Gradle 9.1.0 与仅本次构建生效的依赖镜像。调试包属于个人测试用途，没有商业发行签名。
+
+广电公开页面回归验证在根目录执行 `node scripts/test-broadnet-browser.cjs`，再加 `--delayed-bridge` 验证桥接延迟。需要已安装 Chrome 与 Playwright；本工作区复用 .tools/browser/node_modules/playwright，其他环境可通过 LIULIANG_PLAYWRIGHT_MODULE 指定该包路径，通过 LIULIANG_CHROME_PATH 指定浏览器路径。请求由本地 route 拦截，响应为合成数据，不使用账号、不发送验证码。该检查需要官网可访问，官网 bundle 改版也可能使其失败。
 
 ## 界面演示
 

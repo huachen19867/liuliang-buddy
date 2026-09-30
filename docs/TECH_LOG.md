@@ -81,3 +81,17 @@ GitHub CLI 不自动使用 Windows 系统代理；直连超时会让 gh auth sta
 main 源码提交 25f480697abbb11333e3991153d557b3e2cc35af 已推送，GitHub commits API 核对与本地一致。v1.1.0 标签指向同一提交，测试版 Release 已发布（draft=false、prerelease=true）：https://github.com/huachen19867/liuliang-app/releases/tag/v1.1.0 。APK asset 状态 uploaded、大小 89,496,179 字节；GitHub 返回的 SHA-256 digest 与本地 72a57ebaa68dec4811e212416665cf7c810fb2a37dbe56976759708bb10bd520 完全一致。仓库为私有，下载需要有权账号登录。最终 Web DEMO 也已重新构建成功，包含修正后的关于说明。
 
 此次交付没有连接真机：不能宣称验证了运营商实际余额、验证码登录、Launcher 固定/缩放/点击或通知投递。用户可以在 APP 连接两个号码后添加桌面卡片，查询仍由官方网页执行；必要时根据真机反馈继续适配。
+
+## 2026-09-30：广电官网有余额但首页失败
+
+老板反馈中国广电查询失败，补充官网能正常登录并显示余量，首页却查询失败。先定位本日志并复用已经下载的官方与 GitHub 参考；三角色分别复核协议/真实浏览器、解析门禁和 UI 状态，根代理集成桥接与发布。新的公开浏览器复核记录保存在 references/broadnet-public/failure-review/，没有账号或凭证。
+
+确认原因是官网存在两套不同 jQuery：window.jQuery 3.5.1 来自 WAF；真正业务库为 webpack module 0 导出的 3.6.0，noGlobal=true。原探针只监听全局库的 ajaxSuccess，因此业务查询解码成功也没有 officialDecoded 事件；首页又排除了所有 raw HTTP200 成功结果，最终超时。原 Node mock 只有一套 jQuery 且桥接立即可用，未覆盖这个实际差异。
+
+探针现于公开官网 polyfill 注册 webpackJsonp 后观察 vendor 自然注册的模块0 factory，原 this/参数/返回值保留，模块自然执行后才绑定其导出；不主动 require、不重复请求或再次调用官网 dataFilter。全局库兼容入口继续观察，以 WeakSet 为各实例去重。仅限定查询接口的结果在 bridge 尚未就绪时短暂缓存，条数8、每条2MiB上限，flutterInAppWebViewPlatformReady 后发送，页面销毁即释放。
+
+另补 response_policy.dart：只有解析器已验证成功码、流量字段和 KB 的 raw 明文成功才可回退；加密或未知结构不替换状态，已有成功结果不受晚到 raw 覆盖。解析器与 UI 没有改动，保持通用/定向/用途未知区分。
+
+官网公开页面结合 Playwright 本地 route 合成成功响应，复现原探针只有 raw；修复后 officialDecoded 恰好一条，业务 done/responseJSON 与原样本完全一致。正常桥接与请求结束才就绪的两种场景都通过。复用脚本 scripts/test-broadnet-browser.cjs 进入仓库，浏览器环境配置与范围写入根 README。Node 新增私有业务库、JSONP/factory保真、多实例去重、延迟就绪与有界队列验证；Flutter 28项完整测试和 analyze 全部通过。版本升为1.1.1+3，后续记录最终APK和Release核对。
+
+最终1.1.1/code3 APK 构建成功，89,479,493字节，SHA-256 4d59c8672653f4b05597a170423963574f3834f9a34d861239f18c80b5d6770f，v2签名通过，aapt2核对名称、版本与SDK/权限。仓库版浏览器脚本已再次运行普通与--delayed-bridge，均passed=true/decodedEvents=1。安装包不启用DEMO；真实账号仍需老板手机复测。新文件维护到根README/应用README/输出索引，旧v1.1.0说明保留为历史版本。

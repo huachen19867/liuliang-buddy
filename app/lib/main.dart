@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'data/models.dart';
 import 'data/parsers.dart';
 import 'services/page_probe.dart';
+import 'services/response_policy.dart';
 import 'services/widget_bridge.dart';
 import 'ui/dashboard_screen.dart';
 
@@ -384,11 +385,14 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
             httpStatus: status,
           );
     if (carrier == Carrier.broadnet &&
-        payload['stage'] != 'officialDecoded' &&
-        snapshot.status != QueryStatus.authExpired &&
-        !(status != null && (status < 200 || status >= 300))) {
-      // jQuery's decoded event can precede the raw XHR load event. The raw
-      // encrypted transport must not replace a successfully decoded balance.
+        !shouldApplyBroadnetResponse(
+          stage: payload['stage'] is String ? payload['stage'] as String : null,
+          parsedStatus: snapshot.status,
+          currentStatus: _snapshots[carrier]!.status,
+          httpStatus: status,
+        )) {
+      // Prefer the site's decoded event, but accept an independently verified
+      // plaintext raw success if that event was not observed.
       return;
     }
     if (!mounted) return;

@@ -65,3 +65,15 @@ README 要求登录微信小程序并通过抓包软件找到该请求，再复�
 仍未获得真实成功响应，也不能据公开脚本确定哪些套餐属于通用/定向、是否重叠。新证据足以补充 H5 字段解析和 701 失效判断，但不能宣称广电真机查询已验证。
 
 最终登录页实测暴露 `window.jQuery`，版本 3.5.1，而 `window.$` 为 undefined。应用探针补充了限定 `qryUserRes` 的 jQuery `ajaxSuccess` 观察器，从 `xhr.responseJSON` 获取已由官网转换的结果，以 `stage: officialDecoded` 传回，不调用官网 dataFilter，也不为结果虚构成功状态。官网公共业务脚本未发现禁用 jQuery 全局 Ajax 事件的设置；仍需成功登录后确认实际事件。Node VM 测试验证该观察器不替换或修改官方结果，以及原始 701 响应完整转发。
+
+## 广电失败复核：不同 jQuery 实例（2026-09-30）
+
+老板报告查询失败后，使用真实公开网页与本地拦截合成响应复核，证实上段的全局 jQuery 假设有缺陷：`window.jQuery` 3.5.1 不是官网业务实例，它没有业务 dataFilter/http；webpack module 0 的 jQuery 为 3.6.0，有 dataFilter 且 global=true。官网 `vendor-21074.js` 的模块0按 CommonJS `n(e,!0)` 导出，明确 noGlobal，不会把业务实例赋给 window。
+
+在原应用探针下，使用业务 jQuery 发出被本地 route 接管的合成成功请求，官网 done/responseJSON 正确产生顶层 respCode + intfResultBean，但桥接只收到 raw，完全没有 officialDecoded。根接收逻辑不会用 raw 成功体更新余额，因此形成查询超时。测试与输出位于 `references/broadnet-public/failure-review/`。这是可复现的代码缺陷，尚不能断言用户设备没有额外网络或会话问题。
+
+修复建议是在 document-start 观察同步 script load：polyfill 定义 webpackJsonp 后、vendor 注册模块0前，将注册函数做代理并保持原 this/参数/返回值；仅包装模块0 factory，在原factory自然执行结束后绑定 module.exports 的 ajaxSuccess。不主动重新发送请求、调用dataFilter或重建RSA。全局实例可以作为额外兼容，但必须支持多实例去重，不能绑定第一个全局实例后停止观察。官网当前加载顺序为 polyfill → vendor → common → 页面index，因此此方案具有源码依据，仍需浏览器验收。
+
+另一个独立风险是原send在flutter_inappwebview.callHandler不存在时直接丢弃响应。插件明确提供 flutterInAppWebViewPlatformReady 事件，探针应短暂缓存限定接口的响应并在就绪时发送，设条数/大小上限；不要把就绪丢包伪装成运营商失败。现有Node mock一开始就注入可用bridge且只有单一jQuery实例，未覆盖这两种真实环境差异，必须追加对应回归场景。
+
+根代理实现模块自然初始化观察与桥接缓存后，独立Chrome重跑同一公开网页合成响应：探针正确收到一次 officialDecoded，官网业务 done/responseJSON 的内容不变；随后发送的raw保留原包装。另在官网请求结束后才创建bridge并触发ready，缓存解码结果仍成功送达。两种浏览器复核均未使用用户账号，不能替代真机登录查询，但已验证所定位缺陷的修复路径。

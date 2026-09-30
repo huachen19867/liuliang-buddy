@@ -55,28 +55,46 @@ const responseCaptureScript = r'''
         url.pathname.includes('qryUserRes'));
     } catch (_) { return false; }
   };
+  const pendingMessages = [];
+  const deliver = payload => {
+    try {
+      const bridge = window.flutter_inappwebview;
+      if (!bridge || typeof bridge.callHandler !== 'function') return false;
+      Promise.resolve(bridge.callHandler('trafficResponse', payload)).catch(() => {});
+      return true;
+    } catch (_) { return false; }
+  };
+  const flush = () => {
+    while (pendingMessages.length && deliver(pendingMessages[0])) {
+      pendingMessages.shift();
+    }
+  };
+  window.addEventListener('flutterInAppWebViewPlatformReady', flush);
   const send = (url, body, status, stage = 'raw') => {
     try {
       if (!selected(url) || typeof body !== 'string' ||
           body.length > 2097152) return;
-      const bridge = window.flutter_inappwebview;
-      if (!bridge || typeof bridge.callHandler !== 'function') return;
-      Promise.resolve(bridge.callHandler('trafficResponse', {
-        url: new URL(url, location.href).href,
-        body, status, stage, pageUrl: location.href
-      })).catch(() => {});
+      const payload = {url: new URL(url, location.href).href,
+        body, status, stage, pageUrl: location.href};
+      flush();
+      if (!deliver(payload)) {
+        // Keep a small, bounded queue for document-start responses before the
+        // native WebView bridge exists. Nothing persists beyond this page.
+        while (pendingMessages.length >= 8) pendingMessages.shift();
+        pendingMessages.push(payload);
+      }
     } catch (_) {}
   };
-  // Observe jQuery's already-filtered JSON without invoking dataFilter again.
-  // The public site exposes window.jQuery (not window.$).
+  // The business site uses a private webpack jQuery instance. window.jQuery
+  // belongs to the WAF and never receives the business ajaxSuccess events.
+  // Observe the official decoded result without rerunning its dataFilter.
   if (location.origin === 'https://www.10099.com.cn') {
-    let attached = false;
+    const attached = new WeakSet();
+    const wrappedJsonp = new WeakSet();
     let attempts = 0;
-    let timer;
-    const attach = () => {
-      if (attached) return true;
-      const jq = window.jQuery;
+    const attach = jq => {
       if (typeof jq !== 'function' || !jq.fn || !jq.fn.on) return false;
+      if (attached.has(jq)) return true;
       try {
         jq(document).on('ajaxSuccess.liuliang', (event, xhr, settings, data) => {
           try {
@@ -86,20 +104,45 @@ const responseCaptureScript = r'''
             send(settings.url, JSON.stringify(value), xhr.status, 'officialDecoded');
           } catch (_) {}
         });
-        attached = true;
-        if (timer) clearInterval(timer);
-        document.removeEventListener('load', onScriptLoad, true);
+        attached.add(jq);
         return true;
       } catch (_) { return false; }
     };
+    const observeWebpack = () => {
+      const jsonp = window.webpackJsonp;
+      if (typeof jsonp !== 'function' || wrappedJsonp.has(jsonp)) return;
+      const observer = function(chunkIds, modules) {
+        // Official vendor-21074.js exports business jQuery as module 0.
+        // Wrap its factory only when the website registers it; do not force
+        // initialization or execute additional website requests.
+        const factory = modules && modules[0];
+        if (typeof factory === 'function') {
+          modules[0] = function(module) {
+            const result = factory.apply(this, arguments);
+            attach(module && module.exports);
+            return result;
+          };
+        }
+        return jsonp.apply(this, arguments);
+      };
+      wrappedJsonp.add(observer);
+      window.webpackJsonp = observer;
+    };
+    const discover = () => {
+      observeWebpack();
+      attach(window.jQuery);
+      attach(window.$);
+      flush();
+    };
     const onScriptLoad = event => {
-      if (event.target && event.target.tagName === 'SCRIPT') attach();
+      if (event.target && event.target.tagName === 'SCRIPT') discover();
     };
     document.addEventListener('load', onScriptLoad, true);
-    if (!attach()) timer = setInterval(() => {
-      if (attach() || ++attempts >= 100) {
+    discover();
+    const timer = setInterval(() => {
+      discover();
+      if (++attempts >= 100) {
         clearInterval(timer);
-        document.removeEventListener('load', onScriptLoad, true);
       }
     }, 100);
   }

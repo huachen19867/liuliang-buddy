@@ -14,3 +14,5 @@
 Git 直连在本机失败，前三个项目和广电扩展通过 GitHub codeload 下载并解压，源码保留上游目录名。zip 归档一并保留便于追溯。broadnet-query-page.html 为初次普通 HTTP 请求获得的 WAF 页面；可用业务页面与资源位于 broadnet-public/。
 
 android-widget 的文件与许可证已下载至本地，详细来源在该目录 README.md，实施结论在 docs/WIDGET_RESEARCH.md。GitHub 仓库保留本索引，参考源码不重复上传。
+
+广电失败复核记录位于 broadnet-public/failure-review/，使用新的公开官网加载与本地合成响应核对两套 jQuery 实例、原探针漏数及修复后桥接。可复用的验证脚本收录于 scripts/test-broadnet-browser.cjs；证据范围和复用方法见 docs/PROTOCOL_RESEARCH.md，不含真实账号或凭证。
