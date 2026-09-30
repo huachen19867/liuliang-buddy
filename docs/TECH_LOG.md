@@ -75,3 +75,9 @@ GitHub CLI 不自动使用 Windows 系统代理；直连超时会让 gh auth sta
 最终 1.1.0/code 2 APK 成功生成，89,496,179 字节，SHA-256 为 72a57ebaa68dec4811e212416665cf7c810fb2a37dbe56976759708bb10bd520。apksigner v2 验证通过，aapt2 已确认名称、版本、API24/36、权限与非导出 Widget receiver。插件附带其他 ABI 库，但 libflutter.so 仅为 arm64-v8a，所以交付明确限定 ARM64 手机。没有真机或实际运营商账号验证。
 
 已创建私有仓库 https://github.com/huachen19867/liuliang-app，并用 gh repo view 核对 owner 和 isPrivate=true。暂存范围为 299 个应用、测试、依赖许可、脚本及说明文件，排除工具、APK、缓存和原始参考源码；没有凭证文件。自有文件 git diff --check 通过；vendor 原样保留上游空格风格，未为消除 whitespace 提示改动依赖。源码 push 与 Release 上传结果将在完成后另记。
+
+### GitHub 上传完成
+
+main 源码提交 25f480697abbb11333e3991153d557b3e2cc35af 已推送，GitHub commits API 核对与本地一致。v1.1.0 标签指向同一提交，测试版 Release 已发布（draft=false、prerelease=true）：https://github.com/huachen19867/liuliang-app/releases/tag/v1.1.0 。APK asset 状态 uploaded、大小 89,496,179 字节；GitHub 返回的 SHA-256 digest 与本地 72a57ebaa68dec4811e212416665cf7c810fb2a37dbe56976759708bb10bd520 完全一致。仓库为私有，下载需要有权账号登录。最终 Web DEMO 也已重新构建成功，包含修正后的关于说明。
+
+此次交付没有连接真机：不能宣称验证了运营商实际余额、验证码登录、Launcher 固定/缩放/点击或通知投递。用户可以在 APP 连接两个号码后添加桌面卡片，查询仍由官方网页执行；必要时根据真机反馈继续适配。
