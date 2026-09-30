@@ -35,7 +35,10 @@ void main() {
       expect(mobile.keys, isNot(contains('phoneMasked')));
       expect((payload['broadnet'] as Map)['remainingBytes'], isNull);
       expect((payload['broadnet'] as Map)['status'], 'notConnected');
-      expect(payload['selectedCarriers'], ['mobile', 'broadnet']);
+      expect(
+        payload['selectedCarriers'],
+        Carrier.values.map((item) => item.name),
+      );
     },
   );
 
@@ -144,5 +147,70 @@ void main() {
     expect(payload['selectedCarriers'], isEmpty);
     expect((payload['mobile'] as Map)['remainingBytes'], isNull);
     expect((payload['mobile'] as Map)['queriedAt'], isNull);
+  });
+
+  test('all four selected carriers have separate display fields', () {
+    final selection = CarrierSelection.complete(Carrier.values);
+    final snapshots = [
+      for (final carrier in Carrier.values)
+        CarrierSnapshot(
+          carrier: carrier,
+          status: QueryStatus.success,
+          queriedAt: time,
+          phoneMasked: 'private',
+          buckets: const [
+            TrafficBucket(
+              name: '通用流量',
+              kind: BucketKind.general,
+              remainingBytes: 42,
+            ),
+          ],
+        ),
+    ];
+    final payload = buildWidgetPayload(
+      snapshots,
+      thresholdGb: 5,
+      selection: selection,
+    );
+    expect(
+      payload['selectedCarriers'],
+      Carrier.values.map((item) => item.name),
+    );
+    for (final carrier in Carrier.values) {
+      final card = payload[carrier.name] as Map<String, Object?>;
+      expect(card['status'], 'success');
+      expect(card['remainingBytes'], 42);
+      expect(card['queriedAt'], time.millisecondsSinceEpoch);
+      expect(card.keys, isNot(contains('phoneMasked')));
+    }
+  });
+
+  test('nonadjacent selection excludes other carriers from cache', () {
+    final payload = buildWidgetPayload(
+      [
+        for (final carrier in Carrier.values)
+          CarrierSnapshot(
+            carrier: carrier,
+            status: QueryStatus.success,
+            queriedAt: time,
+            buckets: const [
+              TrafficBucket(
+                name: '通用流量',
+                kind: BucketKind.general,
+                remainingBytes: 123,
+              ),
+            ],
+          ),
+      ],
+      thresholdGb: 5,
+      selection: CarrierSelection.complete([Carrier.broadnet, Carrier.telecom]),
+    );
+    expect(payload['selectedCarriers'], ['broadnet', 'telecom']);
+    for (final carrier in [Carrier.mobile, Carrier.unicom]) {
+      final card = payload[carrier.name] as Map<String, Object?>;
+      expect(card['status'], 'notConnected');
+      expect(card['remainingBytes'], isNull);
+      expect(card['queriedAt'], isNull);
+    }
   });
 }

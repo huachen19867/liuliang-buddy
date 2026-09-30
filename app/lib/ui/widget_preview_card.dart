@@ -10,7 +10,7 @@ class WidgetPreviewCard extends StatelessWidget {
   const WidgetPreviewCard({
     super.key,
     required this.widgetSupported,
-    this.selectedCarriers = const [Carrier.mobile, Carrier.broadnet],
+    this.selectedCarriers = Carrier.values,
     this.onAddWidget,
   });
 

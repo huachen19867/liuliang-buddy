@@ -53,3 +53,5 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 联通/电信研究新增 ChinaUnicomMonitor 与 FlowLite（未发现许可证）、ChinaTelecomMonitor（AGPL-3.0）。均只作为本地协议线索，没有复制代码或参考下载文件到发布范围；目前未实现联通/电信余额读取，详见 UNICOM_TELECOM_RESEARCH.md。
+
+1.3.0联通协议来自iservice公开查询页与commonBase脚本的字段/单位事实，电信DOM结构及单位来自当前天翼账号公开业务组件。不复制运营商JS、签名或加解密实现。dompling/Scriptable历史网页登录方案无LICENSE，仅为本地调研线索；更多历史参考及当前替代证据见UNICOM_TELECOM_RESEARCH.md，参考下载文件不进入发布范围。

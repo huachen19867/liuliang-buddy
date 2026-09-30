@@ -7,7 +7,7 @@ const source = fs.readFileSync(path.join(__dirname,
   '../../lib/services/page_probe.dart'), 'utf8');
 const script = source.match(/const responseCaptureScript = r'''([\s\S]*?)''';/)[1];
 
-function setup(origin, {subframe = false, brokenBridge = false, bridgeReady = true} = {}) {
+function setup(origin, {subframe = false, brokenBridge = false, bridgeReady = true, pathname = '/query.html'} = {}) {
   const messages = [];
   const calls = [];
   let lastPromise;
@@ -39,7 +39,7 @@ function setup(origin, {subframe = false, brokenBridge = false, bridgeReady = tr
     addEventListener(name, fn) { windowListeners.set(name, fn); },
     setInterval(fn) { const id = ++nextTimer; timers.set(id, fn); return id; },
     clearInterval(id) { timers.delete(id); },
-    location: {origin, href: origin + '/query.html'},
+    location: {origin, href: origin + pathname, pathname},
     flutter_inappwebview: {callHandler(name, payload) {
       if (brokenBridge) return Promise.reject(new Error('bridge failed'));
       messages.push({name, payload}); return Promise.resolve();
@@ -71,6 +71,18 @@ function setup(origin, {subframe = false, brokenBridge = false, bridgeReady = tr
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
 (async () => {
+  const unicom = setup('https://iservice.10010.com', {pathname:'/e5/index.html'});
+  await unicom.context.fetch('/e3/static/query/userinfoE5query?_=1');
+  await settle();
+  assert.equal(unicom.messages.length, 1);
+  for (const url of ['/e3/static/check/checklogin/', '/sendSms', '/e3/static/query/userinfoE5queryExtra',
+    'https://iservice.10010.com.evil.test/e3/static/query/userinfoE5query']) await unicom.context.fetch(url);
+  await settle();
+  assert.equal(unicom.messages.length, 1, 'Unicom only observes its official balance response');
+  const unicomLogin = setup('https://iservice.10010.com', {pathname:'/login.html'});
+  await unicomLogin.context.fetch('/e3/static/query/userinfoE5query');
+  await settle();
+  assert.equal(unicomLogin.messages.length, 0, 'Unicom unrelated pages do not forward personal data');
   const mobile = setup('https://wx.10086.cn');
   const options = {method: 'GET', credentials: 'include'};
   const pending = mobile.context.fetch('/website/getNewMarginInfo', options);

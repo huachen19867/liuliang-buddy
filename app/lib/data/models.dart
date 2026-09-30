@@ -1,15 +1,21 @@
 enum Carrier {
   mobile,
-  broadnet;
+  broadnet,
+  unicom,
+  telecom;
 
   String get label => switch (this) {
     Carrier.mobile => '中国移动',
     Carrier.broadnet => '中国广电',
+    Carrier.unicom => '中国联通',
+    Carrier.telecom => '中国电信',
   };
 
   String get loginUrl => switch (this) {
     Carrier.mobile => 'https://wx.10086.cn/website/spa/main/newHome',
     Carrier.broadnet => 'https://www.10099.com.cn/login.html',
+    Carrier.unicom => 'https://iservice.10010.com/',
+    Carrier.telecom => 'https://e.dlife.cn/portal/web/index.html#/login',
   };
 }
 
@@ -129,8 +135,7 @@ class CarrierSnapshot {
   factory CarrierSnapshot.fromJson(Map<String, dynamic> json) {
     final rawBuckets = json['buckets'];
     final carrierName = json['carrier'];
-    if (carrierName != Carrier.mobile.name &&
-        carrierName != Carrier.broadnet.name) {
+    if (!Carrier.values.any((carrier) => carrier.name == carrierName)) {
       throw const FormatException('Unknown carrier in saved snapshot');
     }
     return CarrierSnapshot(

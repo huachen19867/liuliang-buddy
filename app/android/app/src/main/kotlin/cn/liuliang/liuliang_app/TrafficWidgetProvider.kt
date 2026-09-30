@@ -31,13 +31,17 @@ data class WidgetCardPresentation(
 
 /** Missing key is an older two-card payload; an invalid present key shows no card. */
 object WidgetCarrierSelection {
+    val order = listOf("mobile", "broadnet", "unicom", "telecom")
+
     fun fromPayload(raw: Any?, keyPresent: Boolean): Set<String> {
         if (!keyPresent) return setOf("mobile", "broadnet")
         return (raw as? List<*>)
             ?.filterIsInstance<String>()
-            ?.filter { it == "mobile" || it == "broadnet" }
+            ?.filter { it in order }
             ?.toSet() ?: emptySet()
     }
+
+    fun displayOrder(selected: Set<String>): List<String> = order.filter { it in selected }
 }
 
 /** Pure display rules. A cached amount always carries its original query time. */
@@ -63,7 +67,8 @@ object WidgetPresentation {
             thresholdGb.isFinite() && thresholdGb >= 0.0 &&
             validAmount.toDouble() <= thresholdGb * GIB
         val knownStatus = card.status in setOf("notConnected", "loading", "success", "authExpired", "error")
-        val amount = if (knownStatus && validAmount != null) formatBytes(validAmount) else "—"
+        val rawAmount = if (knownStatus && validAmount != null) formatBytes(validAmount) else "—"
+        val amount = if (card.label == "套餐估算余量" && rawAmount != "—") "约 $rawAmount" else rawAmount
         val state = when (card.status) {
             "success" -> when {
                 validAmount == null -> "待确认"
@@ -77,7 +82,7 @@ object WidgetPresentation {
             else -> "未连接"
         }
         val label = if (card.label == "通用剩余" || card.label == "套餐余量" ||
-            card.label == "套餐明细合计" || card.label == "余额待确认" ||
+            card.label == "套餐明细合计" || card.label == "套餐估算余量" || card.label == "余额待确认" ||
             card.label == "套餐余量·用途待确认") card.label else "套餐余量·用途待确认"
         val time = validTime?.let {
             "上次查询 " + SimpleDateFormat("MM/dd HH:mm", Locale.CHINA).format(Date(it))
@@ -113,10 +118,10 @@ class TrafficWidgetProvider : AppWidgetProvider() {
                 clear()
                 putFloat("thresholdGb", threshold.toFloat())
                 putBoolean("selectionPresent", true)
-                putBoolean("mobileSelected", "mobile" in selected)
-                putBoolean("broadnetSelected", "broadnet" in selected)
-                if ("mobile" in selected) writeCard("mobile", parseCard(root["mobile"]))
-                if ("broadnet" in selected) writeCard("broadnet", parseCard(root["broadnet"]))
+                WidgetCarrierSelection.order.forEach { carrier ->
+                    putBoolean("${carrier}Selected", carrier in selected)
+                    if (carrier in selected) writeCard(carrier, parseCard(root[carrier]))
+                }
                 apply()
             }
         }
@@ -125,8 +130,6 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .clear()
                 .putBoolean("selectionPresent", true)
-                .putBoolean("mobileSelected", false)
-                .putBoolean("broadnetSelected", false)
                 .apply()
         }
 
@@ -170,14 +173,26 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             val threshold = prefs.getFloat("thresholdGb", DEFAULT_THRESHOLD_GB.toFloat()).toDouble()
             val now = System.currentTimeMillis()
             val hasSelection = prefs.getBoolean("selectionPresent", false)
-            val mobile = if (hasSelection) prefs.getBoolean("mobileSelected", false) else true
-            val broadnet = if (hasSelection) prefs.getBoolean("broadnetSelected", false) else true
-            views.setViewVisibility(R.id.mobile_card, if (mobile) View.VISIBLE else View.GONE)
-            views.setViewVisibility(R.id.broadnet_card, if (broadnet) View.VISIBLE else View.GONE)
-            views.setViewVisibility(R.id.card_divider, if (mobile && broadnet) View.VISIBLE else View.GONE)
-            views.setViewVisibility(R.id.widget_empty, if (!mobile && !broadnet) View.VISIBLE else View.GONE)
-            if (mobile) bindCard(views, readCard(context, "mobile"), threshold, now, true)
-            if (broadnet) bindCard(views, readCard(context, "broadnet"), threshold, now, false)
+            val selected = if (hasSelection) WidgetCarrierSelection.displayOrder(
+                WidgetCarrierSelection.order.filter { prefs.getBoolean("${it}Selected", false) }.toSet()
+            ) else listOf("mobile", "broadnet")
+            val slots = listOf(
+                intArrayOf(R.id.slot_1, R.id.slot_1_name, R.id.slot_1_state, R.id.slot_1_amount, R.id.slot_1_label, R.id.slot_1_time),
+                intArrayOf(R.id.slot_2, R.id.slot_2_name, R.id.slot_2_state, R.id.slot_2_amount, R.id.slot_2_label, R.id.slot_2_time),
+                intArrayOf(R.id.slot_3, R.id.slot_3_name, R.id.slot_3_state, R.id.slot_3_amount, R.id.slot_3_label, R.id.slot_3_time),
+                intArrayOf(R.id.slot_4, R.id.slot_4_name, R.id.slot_4_state, R.id.slot_4_amount, R.id.slot_4_label, R.id.slot_4_time),
+            )
+            slots.forEachIndexed { index, ids ->
+                val carrier = selected.getOrNull(index)
+                views.setViewVisibility(ids[0], if (carrier == null) View.GONE else View.VISIBLE)
+                if (carrier != null) bindCard(views, ids, carrier, readCard(context, carrier), threshold, now, selected.size >= 3)
+            }
+            views.setViewVisibility(R.id.top_row, if (selected.isEmpty()) View.GONE else View.VISIBLE)
+            views.setViewVisibility(R.id.top_divider, if (selected.size >= 2) View.VISIBLE else View.GONE)
+            views.setViewVisibility(R.id.bottom_row, if (selected.size >= 3) View.VISIBLE else View.GONE)
+            views.setViewVisibility(R.id.bottom_divider, if (selected.size >= 4) View.VISIBLE else View.GONE)
+            views.setViewVisibility(R.id.row_divider, if (selected.size >= 3) View.VISIBLE else View.GONE)
+            views.setViewVisibility(R.id.widget_empty, if (selected.isEmpty()) View.VISIBLE else View.GONE)
             val intent = Intent(context, MainActivity::class.java).apply {
                 action = "cn.liuliang.liuliang_app.OPEN_WIDGET"
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -191,20 +206,23 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             return views
         }
 
-        private fun bindCard(views: RemoteViews, card: WidgetCardData, threshold: Double, now: Long, mobile: Boolean) {
+        private fun bindCard(views: RemoteViews, ids: IntArray, carrier: String, card: WidgetCardData, threshold: Double, now: Long, compact: Boolean) {
             val display = WidgetPresentation.present(card, threshold, now)
-            val amountId = if (mobile) R.id.mobile_amount else R.id.broadnet_amount
-            val stateId = if (mobile) R.id.mobile_state else R.id.broadnet_state
-            val labelId = if (mobile) R.id.mobile_label else R.id.broadnet_label
-            val timeId = if (mobile) R.id.mobile_time else R.id.broadnet_time
-            views.setTextViewText(amountId, display.amount)
-            views.setTextViewText(stateId, display.state)
-            views.setTextViewText(labelId, display.label)
-            views.setTextViewText(timeId, display.time)
-            val normal = if (mobile) Color.rgb(51, 116, 188) else Color.rgb(201, 121, 115)
+            val (name, normal) = when (carrier) {
+                "mobile" -> "中国移动" to Color.rgb(51, 116, 188)
+                "broadnet" -> "中国广电" to Color.rgb(201, 121, 115)
+                "unicom" -> "中国联通" to Color.rgb(219, 94, 105)
+                else -> "中国电信" to Color.rgb(92, 113, 207)
+            }
+            views.setTextViewText(ids[1], name)
+            views.setTextViewText(ids[2], display.state)
+            views.setTextViewText(ids[3], display.amount)
+            views.setTextViewText(ids[4], display.label)
+            views.setTextViewText(ids[5], if (compact) display.time.removePrefix("上次查询 ") else display.time)
+            views.setTextColor(ids[1], normal)
             val warning = Color.rgb(184, 86, 74)
-            views.setTextColor(amountId, if (display.low) warning else normal)
-            views.setTextColor(stateId, if (display.low || display.stale || card.status == "error" || card.status == "authExpired") warning else Color.rgb(111, 127, 145))
+            views.setTextColor(ids[3], if (display.low) warning else normal)
+            views.setTextColor(ids[2], if (display.low || display.stale || card.status == "error" || card.status == "authExpired") warning else Color.rgb(111, 127, 145))
         }
     }
 }

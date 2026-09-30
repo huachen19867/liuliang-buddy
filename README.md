@@ -1,10 +1,12 @@
 # 流量小伙伴
 
-一个可自行选择运营商的安卓流量查询测试应用。首次使用选择至少一家，当前支持移动单卡、广电单卡或移动与广电组合；设置中可随时改选。联通、电信仍在协议研究阶段，暂不开放余额读取。首页采用奶油背景、圆润双色卡片与笑脸水滴，展示每张卡的剩余流量、查询时间、连接状态，以及通用和定向额度。号码验证由用户在运营商官方网页完成，成功会话尽量复用。
+一个可自行选择运营商的安卓流量查询测试应用。首次使用选择至少一家，现在可选择移动、联通、电信、广电，支持任意单家或多家组合；设置中可随时改选。每家目前只连接一个号码。联通读取官网套餐余量，电信按官网明细已用/总量显示值估算并标「约」，两者不混入已确认通用额度或提醒。首页采用奶油背景、圆润双色卡片与笑脸水滴，展示每张卡的剩余流量、查询时间、连接状态，以及通用和定向额度。号码验证由用户在运营商官方网页完成，成功会话尽量复用。
 
-当前版本 1.2.0+5，已公开发布：[GitHub 仓库](https://github.com/huachen19867/liuliang-buddy) · [安装包发布页](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.2.0)。原有私有仓库和历史发布保留。
+当前版本 1.3.0+6，已公开发布：[GitHub 仓库](https://github.com/huachen19867/liuliang-buddy) · [安装包发布页](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.3.0)。原有私有仓库和历史发布保留。
 
-已生成的安装包：artifacts/liuliang-buddy-debug.apk（约 108.6 MiB，Android 7.0 及以上 ARM64 手机）。APK 构建和 v2 签名检查通过，flutter analyze 无问题，54 项 Flutter 测试、7 项原生卡片测试及网页探针 Node 验证通过。广电监听修复还通过真实公开官网配合本地合成响应的 Chrome 验证；已收到用户真机双卡同步截图，官方余额对照与新版显示仍需实际手机核对。
+已生成的安装包：artifacts/liuliang-buddy-debug.apk（约 85.4 MiB，Android 7.0 及以上 ARM64 手机）。APK 构建和 v2 签名检查通过，flutter analyze 无问题，75 项 Flutter 测试、9 项应用原生卡片测试及网页探针 Node 验证通过。广电监听修复还通过真实公开官网配合本地合成响应的 Chrome 验证；已收到用户真机双卡同步截图，官方余额对照与新版显示仍需实际手机核对。
+
+联通依据公开官网 E5 查询页自然发出的 userinfoE5query 响应，套餐余量单位 MB；不限量已用字段不当成剩余。电信当前天翼账号首页返回加密账务结果，应用读取首页已渲染的指定账务明细（含隐藏的官网明细弹窗），不复制其加解密代码、不自动点击或发送登录请求。每项按已用/总量的 MB/GB 显示值换算后估算差值；缺项、无单位、超额或无限哨兵不算合计。它有官网显示值舍入误差，共享/重叠额度以套餐规则为准。
 
 当前为待真机验证的测试版：移动响应读取与解密已实现；广电官网的真实查询接口、业务字段和 KB 单位已从公开页面核对，使用官网自身解密后的结果。没有真实账号登录验证，不保证各省份或套餐均可读取。运营商没有在调研中提供可稳定依赖的公开余额 API，官网改版或会话失效会影响自动查询。
 
@@ -22,10 +24,12 @@
 | app/lib/data/carrier_selection.dart | 选择保存、旧版迁移及查询门禁 |
 | docs/ONBOARDING_DESIGN.md | 选择流程、旧版迁移与本地记录行为 |
 | docs/UNICOM_TELECOM_RESEARCH.md | 联通、电信入口及尚未接通的证据边界 |
-| app/lib/data/ | 数据模型及移动、广电响应解析 |
+| app/lib/data/ | 四家数据模型、移动/广电/联通响应解析与电信DOM估算 |
 | app/lib/data/traffic_summary.dart | 首页与桌面共享的通用余额/广电套餐明细摘要 |
 | app/lib/services/page_probe.dart | 限定接口的响应观察、移动解码与广电会话脚本 |
 | app/lib/services/response_policy.dart | 广电明文成功结果回退与迟到原始响应门禁 |
+| app/lib/services/carrier_web.dart | 四家登录/查询入口与响应页面门禁 |
+| app/lib/services/telecom_page_probe.dart | 当前电信官网已渲染套餐明细读取，不采集登录数据 |
 | app/lib/services/widget_bridge.dart | 桌面展示数据与原生通信 |
 | app/lib/ui/widget_preview_card.dart | 添加桌面卡片入口与样式示意 |
 | app/android/ | 安卓入口、权限、通知、自绘启动图标与原生桌面卡片 |
@@ -45,6 +49,12 @@
 | docs/WIDGET_RESEARCH.md | Android AppWidget 官方参考、支持范围与实施边界 |
 | docs/RELEASE_1.1.0.md | 版本说明、验证与安装包哈希 |
 | docs/RELEASE_1.1.1.md | 广电查询修复、验证与安装包哈希 |
+| docs/RELEASE_1.3.0.md | 四家选择、联通读取、电信估算和公开测试发布 |
+| scripts/test-telecom-rendered-browser.cjs | Chrome全本地合成官方结构DOM读取验证 |
+| artifacts/carrier-selection-four-demo.png | 四家运营商首次选择DEMO截图 |
+| artifacts/dashboard-unicom-broadnet-demo.png | 联通与广电组合DEMO截图 |
+| artifacts/dashboard-telecom-demo.png | 电信估算余量DEMO截图 |
+| artifacts/carrier-settings-four-demo.png | 四家运营商管理DEMO截图 |
 | docs/RELEASE_1.2.0.md | 首次选择、单卡适配与公开测试发布 |
 | artifacts/carrier-selection-demo.png | 首次运营商选择DEMO截图 |
 | artifacts/dashboard-single-demo.png | 移动单卡首页DEMO截图 |

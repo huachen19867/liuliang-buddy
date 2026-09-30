@@ -7,6 +7,9 @@ const mobileQueryUrl = 'https://wx.10086.cn/website/spa/main/newHome';
 const broadnetLoginUrl = 'https://www.10099.com.cn/login.html';
 const broadnetQueryUrl =
     'https://www.10099.com.cn/personal-center-number-order.html';
+const unicomQueryUrl = 'https://iservice.10010.com/e5/index.html';
+const unicomLoginUrl =
+    'https://uac.10010.com/portal/mallLogin.jsp?redirectURL=https://iservice.10010.com/e5/index.html';
 
 /// Decodes transport JSON only; the carrier parser validates business fields.
 Map<String, dynamic>? decodeMobileResponse(String raw) {
@@ -40,7 +43,8 @@ Map<String, dynamic>? decodeMobileResponse(String raw) {
 const responseCaptureScript = r'''
 (() => {
   'use strict';
-  const allowed = ['https://wx.10086.cn', 'https://www.10099.com.cn'];
+  const allowed = ['https://wx.10086.cn', 'https://www.10099.com.cn',
+    'https://iservice.10010.com'];
   if (window.top !== window || !allowed.includes(location.origin)) return;
   if (window.__liuliangResponseProbe) return;
   window.__liuliangResponseProbe = true;
@@ -52,7 +56,11 @@ const responseCaptureScript = r'''
         url.pathname.includes('getNewMarginInfo')) ||
         (location.origin === 'https://www.10099.com.cn' &&
         ['https://www.10099.com.cn', 'https://wx.10099.com.cn'].includes(url.origin) &&
-        url.pathname.includes('qryUserRes'));
+        url.pathname.includes('qryUserRes')) ||
+        (location.origin === 'https://iservice.10010.com' &&
+        ['/e5/index.html', '/e5/query.html'].includes(location.pathname) &&
+        url.origin === 'https://iservice.10010.com' &&
+        url.pathname === '/e3/static/query/userinfoE5query');
     } catch (_) { return false; }
   };
   const pendingMessages = [];

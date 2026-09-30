@@ -32,151 +32,292 @@
             android:textSize="10sp"
             android:maxLines="1" />
     </LinearLayout>
-
     <LinearLayout
-        android:id="@+id/widget_cards"
+        android:id="@+id/top_row"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:orientation="horizontal">
-
         <LinearLayout
-            android:id="@+id/mobile_card"
+            android:id="@+id/slot_1"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:padding="7dp"
-            android:background="@drawable/widget_mobile_card">
+            android:padding="6dp"
+            android:background="@drawable/widget_carrier_card">
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
                 <TextView
+                    android:id="@+id/slot_1_name"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="中国移动"
+                    android:text="运营商"
                     android:textColor="#386EAD"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
                     android:textStyle="bold"
                     android:maxLines="1" />
                 <TextView
-                    android:id="@+id/mobile_state"
+                    android:id="@+id/slot_1_state"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="未连接"
                     android:textColor="#6F7F91"
-                    android:textSize="9sp"
+                    android:textSize="8sp"
                     android:maxLines="1" />
             </LinearLayout>
             <TextView
-                android:id="@+id/mobile_amount"
+                android:id="@+id/slot_1_amount"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
                 android:gravity="center_vertical"
                 android:text="—"
                 android:textColor="#3374BC"
-                android:textSize="21sp"
+                android:textSize="18sp"
                 android:textStyle="bold"
                 android:singleLine="true"
                 android:ellipsize="end" />
             <TextView
-                android:id="@+id/mobile_label"
+                android:id="@+id/slot_1_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="通用剩余"
+                android:text="余额待确认"
                 android:textColor="#5C7190"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:maxLines="1"
                 android:ellipsize="end" />
             <TextView
-                android:id="@+id/mobile_time"
+                android:id="@+id/slot_1_time"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="尚无查询时间"
                 android:textColor="#77849A"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:maxLines="1" />
         </LinearLayout>
-
         <TextView
-            android:id="@+id/card_divider"
+            android:id="@+id/top_divider"
             android:layout_width="5dp"
             android:layout_height="match_parent"
-            android:text="" />
-
+            android:visibility="gone" />
         <LinearLayout
-            android:id="@+id/broadnet_card"
+            android:id="@+id/slot_2"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:padding="7dp"
-            android:background="@drawable/widget_broadnet_card">
+            android:padding="6dp"
+            android:background="@drawable/widget_carrier_card">
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
                 <TextView
+                    android:id="@+id/slot_2_name"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="中国广电"
-                    android:textColor="#BD6B6A"
-                    android:textSize="11sp"
+                    android:text="运营商"
+                    android:textColor="#386EAD"
+                    android:textSize="10sp"
                     android:textStyle="bold"
                     android:maxLines="1" />
                 <TextView
-                    android:id="@+id/broadnet_state"
+                    android:id="@+id/slot_2_state"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="未连接"
-                    android:textColor="#927A7A"
-                    android:textSize="9sp"
+                    android:textColor="#6F7F91"
+                    android:textSize="8sp"
                     android:maxLines="1" />
             </LinearLayout>
             <TextView
-                android:id="@+id/broadnet_amount"
+                android:id="@+id/slot_2_amount"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
                 android:gravity="center_vertical"
                 android:text="—"
-                android:textColor="#C97973"
-                android:textSize="21sp"
+                android:textColor="#3374BC"
+                android:textSize="18sp"
                 android:textStyle="bold"
                 android:singleLine="true"
                 android:ellipsize="end" />
             <TextView
-                android:id="@+id/broadnet_label"
+                android:id="@+id/slot_2_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="通用剩余"
-                android:textColor="#927574"
-                android:textSize="9sp"
+                android:text="余额待确认"
+                android:textColor="#5C7190"
+                android:textSize="8sp"
                 android:maxLines="1"
                 android:ellipsize="end" />
             <TextView
-                android:id="@+id/broadnet_time"
+                android:id="@+id/slot_2_time"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="尚无查询时间"
-                android:textColor="#A08A88"
-                android:textSize="9sp"
+                android:textColor="#77849A"
+                android:textSize="8sp"
+                android:maxLines="1" />
+        </LinearLayout>
+    </LinearLayout>
+    <TextView
+        android:id="@+id/row_divider"
+        android:layout_width="match_parent"
+        android:layout_height="5dp"
+        android:visibility="gone" />
+    <LinearLayout
+        android:id="@+id/bottom_row"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:visibility="gone">
+        <LinearLayout
+            android:id="@+id/slot_3"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:padding="6dp"
+            android:background="@drawable/widget_carrier_card">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:id="@+id/slot_3_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="运营商"
+                    android:textColor="#386EAD"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:maxLines="1" />
+                <TextView
+                    android:id="@+id/slot_3_state"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="未连接"
+                    android:textColor="#6F7F91"
+                    android:textSize="8sp"
+                    android:maxLines="1" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/slot_3_amount"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:text="—"
+                android:textColor="#3374BC"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:singleLine="true"
+                android:ellipsize="end" />
+            <TextView
+                android:id="@+id/slot_3_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="余额待确认"
+                android:textColor="#5C7190"
+                android:textSize="8sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+            <TextView
+                android:id="@+id/slot_3_time"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="尚无查询时间"
+                android:textColor="#77849A"
+                android:textSize="8sp"
                 android:maxLines="1" />
         </LinearLayout>
         <TextView
-            android:id="@+id/widget_empty"
-            android:layout_width="match_parent"
+            android:id="@+id/bottom_divider"
+            android:layout_width="5dp"
             android:layout_height="match_parent"
-            android:gravity="center"
-            android:text="先在应用里选择运营商"
-            android:textColor="#74819A"
-            android:textSize="12sp"
             android:visibility="gone" />
+        <LinearLayout
+            android:id="@+id/slot_4"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:padding="6dp"
+            android:background="@drawable/widget_carrier_card">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:id="@+id/slot_4_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="运营商"
+                    android:textColor="#386EAD"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:maxLines="1" />
+                <TextView
+                    android:id="@+id/slot_4_state"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="未连接"
+                    android:textColor="#6F7F91"
+                    android:textSize="8sp"
+                    android:maxLines="1" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/slot_4_amount"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:text="—"
+                android:textColor="#3374BC"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:singleLine="true"
+                android:ellipsize="end" />
+            <TextView
+                android:id="@+id/slot_4_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="余额待确认"
+                android:textColor="#5C7190"
+                android:textSize="8sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+            <TextView
+                android:id="@+id/slot_4_time"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="尚无查询时间"
+                android:textColor="#77849A"
+                android:textSize="8sp"
+                android:maxLines="1" />
+        </LinearLayout>
     </LinearLayout>
+    <TextView
+        android:id="@+id/widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="先在应用里选择运营商"
+        android:textColor="#74819A"
+        android:textSize="12sp"
+        android:visibility="gone" />
 </LinearLayout>

@@ -214,6 +214,101 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('联通单条已确认单位的unknown余额显示为套餐余量，不参与通用汇总', (tester) async {
+    _configureViewport(tester, const Size(390, 844));
+    await tester.pumpWidget(
+      _host(
+        snapshots: [_unicomDemoSnapshot()],
+        selectedCarriers: const {Carrier.unicom},
+        demo: true,
+        textScale: 1.0,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('中国联通'), findsWidgets);
+    expect(find.text('套餐余量'), findsOneWidget);
+    expect(find.text('18.0'), findsOneWidget);
+    expect(find.text('通用流量总览'), findsNothing);
+    expect(find.textContaining('提醒线'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('电信套餐显示官网舍入估算并明确不计入通用流量', (tester) async {
+    _configureViewport(tester, const Size(390, 844));
+    await tester.pumpWidget(
+      _host(
+        snapshots: [_telecomDemoSnapshot()],
+        selectedCarriers: const {Carrier.telecom},
+        demo: true,
+        textScale: 1.0,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('中国电信'), findsWidgets);
+    expect(find.text('套餐估算余量'), findsNWidgets(2));
+    expect(find.text('18.0'), findsNWidgets(2));
+    expect(find.text('约'), findsNWidgets(2));
+    expect(find.textContaining('舍入'), findsNWidgets(2));
+    expect(find.text('通用流量总览'), findsNothing);
+    expect(find.textContaining('提醒线'), findsNothing);
+    expect(find.text('约 18.0 GB'), findsOneWidget);
+    await tester.ensureVisible(find.text('约 18.0 GB'));
+    await tester.tap(find.text('约 18.0 GB'));
+    await tester.pumpAndSettle();
+    expect(find.text('剩余流量（估算）'), findsOneWidget);
+    expect(find.text('约 18.0 GB'), findsNWidgets(2));
+    expect(find.textContaining('舍入差异'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('电信部分套餐无法估算时仍标记可计算明细且弹窗保留估算说明', (tester) async {
+    _configureViewport(tester, const Size(390, 844));
+    await tester.pumpWidget(
+      _host(
+        snapshots: [_telecomPartialDemoSnapshot()],
+        selectedCarriers: const {Carrier.telecom},
+        demo: true,
+        textScale: 1.0,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('套餐估算余量'), findsNothing);
+    expect(find.text('余额待确认'), findsOneWidget);
+    expect(find.text('部分官网明细无法估算，暂不显示合计；请核对官方查询页'), findsOneWidget);
+    expect(find.text('约 18.0 GB'), findsOneWidget);
+    expect(find.text('剩余额无法确认（单位待确认）'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('约 18.0 GB'));
+    await tester.tap(find.text('约 18.0 GB'));
+    await tester.pumpAndSettle();
+    expect(find.text('剩余流量（估算）'), findsOneWidget);
+    expect(find.text('约 18.0 GB'), findsNWidgets(2));
+    expect(find.textContaining('舍入差异'), findsOneWidget);
+    expect(find.textContaining('不展示估算余额'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('四家组合在窄屏可滚动显示全部选中运营商', (tester) async {
+    _configureViewport(tester, const Size(320, 640));
+    await tester.pumpWidget(
+      _host(
+        snapshots: const [],
+        selectedCarriers: Carrier.values.toSet(),
+        demo: true,
+        textScale: 1.4,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    for (final carrier in Carrier.values) {
+      expect(find.text(carrier.label), findsWidgets);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('可以从首页进入运营商管理选择页', (tester) async {
     _configureViewport(tester, const Size(390, 844));
     var manageCalls = 0;
@@ -351,40 +446,30 @@ void main() {
   testWidgets('导出首次选择、单家、多家和设置页的真实组件DEMO截图', (tester) async {
     _configureViewport(tester, const Size(390, 1360));
 
+    final unicom = Carrier.values.byName('unicom');
+    final telecom = Carrier.values.byName('telecom');
     tester.view.physicalSize = const Size(390, 844);
     await tester.pumpWidget(
-      _selectionHost(
-        selected: {Carrier.mobile, Carrier.broadnet},
-        isInitialSetup: true,
-      ),
+      _selectionHost(selected: const {}, isInitialSetup: true),
     );
     await tester.pumpAndSettle();
     expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
     expect(find.text('先选好你的运营商'), findsOneWidget);
-    await _writeScreenshot(tester, 'carrier-selection-demo.png');
-
-    tester.view.physicalSize = const Size(390, 1100);
-    await tester.pumpWidget(
-      _host(
-        snapshots: _demoSnapshots(),
-        selectedCarriers: const {Carrier.mobile},
-        demo: true,
-        textScale: 1.0,
-        onAddWidget: () {},
-        onManageCarriers: () {},
-        previewBoundaryKey: _previewBoundaryKey,
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
-    expect(find.text('中国广电'), findsNothing);
-    await _writeScreenshot(tester, 'dashboard-single-demo.png');
+    for (final carrier in Carrier.values) {
+      expect(find.text(carrier.label), findsOneWidget);
+    }
+    expect(find.text('余额查询接入中'), findsNothing);
+    expect(find.text('0 家已选择'), findsOneWidget);
+    await _writeScreenshot(tester, 'carrier-selection-four-demo.png');
 
     tester.view.physicalSize = const Size(390, 1360);
     await tester.pumpWidget(
       _host(
-        snapshots: _demoSnapshots(),
-        selectedCarriers: const {Carrier.mobile, Carrier.broadnet},
+        snapshots: [
+          _unicomDemoSnapshot(),
+          _broadnetPackageSnapshot([30, 113]),
+        ],
+        selectedCarriers: {unicom, Carrier.broadnet},
         demo: true,
         textScale: 1.0,
         onAddWidget: () {},
@@ -394,18 +479,44 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
-    expect(find.text('中国移动'), findsWidgets);
+    expect(find.text('中国移动'), findsNothing);
+    expect(find.text('中国联通'), findsWidgets);
     expect(find.text('中国广电'), findsWidgets);
-    await _writeScreenshot(tester, 'dashboard-multiple-demo.png');
+    expect(find.text('通用流量总览'), findsNothing);
+    await _writeScreenshot(tester, 'dashboard-unicom-broadnet-demo.png');
+
+    tester.view.physicalSize = const Size(390, 1100);
+    await tester.pumpWidget(
+      _host(
+        snapshots: [_telecomDemoSnapshot()],
+        selectedCarriers: {telecom},
+        demo: true,
+        textScale: 1.0,
+        onAddWidget: () {},
+        onManageCarriers: () {},
+        previewBoundaryKey: _previewBoundaryKey,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
+    expect(find.text('中国电信'), findsWidgets);
+    expect(find.text('套餐估算余量'), findsNWidgets(2));
+    expect(find.text('约'), findsNWidgets(2));
+    expect(find.textContaining('舍入'), findsNWidgets(2));
+    expect(find.text('约 18.0 GB'), findsOneWidget);
+    await _writeScreenshot(tester, 'dashboard-telecom-demo.png');
 
     tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
     await tester.pumpWidget(
-      _selectionHost(selected: {Carrier.mobile}, isInitialSetup: false),
+      _selectionHost(selected: {unicom, telecom}, isInitialSetup: false),
     );
     await tester.pumpAndSettle();
     expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
     expect(find.text('管理运营商'), findsOneWidget);
-    await _writeScreenshot(tester, 'carrier-settings-demo.png');
+    expect(find.textContaining('余额查询接入中'), findsNothing);
+    await _writeScreenshot(tester, 'carrier-settings-four-demo.png');
     expect(tester.takeException(), isNull);
   });
 }
@@ -534,6 +645,63 @@ List<CarrierSnapshot> _demoSnapshots() => [
     ],
   ),
 ];
+
+CarrierSnapshot _unicomDemoSnapshot() => CarrierSnapshot(
+  carrier: Carrier.unicom,
+  status: QueryStatus.success,
+  queriedAt: DateTime(2026, 9, 30, 10, 20),
+  phoneMasked: '186****4321',
+  buckets: const [
+    TrafficBucket(
+      name: '官网套餐余量',
+      kind: BucketKind.unknown,
+      remainingBytes: 18 * _gib,
+      totalBytes: 26 * _gib,
+      rawUnit: 'MB',
+      rawRemaining: '18432',
+    ),
+  ],
+);
+
+CarrierSnapshot _telecomDemoSnapshot() => CarrierSnapshot(
+  carrier: Carrier.telecom,
+  status: QueryStatus.success,
+  queriedAt: DateTime(2026, 9, 30, 10, 20),
+  phoneMasked: '189****7612',
+  buckets: const [
+    TrafficBucket(
+      name: '国内流量套餐',
+      kind: BucketKind.unknown,
+      remainingBytes: 18 * _gib,
+      totalBytes: 26 * _gib,
+      rawUnit: 'MB',
+      rawRemaining: '18432.00',
+    ),
+  ],
+);
+
+CarrierSnapshot _telecomPartialDemoSnapshot() => CarrierSnapshot(
+  carrier: Carrier.telecom,
+  status: QueryStatus.success,
+  queriedAt: DateTime(2026, 9, 30, 10, 20),
+  phoneMasked: '189****7612',
+  message: '部分官网明细无法估算，暂不显示合计；请核对官方查询页',
+  buckets: const [
+    TrafficBucket(
+      name: '国内流量套餐',
+      kind: BucketKind.unknown,
+      remainingBytes: 18 * _gib,
+      totalBytes: 26 * _gib,
+      rawUnit: 'B',
+      rawRemaining: '19327352832',
+    ),
+    TrafficBucket(
+      name: '另一项套餐',
+      kind: BucketKind.unknown,
+      rawRemaining: '剩余额无法确认',
+    ),
+  ],
+);
 
 CarrierSnapshot _snapshot(
   Carrier carrier,

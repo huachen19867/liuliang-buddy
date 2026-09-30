@@ -14,6 +14,8 @@ import 'data/carrier_selection.dart';
 import 'ui/carrier_selection_screen.dart';
 import 'data/parsers.dart';
 import 'services/page_probe.dart';
+import 'services/carrier_web.dart';
+import 'services/telecom_page_probe.dart';
 import 'services/response_policy.dart';
 import 'services/widget_bridge.dart';
 import 'ui/dashboard_screen.dart';
@@ -151,13 +153,26 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           carrier: carrier,
           status: QueryStatus.success,
           queriedAt: DateTime.now(),
-          phoneMasked: carrier == Carrier.mobile
-              ? '138****2088'
-              : '192****6099',
+          phoneMasked: switch (carrier) {
+            Carrier.mobile => '138****2088',
+            Carrier.broadnet => '192****6099',
+            Carrier.unicom => '186****3056',
+            Carrier.telecom => '189****4066',
+          },
+          message: carrier == Carrier.telecom
+              ? '根据官网已用/总量显示值估算，有舍入误差（此处为演示）'
+              : null,
           buckets: [
             TrafficBucket(
-              name: '通用流量',
-              kind: BucketKind.general,
+              name: carrier == Carrier.unicom
+                  ? '官网套餐余量'
+                  : carrier == Carrier.telecom
+                  ? '国内流量（演示）'
+                  : '通用流量',
+              kind: carrier == Carrier.unicom || carrier == Carrier.telecom
+                  ? BucketKind.unknown
+                  : BucketKind.general,
+              rawUnit: 'GB',
               remainingBytes:
                   ((carrier == Carrier.mobile ? 23.6 : 4.8) * 1073741824)
                       .round(),
@@ -267,16 +282,13 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     }
   }
 
-  String _queryUrl(Carrier carrier) =>
-      carrier == Carrier.mobile ? mobileQueryUrl : broadnetQueryUrl;
+  String _queryUrl(Carrier carrier) => carrierQueryUrl(carrier);
+  String _loginUrl(Carrier carrier) => carrierLoginUrl(carrier);
 
   bool _allowedUrl(Carrier carrier, WebUri? url) {
     if (url == null) return false;
-    if (url.toString() == 'about:blank') return true;
     final uri = Uri.tryParse(url.toString());
-    final base = carrier == Carrier.mobile ? '10086.cn' : '10099.com.cn';
-    return uri?.scheme == 'https' &&
-        (uri!.host == base || uri.host.endsWith('.$base'));
+    return uri != null && isCarrierNavigationAllowed(carrier, uri);
   }
 
   void _connect(Carrier carrier) {
@@ -305,11 +317,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     if (controller != null) {
       unawaited(
         controller.loadUrl(
-          urlRequest: URLRequest(
-            url: WebUri(
-              carrier == Carrier.mobile ? mobileLoginUrl : broadnetLoginUrl,
-            ),
-          ),
+          urlRequest: URLRequest(url: WebUri(_loginUrl(carrier))),
         ),
       );
     }
@@ -376,22 +384,25 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     final payload = Map<String, dynamic>.from(args.first as Map);
     final url = Uri.tryParse(payload['url'] as String? ?? '');
     final page = Uri.tryParse(payload['pageUrl'] as String? ?? '');
-    final expected = carrier == Carrier.mobile
-        ? 'wx.10086.cn'
-        : 'www.10099.com.cn';
-    if (url?.scheme != 'https' ||
-        page?.scheme != 'https' ||
-        page?.host != expected) {
-      return;
-    }
-    if (carrier == Carrier.mobile &&
-        (url?.host != expected || !url!.path.contains('getNewMarginInfo'))) {
-      return;
-    }
-    if (carrier == Carrier.broadnet &&
-        (!(url?.host == expected || url?.host == 'wx.10099.com.cn') ||
-            !url!.path.contains('qryUserRes'))) {
-      return;
+    final stage = payload['stage'] is String
+        ? payload['stage'] as String
+        : null;
+    if (!isCarrierResponseAllowed(carrier, url, page, stage)) return;
+    if (carrier == Carrier.unicom || carrier == Carrier.telecom) {
+      // A queued event from a Home page must not revive a logged-out SPA.
+      final controller = _controllers[carrier];
+      if (controller == null) return;
+      try {
+        final currentUrl = await controller.getUrl();
+        if (!_current(generation) ||
+            !_selection.allows(carrier) ||
+            currentUrl == null ||
+            Uri.tryParse(currentUrl.toString()) != page) {
+          return;
+        }
+      } on Exception {
+        return;
+      }
     }
     final raw = payload['body'];
     if (raw is! String || raw.length > 2000000) return;
@@ -408,13 +419,27 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     }
     if (decoded == null) return;
     final status = payload['status'] is int ? payload['status'] as int : null;
-    final snapshot = carrier == Carrier.mobile
-        ? parseMobile(decoded, queriedAt: DateTime.now(), httpStatus: status)
-        : parseBroadnetH5(
-            decoded,
-            queriedAt: DateTime.now(),
-            httpStatus: status,
-          );
+    final snapshot = switch (carrier) {
+      Carrier.mobile => parseMobile(
+        decoded,
+        queriedAt: DateTime.now(),
+        httpStatus: status,
+      ),
+      Carrier.broadnet => parseBroadnetH5(
+        decoded,
+        queriedAt: DateTime.now(),
+        httpStatus: status,
+      ),
+      Carrier.unicom => parseUnicomWeb(
+        decoded,
+        queriedAt: DateTime.now(),
+        httpStatus: status,
+      ),
+      Carrier.telecom => parseTelecomRendered(
+        decoded,
+        queriedAt: DateTime.now(),
+      ),
+    };
     if (carrier == Carrier.broadnet &&
         !shouldApplyBroadnetResponse(
           stage: payload['stage'] is String ? payload['stage'] as String : null,
@@ -552,7 +577,13 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
             Expanded(
               child: InAppWebView(
                 key: ValueKey('${carrier.name}_$_generation'),
-                initialUrlRequest: URLRequest(url: WebUri(_queryUrl(carrier))),
+                initialUrlRequest: URLRequest(
+                  url: WebUri(
+                    _snapshots[carrier]!.status == QueryStatus.notConnected
+                        ? _loginUrl(carrier)
+                        : _queryUrl(carrier),
+                  ),
+                ),
                 initialSettings: InAppWebViewSettings(
                   javaScriptEnabled: true,
                   useShouldOverrideUrlLoading: true,
@@ -565,6 +596,11 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                     source: responseCaptureScript,
                     injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
                   ),
+                  if (carrier == Carrier.telecom)
+                    UserScript(
+                      source: telecomRenderedCaptureScript,
+                      injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+                    ),
                   if (carrier == Carrier.broadnet)
                     UserScript(
                       groupName: 'broadnetRestore',
@@ -580,18 +616,35 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                     callback: (args) => _receive(carrier, args, generation),
                   );
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (_current(generation)) _refresh(carrier);
+                    if (_current(generation) &&
+                        _snapshots[carrier]!.status !=
+                            QueryStatus.notConnected) {
+                      _refresh(carrier);
+                    }
                   });
                 },
                 shouldOverrideUrlLoading: (controller, action) async =>
                     _allowedUrl(carrier, action.request.url)
                     ? NavigationActionPolicy.ALLOW
                     : NavigationActionPolicy.CANCEL,
+                onUpdateVisitedHistory: (controller, url, isReload) {
+                  if (!_current(generation) || url == null) return;
+                  final uri = Uri.tryParse(url.toString());
+                  if (uri != null && isCarrierLoginPage(uri)) {
+                    _timeouts[carrier]?.cancel();
+                    setState(
+                      () => _snapshots[carrier] = _snapshots[carrier]!.copyWith(
+                        status: QueryStatus.authExpired,
+                        message: '请在官方页面验证号码，完成后查询流量',
+                      ),
+                    );
+                    unawaited(_publishWidget());
+                  }
+                },
                 onLoadStop: (controller, url) async {
                   if (!_current(generation)) return;
                   if (url != null &&
-                      (url.path.contains('login') ||
-                          url.path.contains('bindAccount'))) {
+                      isCarrierLoginPage(Uri.parse(url.toString()))) {
                     if (carrier == Carrier.broadnet) {
                       _broadnetSession = null;
                       await controller.removeUserScriptsByGroupName(
@@ -931,7 +984,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               widgetSupported: _android && !demoMode,
               onAbout: () => _showInfo(
                 '流量小伙伴 · 测试版',
-                '数据来自您在官方网页验证后的查询结果，通用、定向和用途未知的流量分开展示。\n\n两家运营商已实现官网查询结果读取；真实号码登录和余额准确性仍需手机验证，无法识别时请在官方查询页查看。\n\n会话保存在手机本地，广电会话备份使用系统安全存储；不上传第三方服务器，不读取短信或服务密码。桌面卡片显示上次查询的余额和时间，点击打开 APP 更新；APP 关闭后不会持续查询。',
+                '可选择移动、联通、电信、广电，至少一家。数据来自您登录官方网页后的查询结果，通用、定向和用途未知的流量分开展示。\n\n联通展示官网套餐余量；电信按官网已用量和总量的舍入显示值估算，主位标「约」，均不当作已确认通用额度或触发提醒。真实号码登录和余额准确性仍需手机验证，无法识别时请在官方查询页查看。\n\n会话保存在手机本地，广电会话备份使用系统安全存储；不上传第三方服务器，不读取短信或服务密码。桌面卡片显示上次查询的余额和时间，点击打开 APP 更新；APP 关闭后不会持续查询。',
               ),
               demo: demoMode,
             ),

@@ -1,5 +1,143 @@
 import 'models.dart';
 
+/// Billing DOM contains rounded used/total strings. Their difference is an
+/// estimate, not an exact network response or a verified general allowance.
+CarrierSnapshot parseTelecomRendered(
+  Map<String, dynamic> response, {
+  DateTime? queriedAt,
+}) {
+  CarrierSnapshot fail() => const CarrierSnapshot(
+    carrier: Carrier.telecom,
+    status: QueryStatus.error,
+    message: '电信官网明细或单位尚无法确认，请打开官方查询页查看',
+  );
+  final rows = response['rows'];
+  if (response['source'] != 'officialRendered' ||
+      rows is! List ||
+      rows.isEmpty ||
+      rows.length > 200) {
+    return fail();
+  }
+  int? displayedBytes(Object? value) {
+    if (value is! String || value.length > 60) return null;
+    final match = RegExp(
+      r'^(\d+(?:\.\d+)?)\s*(GB|MB|KB|B)$',
+      caseSensitive: false,
+    ).firstMatch(value.trim());
+    if (match == null) return null;
+    final amount = num.tryParse(match.group(1)!);
+    // Huge sentinel/unlimited values must not be treated as finite balances.
+    if (amount == null || !amount.isFinite || amount > 1000000000) return null;
+    final bytes = _toBytes(match.group(1), match.group(2));
+    return bytes != null && bytes <= 1099511627776 ? bytes : null;
+  }
+
+  final buckets = <TrafficBucket>[];
+  for (final row in rows) {
+    if (row is! Map) return fail();
+    final name = row['name'] is String ? (row['name'] as String).trim() : '';
+    final used = displayedBytes(row['used']);
+    final total = displayedBytes(row['total']);
+    final valid =
+        name.isNotEmpty &&
+        used != null &&
+        total != null &&
+        total > 0 &&
+        used <= total;
+    buckets.add(
+      TrafficBucket(
+        name: name,
+        kind: BucketKind.unknown,
+        remainingBytes: valid ? total - used : null,
+        totalBytes: valid ? total : null,
+        rawRemaining: valid ? '${total - used}' : '剩余额无法确认',
+        rawUnit: valid ? 'B' : null,
+      ),
+    );
+  }
+  if (buckets.every((bucket) => bucket.remainingBytes == null)) return fail();
+  return CarrierSnapshot(
+    carrier: Carrier.telecom,
+    status: QueryStatus.success,
+    queriedAt: queriedAt ?? DateTime.now(),
+    buckets: buckets,
+    message: buckets.any((bucket) => bucket.remainingBytes == null)
+        ? '部分官网明细无法估算，暂不显示合计；请核对官方查询页'
+        : '根据官网已用量和总量的显示值估算，存在舍入误差，套餐适用范围以官网为准',
+  );
+}
+
+/// Official iservice E5 resource summary; commonsFormat.getFlow takes MB.
+/// This is a package summary, not evidence that every byte is general-purpose.
+CarrierSnapshot parseUnicomWeb(
+  Map<String, dynamic> response, {
+  DateTime? queriedAt,
+  int? httpStatus,
+}) {
+  CarrierSnapshot fail(QueryStatus status, String message) => CarrierSnapshot(
+    carrier: Carrier.unicom,
+    status: status,
+    message: message,
+  );
+  if (httpStatus == 401 || httpStatus == 403 || _isAuthFailure(response)) {
+    return fail(QueryStatus.authExpired, '中国联通登录已失效，请在官网重新验证');
+  }
+  if (httpStatus != null && (httpStatus < 200 || httpStatus >= 300)) {
+    return fail(QueryStatus.error, '中国联通查询失败（HTTP $httpStatus）');
+  }
+  final resource = _map(response['resource']);
+  if (resource == null ||
+      resource['successFlow'] == false ||
+      resource['successFlow'] == 'false') {
+    return fail(QueryStatus.error, '联通官网未返回可确认的流量余量');
+  }
+  final unlimited = resource['hasNolimitedFlow'];
+  // The official page checks JavaScript truthiness, including string flags.
+  if (unlimited != null &&
+      unlimited != false &&
+      unlimited != 0 &&
+      unlimited != '') {
+    return fail(QueryStatus.error, '官网按不限量套餐展示已用流量，剩余量请在官方页面确认');
+  }
+  if (resource['flowFlag'] != true &&
+      resource['flowFlag'] != 1 &&
+      resource['flowFlag'] != '1' &&
+      resource['flowFlag'] != 'true') {
+    return fail(QueryStatus.error, '联通官网没有可确认的流量额度，请查看官方查询页');
+  }
+  final over = num.tryParse(resource['overFlow']?.toString() ?? '');
+  final remaining = resource['remainFlow'];
+  final amount = num.tryParse(remaining?.toString() ?? '');
+  if (over != null && (!over.isFinite || over < 0)) {
+    return fail(QueryStatus.error, '联通官网超额字段无法确认');
+  }
+  final exhausted = over != null && over > 0;
+  if (!exhausted &&
+      (amount == null ||
+          !amount.isFinite ||
+          amount < 0 ||
+          amount > 1000000000)) {
+    return fail(QueryStatus.error, '联通官网剩余额无法确认');
+  }
+  final bytes = exhausted ? 0 : _toBytes(remaining, 'MB');
+  if (bytes == null) return fail(QueryStatus.error, '联通官网剩余额格式无法确认');
+  return CarrierSnapshot(
+    carrier: Carrier.unicom,
+    status: QueryStatus.success,
+    queriedAt: queriedAt ?? DateTime.now(),
+    buckets: [
+      TrafficBucket(
+        name: '官网套餐余量',
+        kind: BucketKind.unknown,
+        remainingBytes: bytes,
+        rawRemaining: exhausted ? '0' : remaining.toString(),
+        rawUnit: 'MB',
+      ),
+    ],
+    message: exhausted ? '官网显示流量已超出套餐额度，适用规则请查看官网' : '官网套餐余量，用途以套餐规则为准',
+  );
+}
+
 /// Parses a decoded getNewMarginInfo response from wx.10086.cn.
 /// The caller must verify the response URL and decrypt it before calling this.
 CarrierSnapshot parseMobile(

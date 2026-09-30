@@ -20,3 +20,7 @@ android-widget 的文件与许可证已下载至本地，详细来源在该目�
 新增联通/电信精选参考：`ChinaUnicomMonitor/` 来源 https://github.com/dengfhqqq/ChinaUnicomMonitor （未发现LICENSE）；`FlowLite/` 来源 https://github.com/nongchengqi/FlowLite （未发现LICENSE）；`ChinaTelecomMonitor/` 来源 https://github.com/Cp0204/ChinaTelecomMonitor （AGPL-3.0，附LICENSE）。仅协议研究，不复制到应用，这些项目依赖APP认证，不能作为网页登录已接通的依据。
 
 `carrier-web-research.cjs` 与 `carrier-web-entries.json` 为本机Chrome公开入口检查工具及无账号结果。结论见 `docs/UNICOM_TELECOM_RESEARCH.md`。
+
+深入官网记录位于carrier-public-deep/和telecom-public-deep/，每个index.json保留原URL与HTTP状态。联通已取得userinfoE5query请求、resource.remainFlow字段、MB单位与登录门禁原文；电信省分/全国页面仍在正常执行防护后返回空白。ahBot/精选文件来自https://github.com/WM9116/ahBot，未发现LICENSE，仅小程序线索研究。工具为carrier-web-deep.cjs，未输入账号或发送短信。
+
+电信新官网Account结构的可复用浏览器验收脚本为 scripts/test-telecom-rendered-browser.cjs，全部网页请求本地拦截，结果 artifacts/telecom-rendered-browser.json。它验证探针与已归档公开DOM结构，不验证真实账号，也不调用电信余额接口。

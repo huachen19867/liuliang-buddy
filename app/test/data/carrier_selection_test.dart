@@ -11,7 +11,10 @@ void main() {
       Carrier.mobile,
     ]);
     expect(selected.setupCompleted, isTrue);
-    expect(selected.selectedCarriers.toList(), Carrier.values);
+    expect(selected.selectedCarriers.toList(), [
+      Carrier.mobile,
+      Carrier.broadnet,
+    ]);
   });
 
   test('selection persists names and rejects unknown or future versions', () {
@@ -58,6 +61,38 @@ void main() {
     expect(unused.selectedCarriers, isEmpty);
   });
 
+  test('four-carrier selections persist without enabling hidden carriers', () {
+    for (final carriers in [
+      [Carrier.unicom, Carrier.broadnet],
+      [Carrier.telecom],
+      Carrier.values,
+    ]) {
+      final saved = CarrierSelection.complete(carriers).toStorageString();
+      final restored = CarrierSelection.restore(
+        savedJson: saved,
+        legacyPreferences: {'connected_mobile': true},
+      );
+      expect(restored.selectedCarriers, carriers.toSet());
+      for (final carrier in Carrier.values) {
+        expect(restored.allows(carrier), carriers.contains(carrier));
+      }
+    }
+  });
+
+  test('legacy flags migrate any combination of four carriers', () {
+    final restored = CarrierSelection.restore(
+      savedJson: null,
+      legacyPreferences: {
+        'connected_mobile': false,
+        'connected_broadnet': true,
+        'connected_unicom': true,
+        'connected_telecom': false,
+      },
+    );
+    expect(restored.selectedCarriers, {Carrier.broadnet, Carrier.unicom});
+    expect(restored.toJson()['selectedCarriers'], ['broadnet', 'unicom']);
+  });
+
   test(
     'hidden carriers cannot enter query or visible snapshot projections',
     () {
@@ -96,4 +131,23 @@ void main() {
       );
     },
   );
+
+  test('nonadjacent four-carrier projection keeps only selected snapshots', () {
+    final selected = CarrierSelection.complete([
+      Carrier.broadnet,
+      Carrier.telecom,
+    ]);
+    final snapshots = [
+      for (final carrier in Carrier.values)
+        CarrierSnapshot(carrier: carrier, status: QueryStatus.success),
+    ];
+    expect(selected.visibleSnapshots(snapshots).map((item) => item.carrier), [
+      Carrier.broadnet,
+      Carrier.telecom,
+    ]);
+    expect(selected.queryableCarriers(Carrier.values), [
+      Carrier.broadnet,
+      Carrier.telecom,
+    ]);
+  });
 }

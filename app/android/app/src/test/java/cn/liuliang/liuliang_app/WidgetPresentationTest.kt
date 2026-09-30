@@ -89,6 +89,20 @@ class WidgetPresentationTest {
         assertFalse(display.low)
     }
 
+    @Test fun telecomEstimateKeepsApproximationAndOriginalTimeWithoutLowWarning() {
+        val originalTime = now - 25L * 60L * 60L * 1000L
+        val display = WidgetPresentation.present(
+            WidgetCardData("success", gib, "套餐估算余量", originalTime),
+            5.0, now,
+        )
+        assertEquals("约 1.00 GB", display.amount)
+        assertEquals("套餐估算余量", display.label)
+        assertEquals("已过期", display.state)
+        assertTrue(display.time.startsWith("上次查询 "))
+        assertTrue(display.stale)
+        assertFalse(display.low)
+    }
+
     @Test fun carrierWhitelistSupportsLegacySingleAndEmptyLayouts() {
         assertEquals(
             setOf("mobile", "broadnet"),
@@ -100,5 +114,24 @@ class WidgetPresentationTest {
         )
         assertEquals(emptySet<String>(), WidgetCarrierSelection.fromPayload(emptyList<String>(), true))
         assertEquals(emptySet<String>(), WidgetCarrierSelection.fromPayload("mobile", true))
+        assertEquals(
+            setOf("mobile", "broadnet", "unicom", "telecom"),
+            WidgetCarrierSelection.fromPayload(listOf("telecom", "unicom", "broadnet", "mobile"), true),
+        )
+        assertEquals(
+            listOf("broadnet", "telecom"),
+            WidgetCarrierSelection.displayOrder(setOf("telecom", "broadnet")),
+        )
+    }
+
+    @Test fun allCarrierCombinationsOccupyConsecutiveSlots() {
+        val carriers = WidgetCarrierSelection.order
+        for (mask in 1 until (1 shl carriers.size)) {
+            val selected = carriers.filterIndexed { index, _ -> mask and (1 shl index) != 0 }.toSet()
+            val displayed = WidgetCarrierSelection.displayOrder(selected)
+            assertEquals(selected.size, displayed.size)
+            assertEquals(selected, displayed.toSet())
+            assertEquals(carriers.filter { it in selected }, displayed)
+        }
     }
 }

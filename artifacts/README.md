@@ -19,3 +19,13 @@ APK SHA-256：711c032453868810d57d5319883b657907d95ac1cc8fe63b86ca0a7151b90954�
 carrier-selection-demo.png、dashboard-single-demo.png、dashboard-multiple-demo.png、carrier-settings-demo.png 分别为首次选择、移动单卡、移动/广电组合和运营商设置。来自真实Flutter组件渲染，明确标注DEMO，不含用户账号或真机图片。
 
 当前APK更新为1.2.0+5，113,901,232字节，SHA-256：fba83e5088d1fcd6143364a483d605542c5d99e39ccb11544b2f273082e97f8b，v2签名通过，API24/36、ARM64、Android Debug。历史1.1.2记录见上文，已公开发布 https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.2.0 。
+
+## 四运营商 UI 预览
+
+carrier-selection-four-demo.png 展示移动、广电、联通、电信的首次选择页；dashboard-unicom-broadnet-demo.png 展示联通套餐余量与广电套餐明细合计；dashboard-telecom-demo.png 展示电信官网已用/总量显示值估算，并在数值前标“约”、注明舍入误差；carrier-settings-four-demo.png 展示四家运营商设置页。截图由 Flutter 实际 UI 组件和测试样本生成，顶部标有“界面演示 · 非真实流量”，其中号码与余量不代表真实账号或查询准确性。
+
+telecom-rendered-browser.json：scripts/test-telecom-rendered-browser.cjs生成的真实Chrome/全本地合成网页探针验收结果。passed=true，未验证真实账号；覆盖限定DOM、隐藏模态、混合单位、畸形行、登录路由和桥接时序。
+
+## 1.3.0 当前安装包
+
+liuliang-buddy-debug.apk已更新为1.3.0+6，89,530,031字节（约85.4MiB），API24/36、ARM64、Android Debug签名v2通过，未启用DEMO。SHA-256：f0c550a930cc249047479a6539dded713cfa5c90c82146bc7606d2a91d689781。公开下载 https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.3.0 。75项Flutter、9项应用原生JUnit、analyze、Node和Chrome合成DOM验证通过，尚未实测联通/电信账号或Launcher。

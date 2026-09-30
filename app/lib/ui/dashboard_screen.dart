@@ -291,6 +291,15 @@ class _SummaryCard extends StatelessWidget {
         ? null
         : summarizeTraffic(single!.snapshot!);
     final hasSinglePackageTotal = singleSummary?.label == '套餐明细合计';
+    final hasSingleEstimate = singleSummary?.isEstimate == true;
+    final hasSingleBalance = hasSinglePackageTotal || hasSingleEstimate;
+    final singleMessage = single?.snapshot?.message?.trim();
+    final singleStatusMessage =
+        single != null &&
+            single.snapshot?.status != QueryStatus.success &&
+            (singleMessage?.isNotEmpty ?? false)
+        ? singleMessage
+        : null;
     final hasRecords = entries.any(
       (entry) =>
           entry.snapshot?.queriedAt != null &&
@@ -301,13 +310,13 @@ class _SummaryCard extends StatelessWidget {
             0,
             (sum, entry) => sum + entry.snapshot!.generalRemainingBytes!,
           )
-        : hasSinglePackageTotal
+        : hasSingleBalance
         ? singleSummary!.remainingBytes
         : 0;
-    final showAmount = hasGeneralTotal || hasSinglePackageTotal;
+    final showAmount = hasGeneralTotal || hasSingleBalance;
     final headline = hasGeneralTotal
         ? '通用流量总览'
-        : hasSinglePackageTotal
+        : hasSingleBalance
         ? singleSummary!.label
         : entries.isEmpty
         ? '尚未选择运营商'
@@ -318,13 +327,14 @@ class _SummaryCard extends StatelessWidget {
         ? entries.length == 1
               ? '${entries.single.carrier.label}的通用流量剩余'
               : '所选运营商的通用流量剩余合计'
-        : hasSinglePackageTotal
-        ? '仅将已查询套餐的余额相加'
-        : entries.isEmpty
-        ? '选择至少一家运营商后，这里会显示对应流量。'
-        : hasRecords
-        ? '余额见下方，完整的通用流量合计待确认。'
-        : '连接已选择的运营商账号后，流量会显示在这里。';
+        : hasSingleBalance
+        ? singleSummary!.detailNotice ?? '已查询套餐余额'
+        : singleStatusMessage ??
+              (entries.isEmpty
+                  ? '选择至少一家运营商后，这里会显示对应流量。'
+                  : hasRecords
+                  ? '余额见下方，完整的通用流量合计待确认。'
+                  : '连接已选择的运营商账号后，流量会显示在这里。');
     final theme = Theme.of(context);
 
     return Container(
@@ -378,6 +388,18 @@ class _SummaryCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
+                      if (hasSingleEstimate)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 5, bottom: 4),
+                          child: Text(
+                            '约',
+                            style: TextStyle(
+                              color: Color(0xFF71645D),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
                       Text(
                         _formatGb(bytes),
                         style: theme.textTheme.displaySmall?.copyWith(
@@ -528,9 +550,38 @@ class _CarrierCard extends StatelessWidget {
     final trafficSummary = snapshot == null
         ? null
         : summarizeTraffic(snapshot!);
-    final remainingBytes = trafficSummary?.remainingBytes;
-    final totalBytes = trafficSummary?.totalBytes;
-    final detailNotice = trafficSummary?.detailNotice;
+    final singleUnknownBucket = snapshot?.buckets.length == 1
+        ? snapshot!.buckets.single
+        : null;
+    final canShowUnknownBucket =
+        carrier != Carrier.mobile &&
+        singleUnknownBucket?.kind == BucketKind.unknown &&
+        singleUnknownBucket?.remainingBytes != null &&
+        (singleUnknownBucket?.rawUnit?.trim().isNotEmpty ?? false);
+    final remainingBytes =
+        trafficSummary?.remainingBytes ??
+        (canShowUnknownBucket ? singleUnknownBucket!.remainingBytes : null);
+    final totalBytes =
+        trafficSummary?.totalBytes ??
+        (canShowUnknownBucket ? singleUnknownBucket!.totalBytes : null);
+    final remainingLabel =
+        trafficSummary?.label ??
+        (canShowUnknownBucket
+            ? '套餐余量'
+            : status == QueryStatus.success
+            ? '余额待确认'
+            : '流量余量');
+    final partialEstimateNotice =
+        status == QueryStatus.success &&
+            carrier == Carrier.telecom &&
+            trafficSummary == null
+        ? snapshot?.message?.trim()
+        : null;
+    final detailNotice =
+        trafficSummary?.detailNotice ??
+        ((partialEstimateNotice?.isNotEmpty ?? false)
+            ? partialEstimateNotice
+            : null);
     final isBusy = status == QueryStatus.loading;
     final theme = Theme.of(context);
 
@@ -560,7 +611,11 @@ class _CarrierCard extends StatelessWidget {
                   color: accent.withValues(alpha: .12),
                   borderRadius: BorderRadius.circular(15),
                 ),
-                child: Icon(Icons.sim_card_rounded, color: accent, size: 24),
+                child: Icon(
+                  Icons.signal_cellular_alt_rounded,
+                  color: accent,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 11),
               Expanded(
@@ -617,11 +672,7 @@ class _CarrierCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            trafficSummary?.label ??
-                                (carrier == Carrier.broadnet &&
-                                        status == QueryStatus.success
-                                    ? '余额待确认'
-                                    : '通用剩余'),
+                            remainingLabel,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: const Color(0xFF777D87),
                               fontWeight: FontWeight.w600,
@@ -629,7 +680,10 @@ class _CarrierCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           if (remainingBytes != null)
-                            _BigUsageValue(bytes: remainingBytes)
+                            _BigUsageValue(
+                              bytes: remainingBytes,
+                              isEstimate: trafficSummary?.isEstimate ?? false,
+                            )
                           else
                             Text(
                               '--',
@@ -688,7 +742,11 @@ class _CarrierCard extends StatelessWidget {
           ],
           if (_detailBuckets.isNotEmpty) ...[
             const SizedBox(height: 12),
-            _TrafficBucketList(buckets: _detailBuckets, accent: accent),
+            _TrafficBucketList(
+              buckets: _detailBuckets,
+              accent: accent,
+              estimated: carrier == Carrier.telecom,
+            ),
           ],
           const SizedBox(height: 13),
           Row(
@@ -780,9 +838,10 @@ class _CarrierCard extends StatelessWidget {
 }
 
 class _BigUsageValue extends StatelessWidget {
-  const _BigUsageValue({required this.bytes});
+  const _BigUsageValue({required this.bytes, this.isEstimate = false});
 
   final int bytes;
+  final bool isEstimate;
 
   @override
   Widget build(BuildContext context) {
@@ -790,6 +849,18 @@ class _BigUsageValue extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
+        if (isEstimate)
+          const Padding(
+            padding: EdgeInsets.only(right: 4, bottom: 2),
+            child: Text(
+              '约',
+              style: TextStyle(
+                color: Color(0xFF777D87),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         Flexible(
           child: Text(
             value,
@@ -843,14 +914,15 @@ class _DataFootnote extends StatelessWidget {
             ? '登录已过期 · 以下为上次查询 · ${_formatQueryTime(queriedAt)}'
             : '登录已过期 · 重新连接后查询';
       case QueryStatus.error:
-        final message = snapshot?.message;
+        final message = snapshot?.message?.trim();
         text = hasCached
-            ? '查询失败 · 显示上次查询 · ${_formatQueryTime(queriedAt)}'
-            : (message?.trim().isNotEmpty ?? false)
-            ? message!.trim()
+            ? '查询失败${(message?.isNotEmpty ?? false) ? ' · $message' : ''} · 显示上次查询 · ${_formatQueryTime(queriedAt)}'
+            : (message?.isNotEmpty ?? false)
+            ? message!
             : '查询失败 · 请检查连接后重试';
       case QueryStatus.notConnected:
-        text = '来源：运营商查询 · 尚未连接';
+        final message = snapshot?.message?.trim();
+        text = (message?.isNotEmpty ?? false) ? message! : '来源：运营商查询 · 尚未连接';
     }
 
     return Row(
@@ -878,10 +950,15 @@ class _DataFootnote extends StatelessWidget {
 }
 
 class _TrafficBucketList extends StatefulWidget {
-  const _TrafficBucketList({required this.buckets, required this.accent});
+  const _TrafficBucketList({
+    required this.buckets,
+    required this.accent,
+    required this.estimated,
+  });
 
   final List<TrafficBucket> buckets;
   final Color accent;
+  final bool estimated;
 
   @override
   State<_TrafficBucketList> createState() => _TrafficBucketListState();
@@ -901,7 +978,11 @@ class _TrafficBucketListState extends State<_TrafficBucketList> {
         for (final bucket in visibleBuckets)
           Padding(
             padding: const EdgeInsets.only(bottom: 5),
-            child: _TrafficBucketRow(bucket: bucket, accent: widget.accent),
+            child: _TrafficBucketRow(
+              bucket: bucket,
+              accent: widget.accent,
+              estimated: widget.estimated,
+            ),
           ),
         if (widget.buckets.length > 3)
           Align(
@@ -933,10 +1014,15 @@ class _TrafficBucketListState extends State<_TrafficBucketList> {
 }
 
 class _TrafficBucketRow extends StatelessWidget {
-  const _TrafficBucketRow({required this.bucket, required this.accent});
+  const _TrafficBucketRow({
+    required this.bucket,
+    required this.accent,
+    required this.estimated,
+  });
 
   final TrafficBucket bucket;
   final Color accent;
+  final bool estimated;
 
   @override
   Widget build(BuildContext context) {
@@ -945,10 +1031,11 @@ class _TrafficBucketRow extends StatelessWidget {
       color: Colors.transparent,
       child: Semantics(
         button: true,
-        label: '查看 $bucketLabel 的完整套餐名称和余额详情',
+        label: '查看 $bucketLabel 的完整套餐名称和${estimated ? '估算余额' : '余额'}详情',
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
-          onTap: () => _showBucketDetails(context, bucket),
+          onTap: () =>
+              _showBucketDetails(context, bucket, estimated: estimated),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
             child: Row(
@@ -976,7 +1063,7 @@ class _TrafficBucketRow extends StatelessWidget {
                 const SizedBox(width: 6),
                 Flexible(
                   child: Text(
-                    _bucketRemainingText(bucket),
+                    _bucketRemainingText(bucket, estimated: estimated),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
@@ -1006,9 +1093,11 @@ String _bucketName(TrafficBucket bucket) {
   return bucket.kind == BucketKind.directed ? '定向流量' : '流量项';
 }
 
-String _bucketRemainingText(TrafficBucket bucket) {
+String _bucketRemainingText(TrafficBucket bucket, {bool estimated = false}) {
   final remaining = bucket.remainingBytes;
-  if (remaining != null) return '${_formatGb(remaining)} GB';
+  if (remaining != null) {
+    return '${estimated ? '约 ' : ''}${_formatGb(remaining)} GB';
+  }
   final rawRemaining = bucket.rawRemaining?.trim();
   if (rawRemaining == null || rawRemaining.isEmpty) return '--';
   final rawUnit = bucket.rawUnit?.trim();
@@ -1024,7 +1113,11 @@ String _bucketTotalText(TrafficBucket bucket) {
   return '${_formatGb(total)} GB';
 }
 
-void _showBucketDetails(BuildContext context, TrafficBucket bucket) {
+void _showBucketDetails(
+  BuildContext context,
+  TrafficBucket bucket, {
+  bool estimated = false,
+}) {
   final name = _bucketName(bucket);
   showDialog<void>(
     context: context,
@@ -1036,12 +1129,25 @@ void _showBucketDetails(BuildContext context, TrafficBucket bucket) {
           mainAxisSize: MainAxisSize.min,
           children: [
             _BucketDetailValue(
-              label: '剩余流量',
-              value: _bucketRemainingText(bucket),
+              label: estimated ? '剩余流量（估算）' : '剩余流量',
+              value: _bucketRemainingText(bucket, estimated: estimated),
             ),
             const SizedBox(height: 12),
             _BucketDetailValue(label: '套餐总量', value: _bucketTotalText(bucket)),
-            if (bucket.remainingBytes == null) ...[
+            if (estimated) ...[
+              const SizedBox(height: 12),
+              const Text(
+                '剩余值按官网已用量与总量的显示值估算，可能有舍入差异；套餐适用范围以官网规则为准。',
+                style: TextStyle(color: Color(0xFF777D87), fontSize: 12),
+              ),
+            ],
+            if (bucket.remainingBytes == null && estimated) ...[
+              const SizedBox(height: 8),
+              const Text(
+                '此项已用量或总量无法确认，因此不展示估算余额。',
+                style: TextStyle(color: Color(0xFF777D87), fontSize: 12),
+              ),
+            ] else if (bucket.remainingBytes == null) ...[
               const SizedBox(height: 12),
               const Text(
                 '此项余额或单位尚未确认，请对照官方页面。',

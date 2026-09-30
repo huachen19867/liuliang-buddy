@@ -18,6 +18,9 @@ void main() {
     expect(find.textContaining('不读取 SIM 卡槽'), findsOneWidget);
     expect(find.text('中国移动'), findsOneWidget);
     expect(find.text('中国广电'), findsOneWidget);
+    expect(find.text('中国联通'), findsOneWidget);
+    expect(find.text('中国电信'), findsOneWidget);
+    expect(find.text('余额查询接入中'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -105,7 +108,7 @@ void main() {
 }
 
 Widget _host({
-  List<Carrier> available = const [Carrier.mobile, Carrier.broadnet],
+  List<Carrier> available = Carrier.values,
   required Set<Carrier> selected,
   ValueChanged<Set<Carrier>>? onChanged,
   ValueChanged<Set<Carrier>>? onContinue,

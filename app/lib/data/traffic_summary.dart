@@ -7,12 +7,14 @@ class TrafficSummary {
     required this.label,
     this.totalBytes,
     this.detailNotice,
+    this.isEstimate = false,
   });
 
   final int remainingBytes;
   final int? totalBytes;
   final String label;
   final String? detailNotice;
+  final bool isEstimate;
 }
 
 /// Chooses a truthful headline from an already verified carrier snapshot.
@@ -36,10 +38,28 @@ TrafficSummary? summarizeTraffic(CarrierSnapshot snapshot) {
     );
   }
 
+  // The official E5 response exposes one aggregate, without a general label.
+  if (snapshot.carrier == Carrier.unicom && snapshot.buckets.length == 1) {
+    final bucket = snapshot.buckets.single;
+    if (bucket.name == '官网套餐余量' &&
+        bucket.kind == BucketKind.unknown &&
+        bucket.remainingBytes != null &&
+        bucket.remainingBytes! >= 0 &&
+        _hasVerifiedUnit(bucket.rawUnit)) {
+      return TrafficSummary(
+        remainingBytes: bucket.remainingBytes!,
+        label: '套餐余量',
+        detailNotice: '官网套餐剩余额，适用范围以套餐规则为准',
+      );
+    }
+  }
+
   // H5 qryUserRes returns flow-package rows, not a verified general bucket.
   // This sum describes those rows only. No Mobile fallback: its totalInfo may
   // already contain the other categories, so adding them would double count.
-  if (snapshot.carrier != Carrier.broadnet || snapshot.buckets.isEmpty) {
+  if ((snapshot.carrier != Carrier.broadnet &&
+          snapshot.carrier != Carrier.telecom) ||
+      snapshot.buckets.isEmpty) {
     return null;
   }
   if (snapshot.buckets.any(
@@ -55,8 +75,11 @@ TrafficSummary? summarizeTraffic(CarrierSnapshot snapshot) {
   return TrafficSummary(
     remainingBytes: remaining,
     totalBytes: _completeSum(snapshot.buckets, (bucket) => bucket.totalBytes),
-    label: '套餐明细合计',
-    detailNotice: '仅将已查询套餐的余额相加，适用范围以各套餐规则为准',
+    label: snapshot.carrier == Carrier.telecom ? '套餐估算余量' : '套餐明细合计',
+    isEstimate: snapshot.carrier == Carrier.telecom,
+    detailNotice: snapshot.carrier == Carrier.telecom
+        ? '按官网已用/总量显示值估算后相加，有舍入误差；共享或重叠额度请以套餐规则为准'
+        : '仅将已查询套餐的余额相加，适用范围以各套餐规则为准',
   );
 }
 

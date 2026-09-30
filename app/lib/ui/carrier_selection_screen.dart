@@ -4,14 +4,15 @@ import '../data/models.dart';
 
 /// Lets the user choose which supported carriers the app should show.
 ///
-/// The default list is deliberately limited to the two carriers currently
-/// queried by the app. Callers can pass a narrower or expanded list as support
-/// becomes available. Labels come from [Carrier.label], so this screen does
-/// not need carrier-specific branches when the enum grows.
+/// The selectable list follows the carrier enum by default. Query support is
+/// declared separately so a provider can be selectable while its balance
+/// reader is still being integrated. Labels come from [Carrier.label], so this
+/// screen does not need carrier-specific branches when the enum grows.
 class CarrierSelectionScreen extends StatelessWidget {
   const CarrierSelectionScreen({
     super.key,
-    this.availableCarriers = const [Carrier.mobile, Carrier.broadnet],
+    this.availableCarriers = Carrier.values,
+    this.querySupportedCarriers = Carrier.values,
     required this.selectedCarriers,
     required this.onSelectionChanged,
     required this.onContinue,
@@ -20,6 +21,7 @@ class CarrierSelectionScreen extends StatelessWidget {
   });
 
   final List<Carrier> availableCarriers;
+  final List<Carrier> querySupportedCarriers;
   final Set<Carrier> selectedCarriers;
   final ValueChanged<Set<Carrier>> onSelectionChanged;
   final ValueChanged<Set<Carrier>> onContinue;
@@ -96,7 +98,7 @@ class CarrierSelectionScreen extends StatelessWidget {
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            '这里只决定首页展示和查询哪些运营商，不读取 SIM 卡槽。取消选择只会隐藏对应卡片，不会删除已有本地记录或登录状态；之后可以随时改回。',
+                            '这里只决定首页展示和查询哪些运营商，不读取 SIM 卡槽。每家运营商的查询支持状态会单独标明；取消选择只会隐藏对应卡片，不会删除已有本地记录或登录状态。',
                             style: TextStyle(
                               color: Color(0xFF765B50),
                               fontSize: 12,
@@ -140,6 +142,9 @@ class CarrierSelectionScreen extends StatelessWidget {
                         key: ValueKey('carrier-option-${carriers[index].name}'),
                         carrier: carriers[index],
                         accent: _palette[index % _palette.length],
+                        querySupported: querySupportedCarriers.contains(
+                          carriers[index],
+                        ),
                         selected: selected.contains(carriers[index]),
                         onTap: () {
                           final next = {...selected};
@@ -280,12 +285,14 @@ class _CarrierOption extends StatelessWidget {
     super.key,
     required this.carrier,
     required this.accent,
+    required this.querySupported,
     required this.selected,
     required this.onTap,
   });
 
   final Carrier carrier;
   final Color accent;
+  final bool querySupported;
   final bool selected;
   final VoidCallback onTap;
 
@@ -351,7 +358,15 @@ class _CarrierOption extends StatelessWidget {
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        selected ? '已加入首页' : '点按即可选择',
+                        !querySupported
+                            ? selected
+                                  ? '已加入首页 · 余额查询接入中'
+                                  : '余额查询接入中'
+                            : selected
+                            ? '已加入首页'
+                            : '点按即可选择',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Color(0xFF858A93),
                           fontSize: 11,

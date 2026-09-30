@@ -127,3 +127,31 @@ main集成首次配置、启动恢复加载、旧connected标记迁移、设置�
 最终APK在最后主流程修改后重建，113,901,232字节，SHA-256 fba83e5088d1fcd6143364a483d605542c5d99e39ccb11544b2f273082e97f8b。apksigner v2通过，aapt2确认1.2.0/code5、API24/36；Zip核对libflutter.so仅arm64-v8a。普通debug包，未传DEMO；源码与截图准备公开，工具、缓存、参考下载、APK和用户截图排除，APK放Release。新公开仓库huachen19867/liuliang-buddy已创建并核对isPrivate=false，旧私有仓库未改变。
 
 公开上传完成：源码914b7b87fc45e9c92f20162bf8f736cb55250223推送到 https://github.com/huachen19867/liuliang-buddy ，GitHub commits API与本地一致，v1.2.0标签指向同一源码提交。Release https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.2.0 已发布，draft=false/prerelease=true；安装包state=uploaded、size=113901232，GitHub SHA-256 digest与本地fba83e5088d1fcd6143364a483d605542c5d99e39ccb11544b2f273082e97f8b完全一致。Web DEMO构建成功，截图与技术索引已随源码上传。54项Flutter、7项原生、Node、analyze通过；未进行新版真实账号/Launcher验证。联通、电信余额读取仍待取得官网协议证据，不宣称已支持此组合。
+
+### 四运营商深入官网协议：联通取得可实施证据
+
+本次复用已有参考并通过Chrome正常浏览公开页面。联通e5/index.html与query.html暴露真实业务模板：自然POST /e3/static/query/userinfoE5query，resource.remainFlow为MB，成功受successFlow/flowFlag及有限流量条件约束；登录判断来自checklogin.isLogin。没有借用APP token接口。原文、来源与严格DOM候选写入docs/UNICOM_TELECOM_RESEARCH.md及references/carrier-public-deep。
+
+电信全国/省分多入口正常执行防护后返回400空白或连接关闭，未取得真实余额DOM/API，不能泛扫营销页面文字并称接通。额外ahBot是安徽小程序openid方案而非网页登录。公开抓取索引保存HTTP状态，没有账号、Cookie或短信操作。本代理未更改应用文件。
+
+### 四运营商桌面卡片扩展
+
+桌面桥接沿用 schema 1，以 `selectedCarriers` 名单和四个 `Carrier.name` 展示键传值。Native 白名单为 mobile/broadnet/unicom/telecom；旧数据没有名单时仍默认移动与广电。只缓存选中运营商的状态、主数值、标签与查询时间，四个连续 slot 按固定次序填充：1 张独占首行、2 张并排、3/4 张为 2×2。联通、电信没有得到可确认数值时显示未连接或待确认，不合成余额。最小桌面高度调到 210dp；旧桌面若维持旧 120dp 尺寸，需用户在 Launcher 调整尺寸或重加，实际宿主视觉尚待真机核对。
+
+电信官方页面 DOM 的已用/总量估算若产生 `套餐估算余量` 标签，Native 在可显示数值前加“约”，不会触发通用低流量颜色，过期状态和原查询时间仍保留。Flutter 选择/桌面定向 14 项通过，覆盖四家持久化、旧标记迁移、非相邻组合过滤、四家 payload 与隐藏缓存；应用原生 JUnit 9 项通过，覆盖全部 1..4 组合映射与估算展示。Android 资源和 Kotlin 编译通过。全模块 Gradle testDebugUnitTest 因依赖包 shared_preferences_android 的 Robolectric SDK36 要求 Java21，而本项目固定 JDK17，失败于依赖包自己的测试；单独 `:app:testDebugUnitTest` 成功。
+
+选择页默认开放四家运营商；联通单条带已确认单位的套餐余量只显示在对应卡片，电信按官网已用/总量显示值生成的余量在首页主位加“约”，并注明舍入和共享额度限制，不进入通用总览或提醒。Flutter 首页及选择页两组定向测试共19项通过，覆盖四家窄屏布局和这些显示边界。四张实际组件截图输出为 carrier-selection-four-demo.png、dashboard-unicom-broadnet-demo.png、dashboard-telecom-demo.png、carrier-settings-four-demo.png；均为测试样本并带 DEMO 标记，已逐张检查。截图测试切换页面时先卸载旧 widget，再挂载选择页，避免前一页残留在输出顶部；文件名与说明已登记到 artifacts/README.md。
+
+### 电信定向DOM探针浏览器验收
+
+新增 scripts/test-telecom-rendered-browser.cjs，使用真实Chrome，但全部导航/请求在本地route拦截为合成官网Account结构，不访问真实账号或接口。七项场景通过：v-show隐藏账务明细、混合MB/GB与NBSP、语音短信排除、登录路由拒绝、营销类似文本拒绝、延迟bridge、畸形行保留null不伪造合计，以及SPA返回登录不发送旧/待发明细（部分条件组合在同一场景）。结果 artifacts/telecom-rendered-browser.json 为passed=true、syntheticOnly=true、actualAccountVerified=false。此测试只验证JS探针，在真实手机账号上仍需核对官方套餐与估算数据。
+
+## 2026-09-30：1.3.0四运营商接入
+
+老板指出此前只开放移动/广电不符合通用版本，并明确要求继续改。复用技术日志和已下载参考，三角色继续深挖官网协议、四家UI与四槽桌面，根集成。联通公开E5页给出真实userinfoE5query请求、resource.remainFlow为MB、flowFlag/successFlow/overFlow/hasNolimitedFlow语义。电信旧189网厅被防护阻断，经历史网页登录参考找到当前e.dlife.cn天翼账号Home账务组件。新接口自然调用、result10000，传输加密；本版不复制其签名/密钥，改读取指定#balanceModal账务DOM的流量条目，含v-show隐藏但已渲染数据。
+
+四家枚举按旧mobile/broadnet后追加unicom/telecom，保持旧存储与提醒ID不变。四家URL/SSO与来源门禁集中到carrier_web.dart，联通仅E5页面的确切userinfoE5query响应，电信只Home路由且telecomRendered阶段。电信每条已用/总量分别MB/GB换算，合法差值标估算，缺项保留未知并拒绝合计，超用/零总量/无限哨兵拒绝。联通主位套餐余量，电信主位约+套餐估算余量，全部unknown不进入通用总览/通知。登录SPA路由切换会变待验证，清除数据涵盖四家网站。
+
+Flutter完整74项通过，Node加入联通精确端点/登录与敏感接口排除；应用原生9项通过，Chrome本地合成账务结构7场景通过。四张新DEMO组件截图与技术索引已生成；静态分析发现4处样式lint，已按等价写法修正，后续记录analyze与最终构建上传核对。新版未做真实号码/Launcher验证，不宣称官网DOM舍入估算等于精确余额。
+
+最终完整Flutter75项通过、analyze无问题、Node探针通过；电信明细列表与详情弹窗也标约/估算，即使一条未知导致无合计，有效条目仍保留估算语义。新运营商接收时额外核对当前WebView URL，避免Home旧队列回调在SPA已回登录页后恢复成功态。最终1.3.0/code6 APK构建成功，89,530,031字节，SHA-256 f0c550a930cc249047479a6539dded713cfa5c90c82146bc7606d2a91d689781。v2签名与aapt2版本/API24/36检查通过。GitHub与Web DEMO完成后另记。
