@@ -1,0 +1,269 @@
+import 'package:flutter/material.dart';
+
+/// A native-widget feature entry with a visual-only preview.
+///
+/// The preview deliberately contains no traffic values. Its colored bars are
+/// decorative placeholders and do not read or imply account data.
+class WidgetPreviewCard extends StatelessWidget {
+  const WidgetPreviewCard({
+    super.key,
+    required this.widgetSupported,
+    this.onAddWidget,
+  });
+
+  final bool widgetSupported;
+  final VoidCallback? onAddWidget;
+
+  bool get _canAdd => widgetSupported && onAddWidget != null;
+
+  String get _hint {
+    if (!widgetSupported) return '请在安卓手机添加';
+    if (onAddWidget == null) return '桌面卡片入口暂不可用';
+    return '亮屏就能看上次查询，点卡片更新';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F5EF),
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(color: const Color(0xFFEAECE4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE9F0F6),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.widgets_rounded,
+                  color: Color(0xFF6482A7),
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '流量放在桌面',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: const Color(0xFF303B4A),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '少一步打开，最近查询一眼可见',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF777D87),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 13),
+          const _WidgetCardIllustration(),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _canAdd ? onAddWidget : null,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF526B85),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: const Color(0xFFE4E6E4),
+              disabledForegroundColor: const Color(0xFF898E94),
+              minimumSize: const Size(0, 46),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              textStyle: theme.textTheme.labelLarge?.copyWith(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            icon: const Icon(Icons.add_to_home_screen_rounded, size: 18),
+            label: const Text('添加桌面卡片'),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            _hint,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: const Color(0xFF777D87),
+              fontSize: 11,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WidgetCardIllustration extends StatelessWidget {
+  const _WidgetCardIllustration();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 13),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: .91),
+            const Color(0xFFEAF0F2).withValues(alpha: .84),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: .92)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0C3C5060),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '桌面卡片样式预览',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: const Color(0xFF556476),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8EEF1),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  '示意',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: const Color(0xFF75818E),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                flex: 6,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '— —',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: const Color(0xFF516174),
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                        letterSpacing: -1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '最近一次查询',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: const Color(0xFF7E8792),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                flex: 7,
+                child: Column(
+                  children: const [
+                    _WidgetColorBar(
+                      label: '移动',
+                      color: Color(0xFF4E83D9),
+                      fraction: .28,
+                    ),
+                    SizedBox(height: 9),
+                    _WidgetColorBar(
+                      label: '广电',
+                      color: Color(0xFFE58C79),
+                      fraction: .18,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WidgetColorBar extends StatelessWidget {
+  const _WidgetColorBar({
+    required this.label,
+    required this.color,
+    required this.fraction,
+  });
+
+  final String label;
+  final Color color;
+  final double fraction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 32,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF737D89),
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: fraction,
+              minHeight: 6,
+              color: color,
+              backgroundColor: color.withValues(alpha: .16),
+              semanticsLabel: '$label 流量示意',
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
