@@ -95,3 +95,5 @@ main 源码提交 25f480697abbb11333e3991153d557b3e2cc35af 已推送，GitHub co
 官网公开页面结合 Playwright 本地 route 合成成功响应，复现原探针只有 raw；修复后 officialDecoded 恰好一条，业务 done/responseJSON 与原样本完全一致。正常桥接与请求结束才就绪的两种场景都通过。复用脚本 scripts/test-broadnet-browser.cjs 进入仓库，浏览器环境配置与范围写入根 README。Node 新增私有业务库、JSONP/factory保真、多实例去重、延迟就绪与有界队列验证；Flutter 28项完整测试和 analyze 全部通过。版本升为1.1.1+3，后续记录最终APK和Release核对。
 
 最终1.1.1/code3 APK 构建成功，89,479,493字节，SHA-256 4d59c8672653f4b05597a170423963574f3834f9a34d861239f18c80b5d6770f，v2签名通过，aapt2核对名称、版本与SDK/权限。仓库版浏览器脚本已再次运行普通与--delayed-bridge，均passed=true/decodedEvents=1。安装包不启用DEMO；真实账号仍需老板手机复测。新文件维护到根README/应用README/输出索引，旧v1.1.0说明保留为历史版本。
+
+修复源码4417ebf52fed89cf50cf51598fe8e1cb3443912c已推送并经GitHub API核对。v1.1.1标签指向同提交，私有测试Release https://github.com/huachen19867/liuliang-app/releases/tag/v1.1.1 已发布（draft=false），APK uploaded、89,479,493字节，GitHub digest与本地SHA-256一致。Web DEMO重新构建成功。没有替换或删除旧Release，用户可覆盖安装修复版再以真实号码核对广电结果。
