@@ -155,3 +155,5 @@ main集成首次配置、启动恢复加载、旧connected标记迁移、设置�
 Flutter完整74项通过，Node加入联通精确端点/登录与敏感接口排除；应用原生9项通过，Chrome本地合成账务结构7场景通过。四张新DEMO组件截图与技术索引已生成；静态分析发现4处样式lint，已按等价写法修正，后续记录analyze与最终构建上传核对。新版未做真实号码/Launcher验证，不宣称官网DOM舍入估算等于精确余额。
 
 最终完整Flutter75项通过、analyze无问题、Node探针通过；电信明细列表与详情弹窗也标约/估算，即使一条未知导致无合计，有效条目仍保留估算语义。新运营商接收时额外核对当前WebView URL，避免Home旧队列回调在SPA已回登录页后恢复成功态。最终1.3.0/code6 APK构建成功，89,530,031字节，SHA-256 f0c550a930cc249047479a6539dded713cfa5c90c82146bc7606d2a91d689781。v2签名与aapt2版本/API24/36检查通过。GitHub与Web DEMO完成后另记。
+
+公开1.3.0发布完成：源码4a0e0e4677fcba05bef847bd989e36de4aae345e已推送到huachen19867/liuliang-buddy，GitHub main及v1.3.0标签API均与本地一致。Release https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.3.0 draft=false/prerelease=true；APK state=uploaded、size=89530031、GitHub digest sha256:f0c550a930cc249047479a6539dded713cfa5c90c82146bc7606d2a91d689781与本地完全一致。Web DEMO已构建成功，四家选择/联通广电/电信估算/运营商管理截图均上传。旧版本与私有仓库保留，未访问真实账号、未发送验证码；真实登录、金额与Launcher仍待设备核对。
