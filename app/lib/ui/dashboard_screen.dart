@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
+import '../data/traffic_summary.dart';
 import 'widget_preview_card.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -234,6 +235,9 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasTotal = _canAggregate(mobile) && _canAggregate(broadnet);
+    final hasRecords =
+        (mobile?.queriedAt != null && mobile!.buckets.isNotEmpty) ||
+        (broadnet?.queriedAt != null && broadnet!.buckets.isNotEmpty);
     final bytes = hasTotal
         ? mobile!.generalRemainingBytes! + broadnet!.generalRemainingBytes!
         : 0;
@@ -323,7 +327,7 @@ class _SummaryCard extends StatelessWidget {
                   _ThresholdHint(thresholdGb: thresholdGb),
                 ] else ...[
                   Text(
-                    '连接运营商账号后，流量会显示在这里。',
+                    hasRecords ? '各卡余量见下方，通用流量总览待确认。' : '连接运营商账号后，流量会显示在这里。',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: const Color(0xFF71645D),
                       height: 1.45,
@@ -415,9 +419,12 @@ class _CarrierCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = snapshot?.status ?? QueryStatus.notConnected;
-    final generalRemaining = _generalRemainingForDisplay(snapshot);
-    final generalTotal = _generalTotalForDisplay(snapshot);
-    final hasGeneral = generalRemaining != null;
+    final trafficSummary = snapshot == null
+        ? null
+        : summarizeTraffic(snapshot!);
+    final remainingBytes = trafficSummary?.remainingBytes;
+    final totalBytes = trafficSummary?.totalBytes;
+    final detailNotice = trafficSummary?.detailNotice;
     final isBusy = status == QueryStatus.loading;
     final theme = Theme.of(context);
 
@@ -504,15 +511,19 @@ class _CarrierCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '通用剩余',
+                            trafficSummary?.label ??
+                                (carrier == Carrier.broadnet &&
+                                        status == QueryStatus.success
+                                    ? '余额待确认'
+                                    : '通用剩余'),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: const Color(0xFF777D87),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           const SizedBox(height: 4),
-                          if (hasGeneral)
-                            _BigUsageValue(bytes: generalRemaining)
+                          if (remainingBytes != null)
+                            _BigUsageValue(bytes: remainingBytes)
                           else
                             Text(
                               '--',
@@ -525,11 +536,11 @@ class _CarrierCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (generalTotal != null)
+                    if (totalBytes != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 3),
                         child: Text(
-                          '共 ${_formatGb(generalTotal)} GB',
+                          '共 ${_formatGb(totalBytes)} GB',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: const Color(0xFF8A8E95),
                           ),
@@ -537,19 +548,32 @@ class _CarrierCard extends StatelessWidget {
                       ),
                   ],
                 ),
-                if (hasGeneral && generalTotal != null && generalTotal > 0) ...[
+                if (remainingBytes != null &&
+                    totalBytes != null &&
+                    totalBytes > 0) ...[
                   const SizedBox(height: 11),
                   _RemainingBar(
-                    ratio: (generalRemaining / generalTotal).clamp(0.0, 1.0),
+                    ratio: (remainingBytes / totalBytes).clamp(0.0, 1.0),
                     color: accent,
                   ),
                 ],
                 const SizedBox(height: 9),
                 _DataFootnote(snapshot: snapshot, status: status),
+                if (detailNotice != null && detailNotice.isNotEmpty) ...[
+                  const SizedBox(height: 7),
+                  Text(
+                    detailNotice,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFF92765F),
+                      fontSize: 10.5,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          if (!hasGeneral && status == QueryStatus.notConnected) ...[
+          if (remainingBytes == null && status == QueryStatus.notConnected) ...[
             const SizedBox(height: 9),
             const Text(
               '连接后查看',
@@ -558,14 +582,7 @@ class _CarrierCard extends StatelessWidget {
           ],
           if (_detailBuckets.isNotEmpty) ...[
             const SizedBox(height: 12),
-            ..._detailBuckets
-                .take(3)
-                .map(
-                  (bucket) => Padding(
-                    padding: const EdgeInsets.only(bottom: 5),
-                    child: _DirectedBucketRow(bucket: bucket, accent: accent),
-                  ),
-                ),
+            _TrafficBucketList(buckets: _detailBuckets, accent: accent),
           ],
           const SizedBox(height: 13),
           Row(
@@ -754,52 +771,223 @@ class _DataFootnote extends StatelessWidget {
   }
 }
 
-class _DirectedBucketRow extends StatelessWidget {
-  const _DirectedBucketRow({required this.bucket, required this.accent});
+class _TrafficBucketList extends StatefulWidget {
+  const _TrafficBucketList({required this.buckets, required this.accent});
+
+  final List<TrafficBucket> buckets;
+  final Color accent;
+
+  @override
+  State<_TrafficBucketList> createState() => _TrafficBucketListState();
+}
+
+class _TrafficBucketListState extends State<_TrafficBucketList> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleBuckets = _expanded
+        ? widget.buckets
+        : widget.buckets.take(3).toList(growable: false);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final bucket in visibleBuckets)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 5),
+            child: _TrafficBucketRow(bucket: bucket, accent: widget.accent),
+          ),
+        if (widget.buckets.length > 3)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => setState(() => _expanded = !_expanded),
+              style: TextButton.styleFrom(
+                foregroundColor: widget.accent,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                visualDensity: VisualDensity.compact,
+              ),
+              icon: Icon(
+                _expanded
+                    ? Icons.expand_less_rounded
+                    : Icons.expand_more_rounded,
+                size: 17,
+              ),
+              label: Text(
+                _expanded ? '收起套餐明细' : '查看全部 ${widget.buckets.length} 项',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _TrafficBucketRow extends StatelessWidget {
+  const _TrafficBucketRow({required this.bucket, required this.accent});
 
   final TrafficBucket bucket;
   final Color accent;
 
   @override
   Widget build(BuildContext context) {
-    final remaining = bucket.remainingBytes;
-    final rawRemaining = bucket.rawRemaining?.trim();
-    final rawUnit = bucket.rawUnit?.trim();
-    final rawText = rawRemaining == null || rawRemaining.isEmpty
-        ? '--'
-        : rawUnit == null || rawUnit.isEmpty
-        ? '$rawRemaining（单位待确认）'
-        : '$rawRemaining $rawUnit';
-    final bucketLabel = bucket.name.isNotEmpty
-        ? bucket.name
-        : bucket.kind == BucketKind.directed
-        ? '定向流量'
-        : '流量项';
-    return Row(
-      children: [
-        Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 7),
-        Expanded(
-          child: Text(
-            bucketLabel,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF717783), fontSize: 11),
+    final bucketLabel = _bucketName(bucket);
+    return Material(
+      color: Colors.transparent,
+      child: Semantics(
+        button: true,
+        label: '查看 $bucketLabel 的完整套餐名称和余额详情',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => _showBucketDetails(context, bucket),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+            child: Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    bucketLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF717783),
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    _bucketRemainingText(bucket),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                      color: Color(0xFF4C5563),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: Color(0xFF9AA1AA),
+                ),
+              ],
+            ),
           ),
         ),
-        Text(
-          remaining == null ? rawText : '${_formatGb(remaining)} GB',
-          style: const TextStyle(
-            color: Color(0xFF4C5563),
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
+      ),
+    );
+  }
+}
+
+String _bucketName(TrafficBucket bucket) {
+  if (bucket.name.isNotEmpty) return bucket.name;
+  return bucket.kind == BucketKind.directed ? '定向流量' : '流量项';
+}
+
+String _bucketRemainingText(TrafficBucket bucket) {
+  final remaining = bucket.remainingBytes;
+  if (remaining != null) return '${_formatGb(remaining)} GB';
+  final rawRemaining = bucket.rawRemaining?.trim();
+  if (rawRemaining == null || rawRemaining.isEmpty) return '--';
+  final rawUnit = bucket.rawUnit?.trim();
+  if (rawUnit == null || rawUnit.isEmpty) {
+    return '$rawRemaining（单位待确认）';
+  }
+  return '$rawRemaining $rawUnit';
+}
+
+String _bucketTotalText(TrafficBucket bucket) {
+  final total = bucket.totalBytes;
+  if (total == null) return '未提供可确认的套餐总量';
+  return '${_formatGb(total)} GB';
+}
+
+void _showBucketDetails(BuildContext context, TrafficBucket bucket) {
+  final name = _bucketName(bucket);
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(name),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _BucketDetailValue(
+              label: '剩余流量',
+              value: _bucketRemainingText(bucket),
+            ),
+            const SizedBox(height: 12),
+            _BucketDetailValue(label: '套餐总量', value: _bucketTotalText(bucket)),
+            if (bucket.remainingBytes == null) ...[
+              const SizedBox(height: 12),
+              const Text(
+                '此项余额或单位尚未确认，请对照官方页面。',
+                style: TextStyle(color: Color(0xFF777D87), fontSize: 12),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('知道了'),
         ),
       ],
+    ),
+  );
+}
+
+class _BucketDetailValue extends StatelessWidget {
+  const _BucketDetailValue({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBF7),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: const Color(0xFF777D87)),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: const Color(0xFF303845),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1124,39 +1312,6 @@ class _CuteDropMarkPainter extends CustomPainter {
 String _formatGb(int bytes) {
   final value = bytes / (1024 * 1024 * 1024);
   return value < 100 ? value.toStringAsFixed(1) : value.toStringAsFixed(0);
-}
-
-int? _generalRemainingForDisplay(CarrierSnapshot? snapshot) {
-  if (snapshot == null) return null;
-  if (snapshot.status == QueryStatus.success) {
-    return snapshot.generalRemainingBytes;
-  }
-  return _sumStoredGeneralBuckets(snapshot, (bucket) => bucket.remainingBytes);
-}
-
-int? _generalTotalForDisplay(CarrierSnapshot? snapshot) {
-  if (snapshot == null) return null;
-  if (snapshot.status == QueryStatus.success) {
-    return snapshot.generalTotalBytes;
-  }
-  return _sumStoredGeneralBuckets(snapshot, (bucket) => bucket.totalBytes);
-}
-
-int? _sumStoredGeneralBuckets(
-  CarrierSnapshot snapshot,
-  int? Function(TrafficBucket) select,
-) {
-  final general = snapshot.buckets.where(
-    (bucket) => bucket.kind == BucketKind.general,
-  );
-  if (general.isEmpty) return null;
-  var sum = 0;
-  for (final bucket in general) {
-    final value = select(bucket);
-    if (value == null) return null;
-    sum += value;
-  }
-  return sum;
 }
 
 String _formatQueryTime(DateTime? dateTime) {

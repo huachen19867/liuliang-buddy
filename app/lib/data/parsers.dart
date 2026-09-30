@@ -191,35 +191,33 @@ CarrierSnapshot parseBroadnetH5(
     final entry = _map(item);
     if (entry == null || _text(entry['busiType']) != '5') continue;
     final name = _text(entry['discntName']);
+    final named = name != null && name.isNotEmpty;
     final rawRemaining = _text(entry['balance']);
-    final remainingBytes = _toBytes(entry['balance'], 'KB');
-    if (name == null ||
-        name.isEmpty ||
-        rawRemaining == null ||
-        remainingBytes == null) {
-      continue;
-    }
+    final remainingBytes = named ? _toBytes(entry['balance'], 'KB') : null;
     buckets.add(
       TrafficBucket(
-        name: name,
-        kind: _broadnetKind(name),
+        name: named ? name : '未命名流量套餐',
+        kind: named ? _broadnetKind(name) : BucketKind.unknown,
         remainingBytes: remainingBytes,
-        totalBytes: _toBytes(entry['highFee'], 'KB'),
+        totalBytes: named ? _toBytes(entry['highFee'], 'KB') : null,
         rawUnit: 'KB',
         rawRemaining: rawRemaining,
       ),
     );
   }
 
-  if (buckets.isEmpty) {
+  if (buckets.isEmpty ||
+      buckets.every((bucket) => bucket.remainingBytes == null)) {
     return failed(QueryStatus.error, '中国广电未返回可确认的流量套餐');
   }
+  final incomplete = buckets.any((bucket) => bucket.remainingBytes == null);
   return CarrierSnapshot(
     carrier: Carrier.broadnet,
     status: QueryStatus.success,
     queriedAt: queriedAt ?? DateTime.now(),
     phoneMasked: phoneMasked,
     buckets: buckets,
+    message: incomplete ? '部分流量套餐余额未确认，暂不显示明细合计' : null,
   );
 }
 

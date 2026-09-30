@@ -10,6 +10,9 @@ import 'package:liuliang_app/data/models.dart';
 import 'package:liuliang_app/ui/dashboard_screen.dart';
 
 const _previewBoundaryKey = ValueKey<String>('dashboard-preview');
+const _broadnetPreviewBoundaryKey = ValueKey<String>(
+  'broadnet-summary-preview',
+);
 const _gib = 1024 * 1024 * 1024;
 
 void main() {
@@ -167,6 +170,50 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('广电 unknown 套餐大字主位合计，明细可展开并查看完整名称', (tester) async {
+    _configureViewport(tester, const Size(320, 640));
+    final packages = _broadnetPackageSnapshot([30, 113, 20, 4, 2]);
+    for (final size in const [Size(320, 640), Size(390, 844)]) {
+      tester.view.physicalSize = size;
+      await tester.pumpWidget(
+        _host(
+          snapshots: [
+            const CarrierSnapshot(
+              carrier: Carrier.mobile,
+              status: QueryStatus.notConnected,
+            ),
+            packages,
+          ],
+          demo: true,
+          textScale: 1.4,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('套餐明细合计'), findsOneWidget);
+      expect(find.text('169'), findsOneWidget);
+      expect(find.textContaining('适用范围以各套餐规则为准'), findsOneWidget);
+      expect(find.text('查看全部 5 项'), findsOneWidget);
+      expect(find.text('两张卡，一眼看清'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+
+    await tester.ensureVisible(find.text('查看全部 5 项'));
+    await tester.tap(find.text('查看全部 5 项'));
+    await tester.pumpAndSettle();
+    const longName = '视频专属流量套餐明细第五项完整名称';
+    expect(find.text(longName), findsOneWidget);
+
+    await tester.ensureVisible(find.text(longName));
+    await tester.tap(find.text(longName));
+    await tester.pumpAndSettle();
+    expect(find.text(longName), findsNWidgets(2));
+    expect(find.text('剩余流量'), findsOneWidget);
+    expect(find.text('套餐总量'), findsOneWidget);
+    expect(find.text('4.0 GB'), findsNWidgets(2));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('生成含演示提示的完整中文预览截图', (tester) async {
     _configureViewport(tester, const Size(390, 1360));
     await tester.pumpWidget(
@@ -186,6 +233,45 @@ void main() {
       find.byKey(_previewBoundaryKey),
     );
     final output = _previewFile();
+    await tester.runAsync(() async {
+      final image = await boundary.toImage(pixelRatio: 2);
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      await output.parent.create(recursive: true);
+      await output.writeAsBytes(png!.buffer.asUint8List());
+      image.dispose();
+    });
+    expect(output.existsSync(), isTrue);
+    expect(output.lengthSync(), greaterThan(10_000));
+  });
+
+  testWidgets('生成广电套餐明细合计演示截图', (tester) async {
+    _configureViewport(tester, const Size(390, 1360));
+    await tester.pumpWidget(
+      _host(
+        snapshots: [
+          const CarrierSnapshot(
+            carrier: Carrier.mobile,
+            status: QueryStatus.notConnected,
+          ),
+          _broadnetPackageSnapshot([30, 113]),
+        ],
+        demo: true,
+        textScale: 1.15,
+        onAddWidget: () {},
+        previewBoundaryKey: _broadnetPreviewBoundaryKey,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
+    expect(find.text('套餐明细合计'), findsOneWidget);
+    expect(find.text('143'), findsOneWidget);
+    expect(find.textContaining('适用范围以各套餐规则为准'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    final boundary = tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(_broadnetPreviewBoundaryKey),
+    );
+    final output = _previewFile('broadnet-summary-preview.png');
     await tester.runAsync(() async {
       final image = await boundary.toImage(pixelRatio: 2);
       final png = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -335,7 +421,33 @@ Future<void> _loadPreviewChineseFont() async {
   await (FontLoader('PreviewChinese')..addFont(Future.value(data))).load();
 }
 
-File _previewFile() {
+CarrierSnapshot _broadnetPackageSnapshot(List<int> remainingGiB) {
+  const names = [
+    '语音娱乐流量套餐明细第一项',
+    '节假日流量套餐明细第二项',
+    '视频专属流量套餐明细第三项',
+    '家庭共享流量套餐明细第四项',
+    '视频专属流量套餐明细第五项完整名称',
+  ];
+  return CarrierSnapshot(
+    carrier: Carrier.broadnet,
+    status: QueryStatus.success,
+    queriedAt: DateTime(2026, 9, 30, 10, 20),
+    buckets: [
+      for (var index = 0; index < remainingGiB.length; index++)
+        TrafficBucket(
+          name: names[index],
+          kind: BucketKind.unknown,
+          remainingBytes: remainingGiB[index] * _gib,
+          totalBytes: remainingGiB[index] * 2 * _gib,
+          rawUnit: 'KB',
+          rawRemaining: '${remainingGiB[index]}',
+        ),
+    ],
+  );
+}
+
+File _previewFile([String fileName = 'ui-preview.png']) {
   final current = Directory.current;
   final currentPubspec = File(
     '${current.path}${Platform.pathSeparator}pubspec.yaml',
@@ -349,7 +461,7 @@ File _previewFile() {
       : current;
   return File(
     '${repoRoot.path}${Platform.pathSeparator}artifacts'
-    '${Platform.pathSeparator}ui-preview.png',
+    '${Platform.pathSeparator}$fileName',
   );
 }
 

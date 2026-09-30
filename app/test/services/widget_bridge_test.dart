@@ -37,7 +37,7 @@ void main() {
     },
   );
 
-  test('unknown packages are never summed into a widget total', () {
+  test('packages without verified units are never partially summed', () {
     const packages = [
       TrafficBucket(name: '套餐A', kind: BucketKind.unknown, remainingBytes: 42),
       TrafficBucket(name: '套餐B', kind: BucketKind.unknown, remainingBytes: 80),
@@ -53,7 +53,7 @@ void main() {
     expect((payload['broadnet'] as Map)['remainingBytes'], isNull);
   });
 
-  test('single unclassified package is shown with its limitation', () {
+  test('verified Broadnet package rows show a limited detail sum', () {
     final payload = buildWidgetPayload([
       CarrierSnapshot(
         carrier: Carrier.broadnet,
@@ -64,11 +64,18 @@ void main() {
             name: '套餐A',
             kind: BucketKind.unknown,
             remainingBytes: 42,
+            rawUnit: 'KB',
+          ),
+          TrafficBucket(
+            name: '套餐B',
+            kind: BucketKind.unknown,
+            remainingBytes: 80,
+            rawUnit: 'KB',
           ),
         ],
       ),
     ], thresholdGb: 5);
-    expect((payload['broadnet'] as Map)['remainingBytes'], 42);
-    expect((payload['broadnet'] as Map)['label'], contains('用途待确认'));
+    expect((payload['broadnet'] as Map)['remainingBytes'], 122);
+    expect((payload['broadnet'] as Map)['label'], '套餐明细合计');
   });
 }

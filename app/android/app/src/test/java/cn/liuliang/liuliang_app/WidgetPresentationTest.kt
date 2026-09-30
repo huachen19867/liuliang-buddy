@@ -77,4 +77,15 @@ class WidgetPresentationTest {
             TimeZone.setDefault(previousZone)
         }
     }
+
+    @Test fun packageDetailSumIsLabelledAndDoesNotTriggerGeneralLowTraffic() {
+        val display = WidgetPresentation.present(
+            WidgetCardData("success", gib, "套餐明细合计", now),
+            5.0, now,
+        )
+        assertEquals("1.00 GB", display.amount)
+        assertEquals("套餐明细合计", display.label)
+        assertEquals("上次记录", display.state)
+        assertFalse(display.low)
+    }
 }

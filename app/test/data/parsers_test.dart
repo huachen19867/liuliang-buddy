@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liuliang_app/data/models.dart';
 import 'package:liuliang_app/data/parsers.dart';
+import 'package:liuliang_app/data/traffic_summary.dart';
 
 void main() {
   final queriedAt = DateTime.utc(2026, 9, 30, 3, 4, 5);
@@ -181,6 +182,27 @@ void main() {
       }).status,
       QueryStatus.error,
     );
+  });
+
+  test('incomplete H5 flow rows block an incomplete detail sum', () {
+    final snapshot = parseBroadnetH5({
+      'respCode': '000000',
+      'intfResultBean': {
+        'userResList': [
+          {'busiType': '5', 'discntName': '30GB升卿卡', 'balance': '31457280'},
+          {'busiType': '5', 'discntName': '首充赠送'},
+          {'busiType': '5', 'balance': '1048576'},
+        ],
+      },
+    }, queriedAt: queriedAt);
+    expect(snapshot.status, QueryStatus.success);
+    expect(snapshot.buckets, hasLength(3));
+    expect(snapshot.buckets.first.remainingBytes, 30 * 1024 * 1024 * 1024);
+    expect(snapshot.buckets[1].remainingBytes, isNull);
+    expect(snapshot.buckets[2].name, '未命名流量套餐');
+    expect(snapshot.buckets[2].remainingBytes, isNull);
+    expect(snapshot.message, contains('暂不显示明细合计'));
+    expect(summarizeTraffic(snapshot), isNull);
   });
 
   test('broadnet H5 rejects expired and unconfirmed responses', () {

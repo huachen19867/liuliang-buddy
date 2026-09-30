@@ -1,5 +1,7 @@
 # 运营商数据解析说明
 
+1.1.2 展示补充：用户真机截图证实广电已成功同步，但升卿卡及赠送/结转明细未明确写“通用”，因此不能据名称强行分类。共享 traffic_summary.dart 在广电没有已确认通用额度、且每一项都具有可确认单位与非负剩余额时提供“套餐明细合计”。它只是已解析流量条目的数学合计，不证明条目互斥、可叠加或不限用途，不进入通用汇总及低量提醒。所有原明细保留供用户核对；缺任意项余额/单位就不做不完整合计。移动总览可能与分类重叠，不能套用该回退。
+
 数据入口是应用内官方页面返回的响应。调用方必须先确认响应来自对应官方域名与接口，并在必要时解密、JSON 解码，再调用 `app/lib/data/parsers.dart`。解析器不处理 Cookie、Session、Access、手机号或原始响应的持久化；快照只保留脱敏号码、查询时间、明细名称、数值和状态。
 
 中国移动参考项目 `references/ChinaMobileMonitor/ChinaMobileMonitor-main/chinamobile.py` 通过 Playwright 捕获 `wx.10086.cn` 的 `getNewMarginInfo`，必要时将十六进制 AES 响应解密。流量字段是 `data.resultData.planRemianFlowInfo`。`planRemian` 为通用，`directionalFlowInfo` 为定向，`otherRemian` 为其他，`totalInfo` 是官方总览。各项的 `remainNum`、`sumNum` 必须结合实际 `unit` 换算；参考实现中的 `03` 为 MB，`04` 为 GB。总览可能已包含各分类，解析器保留其原值但不参与通用余额求和。响应缺单位、缺剩余额或不是可识别结构时，不输出零余额。

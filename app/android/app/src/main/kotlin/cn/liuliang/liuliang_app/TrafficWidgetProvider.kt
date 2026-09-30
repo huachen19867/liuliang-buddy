@@ -65,6 +65,7 @@ object WidgetPresentation {
             else -> "未连接"
         }
         val label = if (card.label == "通用剩余" || card.label == "套餐余量" ||
+            card.label == "套餐明细合计" || card.label == "余额待确认" ||
             card.label == "套餐余量·用途待确认") card.label else "套餐余量·用途待确认"
         val time = validTime?.let {
             "上次查询 " + SimpleDateFormat("MM/dd HH:mm", Locale.CHINA).format(Date(it))

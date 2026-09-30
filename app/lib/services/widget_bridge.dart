@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 
 import '../data/models.dart';
+import '../data/traffic_summary.dart';
 
 /// Display-only snapshot. No phone numbers, credentials or raw responses.
 Map<String, Object?> buildWidgetPayload(
@@ -12,26 +13,11 @@ Map<String, Object?> buildWidgetPayload(
     final snapshot = snapshots
         .where((item) => item.carrier == carrier)
         .firstOrNull;
-    int? remaining;
-    var label = '通用剩余';
-    if (snapshot?.queriedAt != null) {
-      remaining = snapshot!
-          .copyWith(status: QueryStatus.success)
-          .generalRemainingBytes;
-      // A single unclassified package may be shown with its actual limitation;
-      // multiple unknown packages are never added together.
-      if (remaining == null && snapshot.buckets.length == 1) {
-        final bucket = snapshot.buckets.single;
-        if (bucket.kind == BucketKind.unknown) {
-          remaining = bucket.remainingBytes;
-          label = '套餐余量·用途待确认';
-        }
-      }
-    }
+    final summary = snapshot == null ? null : summarizeTraffic(snapshot);
     payload[carrier.name] = <String, Object?>{
       'status': snapshot?.status.name ?? QueryStatus.notConnected.name,
-      'remainingBytes': remaining,
-      'label': label,
+      'remainingBytes': summary?.remainingBytes,
+      'label': summary?.label ?? '余额待确认',
       'queriedAt': snapshot?.queriedAt?.millisecondsSinceEpoch,
     };
   }
