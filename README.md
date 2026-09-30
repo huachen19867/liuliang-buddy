@@ -2,7 +2,7 @@
 
 一个可自行选择运营商的安卓流量查询测试应用。首次使用选择至少一家，当前支持移动单卡、广电单卡或移动与广电组合；设置中可随时改选。联通、电信仍在协议研究阶段，暂不开放余额读取。首页采用奶油背景、圆润双色卡片与笑脸水滴，展示每张卡的剩余流量、查询时间、连接状态，以及通用和定向额度。号码验证由用户在运营商官方网页完成，成功会话尽量复用。
 
-当前版本 1.2.0+5，公开发布目标：[GitHub 仓库](https://github.com/huachen19867/liuliang-buddy) · [安装包发布页](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.2.0)。原有私有仓库和历史发布保留。
+当前版本 1.2.0+5，已公开发布：[GitHub 仓库](https://github.com/huachen19867/liuliang-buddy) · [安装包发布页](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.2.0)。原有私有仓库和历史发布保留。
 
 已生成的安装包：artifacts/liuliang-buddy-debug.apk（约 108.6 MiB，Android 7.0 及以上 ARM64 手机）。APK 构建和 v2 签名检查通过，flutter analyze 无问题，54 项 Flutter 测试、7 项原生卡片测试及网页探针 Node 验证通过。广电监听修复还通过真实公开官网配合本地合成响应的 Chrome 验证；已收到用户真机双卡同步截图，官方余额对照与新版显示仍需实际手机核对。
 

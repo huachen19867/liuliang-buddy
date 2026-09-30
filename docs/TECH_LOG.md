@@ -125,3 +125,5 @@ main集成首次配置、启动恢复加载、旧connected标记迁移、设置�
 完整Flutter54项、analyze、Node探针通过，原生JUnit7项通过。四张应用内DEMO实际组件截图已重生并逐张检查；选择/管理页390×844、单卡390×1100、多卡390×1360，输出为2倍PNG。首次图CTA中文缺字来自测试Host未覆盖ButtonStyle字体，已为截图host显式使用已加载中文字体，不影响正式APP系统字体。保存流程按先清空桌面再持久化选择，失败回到旧选择；异常类型配置回到首次页。最后源码改动后重建APK，最终哈希及GitHub核对待记录。
 
 最终APK在最后主流程修改后重建，113,901,232字节，SHA-256 fba83e5088d1fcd6143364a483d605542c5d99e39ccb11544b2f273082e97f8b。apksigner v2通过，aapt2确认1.2.0/code5、API24/36；Zip核对libflutter.so仅arm64-v8a。普通debug包，未传DEMO；源码与截图准备公开，工具、缓存、参考下载、APK和用户截图排除，APK放Release。新公开仓库huachen19867/liuliang-buddy已创建并核对isPrivate=false，旧私有仓库未改变。
+
+公开上传完成：源码914b7b87fc45e9c92f20162bf8f736cb55250223推送到 https://github.com/huachen19867/liuliang-buddy ，GitHub commits API与本地一致，v1.2.0标签指向同一源码提交。Release https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.2.0 已发布，draft=false/prerelease=true；安装包state=uploaded、size=113901232，GitHub SHA-256 digest与本地fba83e5088d1fcd6143364a483d605542c5d99e39ccb11544b2f273082e97f8b完全一致。Web DEMO构建成功，截图与技术索引已随源码上传。54项Flutter、7项原生、Node、analyze通过；未进行新版真实账号/Launcher验证。联通、电信余额读取仍待取得官网协议证据，不宣称已支持此组合。
