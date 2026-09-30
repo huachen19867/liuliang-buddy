@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../data/models.dart';
+
 /// A native-widget feature entry with a visual-only preview.
 ///
 /// The preview deliberately contains no traffic values. Its colored bars are
@@ -8,10 +10,12 @@ class WidgetPreviewCard extends StatelessWidget {
   const WidgetPreviewCard({
     super.key,
     required this.widgetSupported,
+    this.selectedCarriers = const [Carrier.mobile, Carrier.broadnet],
     this.onAddWidget,
   });
 
   final bool widgetSupported;
+  final List<Carrier> selectedCarriers;
   final VoidCallback? onAddWidget;
 
   bool get _canAdd => widgetSupported && onAddWidget != null;
@@ -75,7 +79,7 @@ class WidgetPreviewCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 13),
-          const _WidgetCardIllustration(),
+          _WidgetCardIllustration(selectedCarriers: selectedCarriers),
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: _canAdd ? onAddWidget : null,
@@ -113,7 +117,9 @@ class WidgetPreviewCard extends StatelessWidget {
 }
 
 class _WidgetCardIllustration extends StatelessWidget {
-  const _WidgetCardIllustration();
+  const _WidgetCardIllustration({required this.selectedCarriers});
+
+  final List<Carrier> selectedCarriers;
 
   @override
   Widget build(BuildContext context) {
@@ -200,21 +206,32 @@ class _WidgetCardIllustration extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(
                 flex: 7,
-                child: Column(
-                  children: const [
-                    _WidgetColorBar(
-                      label: '移动',
-                      color: Color(0xFF4E83D9),
-                      fraction: .28,
-                    ),
-                    SizedBox(height: 9),
-                    _WidgetColorBar(
-                      label: '广电',
-                      color: Color(0xFFE58C79),
-                      fraction: .18,
-                    ),
-                  ],
-                ),
+                child: selectedCarriers.isEmpty
+                    ? const Text(
+                        '尚未选择运营商',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF737D89),
+                          fontSize: 10,
+                        ),
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (
+                            var index = 0;
+                            index < selectedCarriers.length;
+                            index++
+                          ) ...[
+                            if (index > 0) const SizedBox(height: 8),
+                            _WidgetColorBar(
+                              label: selectedCarriers[index].label,
+                              color: _carrierColor(selectedCarriers[index]),
+                              fraction: .28 - (index % 4) * .035,
+                            ),
+                          ],
+                        ],
+                      ),
               ),
             ],
           ),
@@ -240,7 +257,7 @@ class _WidgetColorBar extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 32,
+          width: 54,
           child: Text(
             label,
             style: const TextStyle(
@@ -267,3 +284,10 @@ class _WidgetColorBar extends StatelessWidget {
     );
   }
 }
+
+Color _carrierColor(Carrier carrier) => const [
+  Color(0xFF4E83D9),
+  Color(0xFFE58C79),
+  Color(0xFF63A68C),
+  Color(0xFF8B7AC7),
+][carrier.index % 4];

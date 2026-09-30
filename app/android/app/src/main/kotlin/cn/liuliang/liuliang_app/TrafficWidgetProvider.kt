@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.view.View
 import android.widget.RemoteViews
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -27,6 +28,17 @@ data class WidgetCardPresentation(
     val low: Boolean,
     val stale: Boolean,
 )
+
+/** Missing key is an older two-card payload; an invalid present key shows no card. */
+object WidgetCarrierSelection {
+    fun fromPayload(raw: Any?, keyPresent: Boolean): Set<String> {
+        if (!keyPresent) return setOf("mobile", "broadnet")
+        return (raw as? List<*>)
+            ?.filterIsInstance<String>()
+            ?.filter { it == "mobile" || it == "broadnet" }
+            ?.toSet() ?: emptySet()
+    }
+}
 
 /** Pure display rules. A cached amount always carries its original query time. */
 object WidgetPresentation {
@@ -95,19 +107,27 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             }
             val threshold = (root["thresholdGb"] as? Number)?.toDouble()
                 ?.takeIf { it.isFinite() && it >= 0.0 } ?: DEFAULT_THRESHOLD_GB
-            val mobile = parseCard(root["mobile"])
-            val broadnet = parseCard(root["broadnet"])
+            val selected = WidgetCarrierSelection.fromPayload(
+                root["selectedCarriers"], root.containsKey("selectedCarriers"))
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
                 clear()
                 putFloat("thresholdGb", threshold.toFloat())
-                writeCard("mobile", mobile)
-                writeCard("broadnet", broadnet)
+                putBoolean("selectionPresent", true)
+                putBoolean("mobileSelected", "mobile" in selected)
+                putBoolean("broadnetSelected", "broadnet" in selected)
+                if ("mobile" in selected) writeCard("mobile", parseCard(root["mobile"]))
+                if ("broadnet" in selected) writeCard("broadnet", parseCard(root["broadnet"]))
                 apply()
             }
         }
 
         fun clearData(context: Context) {
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .clear()
+                .putBoolean("selectionPresent", true)
+                .putBoolean("mobileSelected", false)
+                .putBoolean("broadnetSelected", false)
+                .apply()
         }
 
         fun updateAll(context: Context) {
@@ -149,8 +169,15 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val threshold = prefs.getFloat("thresholdGb", DEFAULT_THRESHOLD_GB.toFloat()).toDouble()
             val now = System.currentTimeMillis()
-            bindCard(views, readCard(context, "mobile"), threshold, now, true)
-            bindCard(views, readCard(context, "broadnet"), threshold, now, false)
+            val hasSelection = prefs.getBoolean("selectionPresent", false)
+            val mobile = if (hasSelection) prefs.getBoolean("mobileSelected", false) else true
+            val broadnet = if (hasSelection) prefs.getBoolean("broadnetSelected", false) else true
+            views.setViewVisibility(R.id.mobile_card, if (mobile) View.VISIBLE else View.GONE)
+            views.setViewVisibility(R.id.broadnet_card, if (broadnet) View.VISIBLE else View.GONE)
+            views.setViewVisibility(R.id.card_divider, if (mobile && broadnet) View.VISIBLE else View.GONE)
+            views.setViewVisibility(R.id.widget_empty, if (!mobile && !broadnet) View.VISIBLE else View.GONE)
+            if (mobile) bindCard(views, readCard(context, "mobile"), threshold, now, true)
+            if (broadnet) bindCard(views, readCard(context, "broadnet"), threshold, now, false)
             val intent = Intent(context, MainActivity::class.java).apply {
                 action = "cn.liuliang.liuliang_app.OPEN_WIDGET"
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP

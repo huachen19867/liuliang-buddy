@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:liuliang_app/data/models.dart';
+import 'package:liuliang_app/ui/carrier_selection_screen.dart';
 import 'package:liuliang_app/ui/dashboard_screen.dart';
 
 const _previewBoundaryKey = ValueKey<String>('dashboard-preview');
@@ -27,7 +28,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('两张卡，一眼看清'), findsOneWidget);
+      expect(find.text('所选运营商，一眼看清'), findsOneWidget);
       expect(find.text('连接后查看'), findsNWidgets(2));
       expect(tester.takeException(), isNull);
 
@@ -69,8 +70,8 @@ void main() {
     await tester.pump();
     expect(calls.connected, [Carrier.mobile, Carrier.broadnet]);
 
-    await tester.ensureVisible(find.text('全部刷新'));
-    await tester.tap(find.text('全部刷新'));
+    await tester.ensureVisible(find.text('刷新所选'));
+    await tester.tap(find.text('刷新所选'));
     await tester.pump();
     expect(calls.refreshAll, 1);
 
@@ -136,7 +137,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('两张卡，一眼看清'), findsOneWidget);
+    expect(find.text('所选运营商，一眼看清'), findsOneWidget);
     expect(find.text('通用流量总览'), findsNothing);
     expect(find.textContaining('显示上次查询'), findsOneWidget);
     expect(find.textContaining('登录已过期 · 以下为上次查询'), findsOneWidget);
@@ -170,6 +171,70 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('单家运营商只显示所选卡片并按该卡数据汇总', (tester) async {
+    _configureViewport(tester, const Size(390, 844));
+    await tester.pumpWidget(
+      _host(
+        snapshots: _demoSnapshots(),
+        selectedCarriers: const {Carrier.mobile},
+        demo: true,
+        textScale: 1.0,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('中国移动'), findsWidgets);
+    expect(find.text('中国广电'), findsNothing);
+    expect(find.text('通用流量总览'), findsOneWidget);
+    expect(find.text('12.4'), findsNWidgets(2));
+    expect(find.textContaining('中国移动的通用流量剩余'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('单家广电可显示套餐汇总且不套用通用提醒', (tester) async {
+    _configureViewport(tester, const Size(390, 844));
+    await tester.pumpWidget(
+      _host(
+        snapshots: [
+          _broadnetPackageSnapshot([30, 113]),
+        ],
+        selectedCarriers: const {Carrier.broadnet},
+        demo: true,
+        textScale: 1.0,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('中国移动'), findsNothing);
+    expect(find.text('中国广电'), findsWidgets);
+    expect(find.text('套餐明细合计'), findsNWidgets(2));
+    expect(find.text('143'), findsNWidgets(2));
+    expect(find.text('适用范围以各套餐规则为准'), findsOneWidget);
+    expect(find.textContaining('提醒线'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('可以从首页进入运营商管理选择页', (tester) async {
+    _configureViewport(tester, const Size(390, 844));
+    var manageCalls = 0;
+    await tester.pumpWidget(
+      _host(
+        snapshots: const [],
+        selectedCarriers: const {Carrier.mobile},
+        demo: false,
+        textScale: 1.0,
+        onManageCarriers: () => manageCalls++,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('运营商设置'));
+    await tester.tap(find.text('运营商设置'));
+    await tester.pump();
+
+    expect(manageCalls, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('广电 unknown 套餐大字主位合计，明细可展开并查看完整名称', (tester) async {
     _configureViewport(tester, const Size(320, 640));
     final packages = _broadnetPackageSnapshot([30, 113, 20, 4, 2]);
@@ -194,7 +259,7 @@ void main() {
       expect(find.text('169'), findsOneWidget);
       expect(find.textContaining('适用范围以各套餐规则为准'), findsOneWidget);
       expect(find.text('查看全部 5 项'), findsOneWidget);
-      expect(find.text('两张卡，一眼看清'), findsOneWidget);
+      expect(find.text('所选运营商，一眼看清'), findsOneWidget);
       expect(tester.takeException(), isNull);
     }
 
@@ -282,14 +347,125 @@ void main() {
     expect(output.existsSync(), isTrue);
     expect(output.lengthSync(), greaterThan(10_000));
   });
+
+  testWidgets('导出首次选择、单家、多家和设置页的真实组件DEMO截图', (tester) async {
+    _configureViewport(tester, const Size(390, 1360));
+
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpWidget(
+      _selectionHost(
+        selected: {Carrier.mobile, Carrier.broadnet},
+        isInitialSetup: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
+    expect(find.text('先选好你的运营商'), findsOneWidget);
+    await _writeScreenshot(tester, 'carrier-selection-demo.png');
+
+    tester.view.physicalSize = const Size(390, 1100);
+    await tester.pumpWidget(
+      _host(
+        snapshots: _demoSnapshots(),
+        selectedCarriers: const {Carrier.mobile},
+        demo: true,
+        textScale: 1.0,
+        onAddWidget: () {},
+        onManageCarriers: () {},
+        previewBoundaryKey: _previewBoundaryKey,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
+    expect(find.text('中国广电'), findsNothing);
+    await _writeScreenshot(tester, 'dashboard-single-demo.png');
+
+    tester.view.physicalSize = const Size(390, 1360);
+    await tester.pumpWidget(
+      _host(
+        snapshots: _demoSnapshots(),
+        selectedCarriers: const {Carrier.mobile, Carrier.broadnet},
+        demo: true,
+        textScale: 1.0,
+        onAddWidget: () {},
+        onManageCarriers: () {},
+        previewBoundaryKey: _previewBoundaryKey,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
+    expect(find.text('中国移动'), findsWidgets);
+    expect(find.text('中国广电'), findsWidgets);
+    await _writeScreenshot(tester, 'dashboard-multiple-demo.png');
+
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpWidget(
+      _selectionHost(selected: {Carrier.mobile}, isInitialSetup: false),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
+    expect(find.text('管理运营商'), findsOneWidget);
+    await _writeScreenshot(tester, 'carrier-settings-demo.png');
+    expect(tester.takeException(), isNull);
+  });
+}
+
+Widget _selectionHost({
+  required Set<Carrier> selected,
+  required bool isInitialSetup,
+}) {
+  final typography = Typography.material2021(platform: TargetPlatform.android);
+  return MaterialApp(
+    theme: ThemeData(
+      useMaterial3: true,
+      fontFamily: 'PreviewChinese',
+      textTheme: typography.black.apply(fontFamily: 'PreviewChinese'),
+      primaryTextTheme: typography.white.apply(fontFamily: 'PreviewChinese'),
+      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4E83D9)),
+    ),
+    builder: (context, child) => RepaintBoundary(
+      key: _previewBoundaryKey,
+      child: MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: const TextScaler.linear(1.0)),
+        child: child!,
+      ),
+    ),
+    home: CarrierSelectionScreen(
+      selectedCarriers: selected,
+      isInitialSetup: isInitialSetup,
+      demo: true,
+      onSelectionChanged: (_) {},
+      onContinue: (_) {},
+    ),
+  );
+}
+
+Future<void> _writeScreenshot(WidgetTester tester, String fileName) async {
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(_previewBoundaryKey),
+  );
+  final output = _previewFile(fileName);
+  await tester.runAsync(() async {
+    final image = await boundary.toImage(pixelRatio: 2);
+    final png = await image.toByteData(format: ui.ImageByteFormat.png);
+    await output.parent.create(recursive: true);
+    await output.writeAsBytes(png!.buffer.asUint8List());
+    image.dispose();
+  });
+  expect(output.existsSync(), isTrue);
+  expect(output.lengthSync(), greaterThan(10_000));
 }
 
 Widget _host({
   required List<CarrierSnapshot> snapshots,
   required bool demo,
   required double textScale,
+  Set<Carrier> selectedCarriers = const {Carrier.mobile, Carrier.broadnet},
   _CallbackCalls? calls,
   VoidCallback? onAddWidget,
+  VoidCallback? onManageCarriers,
   bool widgetSupported = true,
   Key? previewBoundaryKey,
 }) {
@@ -322,6 +498,8 @@ Widget _host({
       onRefreshAll: () => callbacks.refreshAll++,
       onSettings: () => callbacks.settings++,
       onAbout: () => callbacks.about++,
+      selectedCarriers: selectedCarriers,
+      onManageCarriers: onManageCarriers,
       onAddWidget: onAddWidget,
       widgetSupported: widgetSupported,
     ),

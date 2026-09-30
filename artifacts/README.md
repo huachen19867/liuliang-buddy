@@ -13,3 +13,9 @@ APK SHA-256：711c032453868810d57d5319883b657907d95ac1cc8fe63b86ca0a7151b90954�
 此版本修复广电已同步但主数值为空的摘要显示，首页与桌面使用“套餐明细合计”，用途以各套餐规则为准，不参与通用汇总/提醒。完整 Flutter 37 项测试、原生 6 项展示测试、静态分析及 Node 探针检查通过。收到用户真机查询同步反馈，新版摘要和 Launcher 添加/缩放/点击仍待真机核对。卡片显示原查询时间，点击打开 APP 更新；不会在亮屏时自动向运营商联网。
 
 可交互 Web 演示位于 app/build/web/，以 DEMO=true 构建，需通过本地 HTTP 服务访问。源码与运行说明见根 README.md。
+
+## 1.2.0 输出
+
+carrier-selection-demo.png、dashboard-single-demo.png、dashboard-multiple-demo.png、carrier-settings-demo.png 分别为首次选择、移动单卡、移动/广电组合和运营商设置。来自真实Flutter组件渲染，明确标注DEMO，不含用户账号或真机图片。
+
+当前APK更新为1.2.0+5，113,901,232字节，SHA-256：fba83e5088d1fcd6143364a483d605542c5d99e39ccb11544b2f273082e97f8b，v2签名通过，API24/36、ARM64、Android Debug。历史1.1.2记录见上文，公开发布目标 https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.2.0 。

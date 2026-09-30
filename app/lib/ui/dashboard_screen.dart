@@ -14,6 +14,8 @@ class DashboardScreen extends StatelessWidget {
     required this.onRefreshAll,
     required this.onSettings,
     required this.onAbout,
+    this.selectedCarriers,
+    this.onManageCarriers,
     this.onAddWidget,
     this.widgetSupported = true,
     this.demo = false,
@@ -26,6 +28,8 @@ class DashboardScreen extends StatelessWidget {
   final VoidCallback onRefreshAll;
   final VoidCallback onSettings;
   final VoidCallback onAbout;
+  final Set<Carrier>? selectedCarriers;
+  final VoidCallback? onManageCarriers;
   final VoidCallback? onAddWidget;
   final bool widgetSupported;
   final bool demo;
@@ -35,11 +39,27 @@ class DashboardScreen extends StatelessWidget {
   static const _canvas = Color(0xFFFFF9F1);
   static const _mobileBlue = Color(0xFF4E83D9);
   static const _broadnetPeach = Color(0xFFE58C79);
+  static const _carrierPalette = <Color>[
+    _mobileBlue,
+    _broadnetPeach,
+    Color(0xFF63A68C),
+    Color(0xFF8B7AC7),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final mobile = _snapshotFor(Carrier.mobile);
-    final broadnet = _snapshotFor(Carrier.broadnet);
+    final chosen = selectedCarriers ?? snapshots.map((s) => s.carrier).toSet();
+    final carriers = Carrier.values
+        .where(chosen.contains)
+        .toList(growable: false);
+    final entries = [
+      for (final carrier in carriers)
+        _DashboardCarrier(
+          carrier: carrier,
+          snapshot: _snapshotFor(carrier),
+          accent: _carrierPalette[carrier.index % _carrierPalette.length],
+        ),
+    ];
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -53,37 +73,37 @@ class DashboardScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildHeader(context),
+                  _buildHeader(context, carriers),
                   if (demo) ...[
                     const SizedBox(height: 15),
                     const _DemoNotice(),
                   ],
                   const SizedBox(height: 18),
                   _SummaryCard(
-                    mobile: mobile,
-                    broadnet: broadnet,
+                    entries: entries,
                     thresholdGb: thresholdGb,
                     onRefreshAll: onRefreshAll,
                   ),
-                  const SizedBox(height: 18),
-                  _CarrierCard(
-                    carrier: Carrier.mobile,
-                    slotLabel: '移动卡',
-                    snapshot: mobile,
-                    accent: _mobileBlue,
-                    onConnect: () => onConnect(Carrier.mobile),
-                    onRefresh: () => onRefresh(Carrier.mobile),
-                  ),
-                  const SizedBox(height: 13),
-                  _CarrierCard(
-                    carrier: Carrier.broadnet,
-                    slotLabel: '广电卡',
-                    snapshot: broadnet,
-                    accent: _broadnetPeach,
-                    onConnect: () => onConnect(Carrier.broadnet),
-                    onRefresh: () => onRefresh(Carrier.broadnet),
-                  ),
+                  for (var index = 0; index < entries.length; index++) ...[
+                    SizedBox(height: index == 0 ? 18 : 13),
+                    _CarrierCard(
+                      carrier: entries[index].carrier,
+                      slotLabel: _carrierCardLabel(entries[index].carrier),
+                      snapshot: entries[index].snapshot,
+                      accent: entries[index].accent,
+                      onConnect: () => onConnect(entries[index].carrier),
+                      onRefresh: () => onRefresh(entries[index].carrier),
+                    ),
+                  ],
                   const SizedBox(height: 16),
+                  if (onManageCarriers != null) ...[
+                    _FooterAction(
+                      icon: Icons.tune_rounded,
+                      label: '运营商设置',
+                      onTap: onManageCarriers!,
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   Row(
                     children: [
                       Expanded(
@@ -107,6 +127,7 @@ class DashboardScreen extends StatelessWidget {
                   WidgetPreviewCard(
                     widgetSupported: widgetSupported,
                     onAddWidget: onAddWidget,
+                    selectedCarriers: carriers,
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -126,8 +147,13 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, List<Carrier> carriers) {
     final theme = Theme.of(context);
+    final carrierCaption = carriers.isEmpty
+        ? '先选择运营商'
+        : carriers.length == 1
+        ? '${carriers.single.label}的流量，清楚一点'
+        : '多家运营商的流量，清楚一点';
     return Row(
       children: [
         Container(
@@ -159,15 +185,15 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                '两张卡的流量，清楚一点',
+                carrierCaption,
                 style: theme.textTheme.bodySmall?.copyWith(color: _mutedInk),
               ),
             ],
           ),
         ),
         IconButton.filledTonal(
-          onPressed: onRefreshAll,
-          tooltip: '刷新两张卡',
+          onPressed: carriers.isEmpty ? null : onRefreshAll,
+          tooltip: '刷新所选运营商',
           style: IconButton.styleFrom(
             backgroundColor: Colors.white,
             foregroundColor: _ink,
@@ -185,6 +211,25 @@ class DashboardScreen extends StatelessWidget {
     }
     return null;
   }
+}
+
+class _DashboardCarrier {
+  const _DashboardCarrier({
+    required this.carrier,
+    required this.snapshot,
+    required this.accent,
+  });
+
+  final Carrier carrier;
+  final CarrierSnapshot? snapshot;
+  final Color accent;
+}
+
+String _carrierCardLabel(Carrier carrier) {
+  final name = carrier.label.startsWith('中国')
+      ? carrier.label.substring('中国'.length)
+      : carrier.label;
+  return '$name卡';
 }
 
 class _DemoNotice extends StatelessWidget {
@@ -221,26 +266,65 @@ class _DemoNotice extends StatelessWidget {
 
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
-    required this.mobile,
-    required this.broadnet,
+    required this.entries,
     required this.thresholdGb,
     required this.onRefreshAll,
   });
 
-  final CarrierSnapshot? mobile;
-  final CarrierSnapshot? broadnet;
+  final List<_DashboardCarrier> entries;
   final double thresholdGb;
   final VoidCallback onRefreshAll;
 
   @override
   Widget build(BuildContext context) {
-    final hasTotal = _canAggregate(mobile) && _canAggregate(broadnet);
-    final hasRecords =
-        (mobile?.queriedAt != null && mobile!.buckets.isNotEmpty) ||
-        (broadnet?.queriedAt != null && broadnet!.buckets.isNotEmpty);
-    final bytes = hasTotal
-        ? mobile!.generalRemainingBytes! + broadnet!.generalRemainingBytes!
+    final hasGeneralTotal =
+        entries.isNotEmpty &&
+        entries.every(
+          (entry) =>
+              entry.snapshot?.status == QueryStatus.success &&
+              entry.snapshot?.generalRemainingBytes != null,
+        );
+    final single = entries.length == 1 ? entries.single : null;
+    final singleSummary =
+        single?.snapshot == null ||
+            single?.snapshot?.status != QueryStatus.success
+        ? null
+        : summarizeTraffic(single!.snapshot!);
+    final hasSinglePackageTotal = singleSummary?.label == '套餐明细合计';
+    final hasRecords = entries.any(
+      (entry) =>
+          entry.snapshot?.queriedAt != null &&
+          entry.snapshot!.buckets.isNotEmpty,
+    );
+    final bytes = hasGeneralTotal
+        ? entries.fold<int>(
+            0,
+            (sum, entry) => sum + entry.snapshot!.generalRemainingBytes!,
+          )
+        : hasSinglePackageTotal
+        ? singleSummary!.remainingBytes
         : 0;
+    final showAmount = hasGeneralTotal || hasSinglePackageTotal;
+    final headline = hasGeneralTotal
+        ? '通用流量总览'
+        : hasSinglePackageTotal
+        ? singleSummary!.label
+        : entries.isEmpty
+        ? '尚未选择运营商'
+        : entries.length == 1
+        ? '${entries.single.carrier.label}的流量'
+        : '所选运营商，一眼看清';
+    final explanation = hasGeneralTotal
+        ? entries.length == 1
+              ? '${entries.single.carrier.label}的通用流量剩余'
+              : '所选运营商的通用流量剩余合计'
+        : hasSinglePackageTotal
+        ? '仅将已查询套餐的余额相加'
+        : entries.isEmpty
+        ? '选择至少一家运营商后，这里会显示对应流量。'
+        : hasRecords
+        ? '余额见下方，完整的通用流量合计待确认。'
+        : '连接已选择的运营商账号后，流量会显示在这里。';
     final theme = Theme.of(context);
 
     return Container(
@@ -270,7 +354,7 @@ class _SummaryCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        hasTotal ? '通用流量总览' : '两张卡，一眼看清',
+                        headline,
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: const Color(0xFF5D514B),
                           fontWeight: FontWeight.w700,
@@ -278,19 +362,19 @@ class _SummaryCard extends StatelessWidget {
                       ),
                     ),
                     TextButton.icon(
-                      onPressed: onRefreshAll,
+                      onPressed: entries.isEmpty ? null : onRefreshAll,
                       style: TextButton.styleFrom(
                         foregroundColor: const Color(0xFF6D5147),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         visualDensity: VisualDensity.compact,
                       ),
                       icon: const Icon(Icons.sync_rounded, size: 17),
-                      label: const Text('全部刷新'),
+                      label: const Text('刷新所选'),
                     ),
                   ],
                 ),
                 const SizedBox(height: 11),
-                if (hasTotal) ...[
+                if (showAmount) ...[
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -318,31 +402,44 @@ class _SummaryCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 7),
                   Text(
-                    '两张卡的通用流量剩余合计',
+                    explanation,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: const Color(0xFF71645D),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _ThresholdHint(thresholdGb: thresholdGb),
+                  if (hasGeneralTotal) ...[
+                    const SizedBox(height: 12),
+                    _ThresholdHint(thresholdGb: thresholdGb),
+                  ],
+                  if (hasSinglePackageTotal) ...[
+                    const SizedBox(height: 12),
+                    const _SummaryScopeNote(),
+                  ],
                 ] else ...[
                   Text(
-                    hasRecords ? '各卡余量见下方，通用流量总览待确认。' : '连接运营商账号后，流量会显示在这里。',
+                    explanation,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: const Color(0xFF71645D),
                       height: 1.45,
                     ),
                   ),
                   const SizedBox(height: 9),
-                  const Row(
+                  Wrap(
+                    spacing: 13,
+                    runSpacing: 6,
                     children: [
-                      _MiniCarrierDot(color: Color(0xFF4E83D9)),
-                      SizedBox(width: 6),
-                      Text('中国移动', style: TextStyle(fontSize: 12)),
-                      SizedBox(width: 14),
-                      _MiniCarrierDot(color: Color(0xFFE58C79)),
-                      SizedBox(width: 6),
-                      Text('中国广电', style: TextStyle(fontSize: 12)),
+                      for (final entry in entries)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _MiniCarrierDot(color: entry.accent),
+                            const SizedBox(width: 6),
+                            Text(
+                              entry.carrier.label,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ],
@@ -353,11 +450,20 @@ class _SummaryCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  bool _canAggregate(CarrierSnapshot? snapshot) {
-    return snapshot?.status == QueryStatus.success &&
-        snapshot?.generalRemainingBytes != null;
-  }
+class _SummaryScopeNote extends StatelessWidget {
+  const _SummaryScopeNote();
+
+  @override
+  Widget build(BuildContext context) => const Text(
+    '适用范围以各套餐规则为准',
+    style: TextStyle(
+      color: Color(0xFF71645D),
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+    ),
+  );
 }
 
 class _ThresholdHint extends StatelessWidget {

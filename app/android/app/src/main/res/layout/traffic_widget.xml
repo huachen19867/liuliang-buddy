@@ -34,12 +34,14 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/widget_cards"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:orientation="horizontal">
 
         <LinearLayout
+            android:id="@+id/mobile_card"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
@@ -101,11 +103,13 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/card_divider"
             android:layout_width="5dp"
             android:layout_height="match_parent"
             android:text="" />
 
         <LinearLayout
+            android:id="@+id/broadnet_card"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
@@ -165,5 +169,14 @@
                 android:textSize="9sp"
                 android:maxLines="1" />
         </LinearLayout>
+        <TextView
+            android:id="@+id/widget_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="先在应用里选择运营商"
+            android:textColor="#74819A"
+            android:textSize="12sp"
+            android:visibility="gone" />
     </LinearLayout>
 </LinearLayout>

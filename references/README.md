@@ -16,3 +16,7 @@ Git 直连在本机失败，前三个项目和广电扩展通过 GitHub codeload
 android-widget 的文件与许可证已下载至本地，详细来源在该目录 README.md，实施结论在 docs/WIDGET_RESEARCH.md。GitHub 仓库保留本索引，参考源码不重复上传。
 
 广电失败复核记录位于 broadnet-public/failure-review/，使用新的公开官网加载与本地合成响应核对两套 jQuery 实例、原探针漏数及修复后桥接。可复用的验证脚本收录于 scripts/test-broadnet-browser.cjs；证据范围和复用方法见 docs/PROTOCOL_RESEARCH.md，不含真实账号或凭证。
+
+新增联通/电信精选参考：`ChinaUnicomMonitor/` 来源 https://github.com/dengfhqqq/ChinaUnicomMonitor （未发现LICENSE）；`FlowLite/` 来源 https://github.com/nongchengqi/FlowLite （未发现LICENSE）；`ChinaTelecomMonitor/` 来源 https://github.com/Cp0204/ChinaTelecomMonitor （AGPL-3.0，附LICENSE）。仅协议研究，不复制到应用，这些项目依赖APP认证，不能作为网页登录已接通的依据。
+
+`carrier-web-research.cjs` 与 `carrier-web-entries.json` 为本机Chrome公开入口检查工具及无账号结果。结论见 `docs/UNICOM_TELECOM_RESEARCH.md`。

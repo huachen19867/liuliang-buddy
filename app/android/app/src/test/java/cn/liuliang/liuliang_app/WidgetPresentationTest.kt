@@ -88,4 +88,17 @@ class WidgetPresentationTest {
         assertEquals("上次记录", display.state)
         assertFalse(display.low)
     }
+
+    @Test fun carrierWhitelistSupportsLegacySingleAndEmptyLayouts() {
+        assertEquals(
+            setOf("mobile", "broadnet"),
+            WidgetCarrierSelection.fromPayload(null, false),
+        )
+        assertEquals(
+            setOf("broadnet"),
+            WidgetCarrierSelection.fromPayload(listOf("broadnet", "broadnet", "future"), true),
+        )
+        assertEquals(emptySet<String>(), WidgetCarrierSelection.fromPayload(emptyList<String>(), true))
+        assertEquals(emptySet<String>(), WidgetCarrierSelection.fromPayload("mobile", true))
+    }
 }

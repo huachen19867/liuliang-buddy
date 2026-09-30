@@ -10,6 +10,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/models.dart';
+import 'data/carrier_selection.dart';
+import 'ui/carrier_selection_screen.dart';
 import 'data/parsers.dart';
 import 'services/page_probe.dart';
 import 'services/response_policy.dart';
@@ -61,6 +63,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   final Map<Carrier, DateTime> _lastRequests = {};
   final Map<Carrier, bool> _warnedLow = {};
   SharedPreferences? _prefs;
+  CarrierSelection _selection = CarrierSelection.unconfigured();
+  Set<Carrier> _draftSelection = {};
+  bool _restoring = true;
+  bool _savingSelection = false;
   Map<String, dynamic>? _broadnetSession;
   Carrier? _visibleCarrier;
   double _thresholdGb = 5;
@@ -94,7 +100,11 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     final generation = _generation;
     await _store(() async {
       if (_current(generation)) {
-        await _widgetBridge.update(_snapshots.values, _thresholdGb);
+        await _widgetBridge.update(
+          _snapshots.values,
+          _thresholdGb,
+          selection: _selection,
+        );
       }
     });
   }
@@ -134,6 +144,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     if (_android && !demoMode) _widgetBridge.onOpen(_openFromWidget);
     if (demoMode) {
+      _selection = CarrierSelection.complete(Carrier.values);
+      _restoring = false;
       for (final carrier in Carrier.values) {
         _snapshots[carrier] = CarrierSnapshot(
           carrier: carrier,
@@ -200,6 +212,17 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     if (!_current(generation)) return;
     setState(() {
       _prefs = prefs;
+      _selection = CarrierSelection.restore(
+        savedJson: prefs.get('carrier_selection') == null
+            ? null
+            : prefs.get('carrier_selection') is String
+            ? prefs.get('carrier_selection') as String
+            : 'invalid',
+        legacyPreferences: {
+          for (final key in prefs.getKeys()) key: prefs.get(key),
+        },
+      );
+      _restoring = false;
       _broadnetSession = session;
       _thresholdGb = (prefs.getDouble('threshold_gb') ?? 5).clamp(1, 20);
       _reminders = prefs.getBool('reminders') ?? false;
@@ -221,6 +244,14 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         if (prefs.getBool('connected_${carrier.name}') ?? false) {
           _connected.add(carrier);
         }
+      }
+    });
+    await _store(() async {
+      if (_current(generation)) {
+        await prefs.setString(
+          'carrier_selection',
+          _selection.toStorageString(),
+        );
       }
     });
     await _publishWidget();
@@ -249,7 +280,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   }
 
   void _connect(Carrier carrier) {
-    if (_clearing) return;
+    if (_clearing || !_selection.allows(carrier)) return;
     if (demoMode || !_android) {
       _showInfo('这是界面预览', '请安装安卓测试包后连接号码。演示流量不是您的实际余额。');
       return;
@@ -286,13 +317,13 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   void _refreshAll() {
     if (demoMode || _clearing) return;
-    for (final carrier in _connected.toList()) {
+    for (final carrier in _selection.queryableCarriers(_connected)) {
       _refresh(carrier, automatic: true);
     }
   }
 
   Future<void> _refresh(Carrier carrier, {bool automatic = false}) async {
-    if (_clearing) return;
+    if (_clearing || !_selection.allows(carrier)) return;
     if (!_connected.contains(carrier)) {
       if (!automatic) _connect(carrier);
       return;
@@ -340,7 +371,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     List<dynamic> args,
     int generation,
   ) async {
-    if (!_current(generation)) return;
+    if (!_current(generation) || !_selection.allows(carrier)) return;
     if (args.isEmpty || args.first is! Map) return;
     final payload = Map<String, dynamic>.from(args.first as Map);
     final url = Uri.tryParse(payload['url'] as String? ?? '');
@@ -507,7 +538,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                       child: Text(
-                        _webMessage ?? '在官网完成验证后点击「查询流量」。关闭此页可回到双卡首页。',
+                        _webMessage ?? '在官网完成验证后点击「查询流量」。关闭此页可回到首页。',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF736F69),
@@ -608,6 +639,85 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _applySelection(Set<Carrier> carriers) async {
+    if (_savingSelection || carriers.isEmpty || _clearing) return;
+    final previousSelection = _selection;
+    final selection = CarrierSelection.complete(carriers);
+    final oldControllers = _controllers.values.toList();
+    setState(() {
+      _savingSelection = true;
+      _generation++;
+      _selection = selection;
+      _controllers.clear();
+      _visibleCarrier = null;
+      _lastRequests.clear();
+      _warnedLow.clear();
+    });
+    final generation = _generation;
+    for (final timer in _timeouts.values) {
+      timer.cancel();
+    }
+    for (final controller in oldControllers) {
+      try {
+        await controller.stopLoading();
+      } on Exception {
+        /* Already disposed. */
+      }
+    }
+    try {
+      await _store(() async {
+        if (_current(generation)) {
+          if (_android && !demoMode) {
+            await _widgetBridge.clear();
+          }
+          final saved = await _prefs?.setString(
+            'carrier_selection',
+            selection.toStorageString(),
+          );
+          if (saved == false) throw StateError('Selection save failed');
+          if (_android && !demoMode) {
+            try {
+              await _notifications.invokeMethod('cancelAll');
+            } on PlatformException {
+              /* Display and query selection stay valid. */
+            }
+          }
+        }
+      });
+      if (_current(generation)) {
+        setState(() => _savingSelection = false);
+        await _publishWidget();
+      }
+    } catch (_) {
+      if (_current(generation)) {
+        setState(() {
+          _selection = previousSelection;
+          _savingSelection = false;
+        });
+        await _publishWidget();
+        _showInfo('设置暂未完整保存', '请重新选择运营商并保存。');
+      }
+    }
+  }
+
+  Future<void> _manageCarriers() async {
+    var draft = _selection.selectedCarriers.toSet();
+    final result = await Navigator.of(context).push<Set<Carrier>>(
+      MaterialPageRoute(
+        builder: (context) => StatefulBuilder(
+          builder: (context, update) => CarrierSelectionScreen(
+            selectedCarriers: draft,
+            onSelectionChanged: (value) => update(() => draft = value),
+            onContinue: (value) => Navigator.pop(context, value),
+            isInitialSetup: false,
+            demo: demoMode,
+          ),
+        ),
+      ),
+    );
+    if (result != null && mounted) await _applySelection(result);
+  }
+
   Future<void> _settings() async {
     double threshold = _thresholdGb;
     bool reminders = _reminders;
@@ -627,6 +737,18 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('管理运营商'),
+                  subtitle: Text(
+                    _selection.selectedCarriers.map((c) => c.label).join(' · '),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.pop(context);
+                    unawaited(_manageCarriers());
+                  },
+                ),
                 Text('通用流量低于 ${threshold.toStringAsFixed(0)} GB 时提醒'),
                 Slider(
                   value: threshold,
@@ -759,6 +881,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         );
       }
     });
+    await _publishWidget();
   }
 
   void _showInfo(String title, String content) => showDialog<void>(
@@ -784,23 +907,38 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     child: Scaffold(
       body: Stack(
         children: [
-          DashboardScreen(
-            snapshots: _snapshots.values.toList(),
-            thresholdGb: _thresholdGb,
-            onConnect: _connect,
-            onRefresh: _refresh,
-            onRefreshAll: _refreshAll,
-            onSettings: _settings,
-            onAddWidget: _addWidget,
-            widgetSupported: _android && !demoMode,
-            onAbout: () => _showInfo(
-              '流量小伙伴 · 测试版',
-              '数据来自您在官方网页验证后的查询结果，通用、定向和用途未知的流量分开展示。\n\n两家运营商已实现官网查询结果读取；真实号码登录和余额准确性仍需手机验证，无法识别时请在官方查询页查看。\n\n会话保存在手机本地，广电会话备份使用系统安全存储；不上传第三方服务器，不读取短信或服务密码。桌面卡片显示上次查询的余额和时间，点击打开 APP 更新；APP 关闭后不会持续查询。',
+          if (_restoring || _savingSelection)
+            const Center(child: CircularProgressIndicator())
+          else if (!_selection.setupCompleted)
+            CarrierSelectionScreen(
+              selectedCarriers: _draftSelection,
+              onSelectionChanged: (value) =>
+                  setState(() => _draftSelection = value),
+              onContinue: (value) => unawaited(_applySelection(value)),
+              demo: demoMode,
+            )
+          else
+            DashboardScreen(
+              snapshots: _selection.visibleSnapshots(_snapshots.values),
+              selectedCarriers: _selection.selectedCarriers,
+              onManageCarriers: _manageCarriers,
+              thresholdGb: _thresholdGb,
+              onConnect: _connect,
+              onRefresh: _refresh,
+              onRefreshAll: _refreshAll,
+              onSettings: _settings,
+              onAddWidget: _addWidget,
+              widgetSupported: _android && !demoMode,
+              onAbout: () => _showInfo(
+                '流量小伙伴 · 测试版',
+                '数据来自您在官方网页验证后的查询结果，通用、定向和用途未知的流量分开展示。\n\n两家运营商已实现官网查询结果读取；真实号码登录和余额准确性仍需手机验证，无法识别时请在官方查询页查看。\n\n会话保存在手机本地，广电会话备份使用系统安全存储；不上传第三方服务器，不读取短信或服务密码。桌面卡片显示上次查询的余额和时间，点击打开 APP 更新；APP 关闭后不会持续查询。',
+              ),
+              demo: demoMode,
             ),
-            demo: demoMode,
-          ),
           if (_android && !demoMode)
-            for (final carrier in _connected) _webView(carrier),
+            if (!_restoring && !_savingSelection)
+              for (final carrier in _selection.queryableCarriers(_connected))
+                _webView(carrier),
         ],
       ),
     ),

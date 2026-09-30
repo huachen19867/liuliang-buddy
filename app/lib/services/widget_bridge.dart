@@ -1,18 +1,28 @@
 import 'package:flutter/services.dart';
 
 import '../data/models.dart';
+import '../data/carrier_selection.dart';
 import '../data/traffic_summary.dart';
 
 /// Display-only snapshot. No phone numbers, credentials or raw responses.
 Map<String, Object?> buildWidgetPayload(
   Iterable<CarrierSnapshot> snapshots, {
   required double thresholdGb,
+  CarrierSelection? selection,
 }) {
-  final payload = <String, Object?>{'schema': 1, 'thresholdGb': thresholdGb};
+  final selected = selection?.selectedCarriers ?? Carrier.values.toSet();
+  final payload = <String, Object?>{
+    'schema': 1,
+    'thresholdGb': thresholdGb,
+    'selectedCarriers': [
+      for (final carrier in Carrier.values)
+        if (selected.contains(carrier)) carrier.name,
+    ],
+  };
   for (final carrier in Carrier.values) {
-    final snapshot = snapshots
-        .where((item) => item.carrier == carrier)
-        .firstOrNull;
+    final snapshot = !selected.contains(carrier)
+        ? null
+        : snapshots.where((item) => item.carrier == carrier).firstOrNull;
     final summary = snapshot == null ? null : summarizeTraffic(snapshot);
     payload[carrier.name] = <String, Object?>{
       'status': snapshot?.status.name ?? QueryStatus.notConnected.name,
@@ -38,12 +48,17 @@ class WidgetBridge {
 
   Future<void> update(
     Iterable<CarrierSnapshot> snapshots,
-    double thresholdGb,
-  ) async {
+    double thresholdGb, {
+    CarrierSelection? selection,
+  }) async {
     try {
       await channel.invokeMethod<void>(
         'updateSnapshot',
-        buildWidgetPayload(snapshots, thresholdGb: thresholdGb),
+        buildWidgetPayload(
+          snapshots,
+          thresholdGb: thresholdGb,
+          selection: selection,
+        ),
       );
     } on PlatformException {
       /* A launcher failure cannot replace carrier data. */

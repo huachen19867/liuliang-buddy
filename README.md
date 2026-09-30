@@ -1,10 +1,10 @@
 # 流量小伙伴
 
-一个面向中国移动和中国广电两张流量卡的安卓测试应用。首页采用奶油背景、圆润双色卡片与笑脸水滴，展示每张卡的剩余流量、查询时间、连接状态，以及通用和定向额度。号码验证由用户在运营商官方网页完成，成功会话尽量复用。
+一个可自行选择运营商的安卓流量查询测试应用。首次使用选择至少一家，当前支持移动单卡、广电单卡或移动与广电组合；设置中可随时改选。联通、电信仍在协议研究阶段，暂不开放余额读取。首页采用奶油背景、圆润双色卡片与笑脸水滴，展示每张卡的剩余流量、查询时间、连接状态，以及通用和定向额度。号码验证由用户在运营商官方网页完成，成功会话尽量复用。
 
-当前版本 1.1.2+4：[GitHub 仓库](https://github.com/huachen19867/liuliang-app) · [安装包发布页](https://github.com/huachen19867/liuliang-app/releases/tag/v1.1.2)。私有仓库需要登录有访问权的 GitHub 账号。
+当前版本 1.2.0+5，公开发布目标：[GitHub 仓库](https://github.com/huachen19867/liuliang-buddy) · [安装包发布页](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.2.0)。原有私有仓库和历史发布保留。
 
-已生成的安装包：artifacts/liuliang-buddy-debug.apk（约 85.3 MiB，Android 7.0 及以上 ARM64 手机）。APK 构建和 v2 签名检查通过，flutter analyze 无问题，37 项 Flutter 测试、6 项原生卡片测试及网页探针 Node 验证通过。广电监听修复还通过真实公开官网配合本地合成响应的 Chrome 验证；已收到用户真机双卡同步截图，官方余额对照与新版显示仍需实际手机核对。
+已生成的安装包：artifacts/liuliang-buddy-debug.apk（约 108.6 MiB，Android 7.0 及以上 ARM64 手机）。APK 构建和 v2 签名检查通过，flutter analyze 无问题，54 项 Flutter 测试、7 项原生卡片测试及网页探针 Node 验证通过。广电监听修复还通过真实公开官网配合本地合成响应的 Chrome 验证；已收到用户真机双卡同步截图，官方余额对照与新版显示仍需实际手机核对。
 
 当前为待真机验证的测试版：移动响应读取与解密已实现；广电官网的真实查询接口、业务字段和 KB 单位已从公开页面核对，使用官网自身解密后的结果。没有真实账号登录验证，不保证各省份或套餐均可读取。运营商没有在调研中提供可稳定依赖的公开余额 API，官网改版或会话失效会影响自动查询。
 
@@ -17,7 +17,11 @@
 | 位置 | 内容 |
 | --- | --- |
 | app/lib/main.dart | 生命周期、官方 WebView、会话、查询与提醒集成 |
-| app/lib/ui/dashboard_screen.dart | 可爱双卡首页与各种连接状态 |
+| app/lib/ui/dashboard_screen.dart | 按所选运营商展示的可爱首页与各种连接状态 |
+| app/lib/ui/carrier_selection_screen.dart | 首次运营商选择与后续改选页面 |
+| app/lib/data/carrier_selection.dart | 选择保存、旧版迁移及查询门禁 |
+| docs/ONBOARDING_DESIGN.md | 选择流程、旧版迁移与本地记录行为 |
+| docs/UNICOM_TELECOM_RESEARCH.md | 联通、电信入口及尚未接通的证据边界 |
 | app/lib/data/ | 数据模型及移动、广电响应解析 |
 | app/lib/data/traffic_summary.dart | 首页与桌面共享的通用余额/广电套餐明细摘要 |
 | app/lib/services/page_probe.dart | 限定接口的响应观察、移动解码与广电会话脚本 |
@@ -41,6 +45,11 @@
 | docs/WIDGET_RESEARCH.md | Android AppWidget 官方参考、支持范围与实施边界 |
 | docs/RELEASE_1.1.0.md | 版本说明、验证与安装包哈希 |
 | docs/RELEASE_1.1.1.md | 广电查询修复、验证与安装包哈希 |
+| docs/RELEASE_1.2.0.md | 首次选择、单卡适配与公开测试发布 |
+| artifacts/carrier-selection-demo.png | 首次运营商选择DEMO截图 |
+| artifacts/dashboard-single-demo.png | 移动单卡首页DEMO截图 |
+| artifacts/dashboard-multiple-demo.png | 移动/广电组合首页DEMO截图 |
+| artifacts/carrier-settings-demo.png | 运营商设置DEMO截图 |
 | docs/RELEASE_1.1.2.md | 广电摘要显示修正、验证与安装包哈希 |
 | references/README.md | 下载的参考项目和公开页面索引 |
 | .tools/ | 本工作区构建依赖与缓存，不属于应用业务源码 |

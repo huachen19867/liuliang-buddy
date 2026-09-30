@@ -109,3 +109,19 @@ main 源码提交 25f480697abbb11333e3991153d557b3e2cc35af 已推送，GitHub co
 1.1.2/code4 APK构建成功并通过v2签名检查，aapt2核对版本、API24/36、名称与权限。89,489,653字节，SHA-256为711c032453868810d57d5319883b657907d95ac1cc8fe63b86ca0a7151b90954；个人调试签名延续，不启用DEMO。所有版本、说明和输出索引已更新，用户手机图片没有进入仓库；新增预览完全来自测试样本。新GitHub发布待上传后核对。
 
 源码1d66460420dcdfbc782926e56e8c90633f52f6ef已推送并经API核对，v1.1.2标签一致。私有测试Release https://github.com/huachen19867/liuliang-app/releases/tag/v1.1.2 已发布（draft=false）；APK uploaded、89,489,653字节，服务端SHA-256 digest与本地711c032453868810d57d5319883b657907d95ac1cc8fe63b86ca0a7151b90954一致。Web DEMO更新构建成功。旧版Release保留，用户可覆盖安装1.1.2，实际摘要与桌面还需手机核对。
+
+### 通用运营商版本：联通、电信独立初查
+
+已复用技术日志与既有移动/广电参考，新增ChinaUnicomMonitor、FlowLite、ChinaTelecomMonitor精选文件并记录许可来源。前两者未提供LICENSE，电信项目为AGPL-3.0，均仅协议研究不复制代码。三者依赖APP抓包Cookie/token或APP账号服务，不作为官方网页登录已接通的证据。
+
+本机Chrome无账号打开联通iservice后正常跳uac网页登录，电信login.189.cn也显示密码/短信登录；未输入账号、发送短信或保存Cookie。尚未确认两家官网流量响应、单位和成功码，因此只能确认官方入口候选，不能宣称四家真实查询都已支持。工具与公开结果在references/carrier-web-research.cjs和carrier-web-entries.json；详细结论见docs/UNICOM_TELECOM_RESEARCH.md。本阶段未改应用文件，公开GitHub与功能范围由根代理继续跟进。
+
+## 2026-09-30：通用选择版本 1.2.0
+
+老板要求首次选择运营商、适配单卡与不同组合，公开GitHub并交付几张应用内截图。先读取日志，复用已有参考，并下载联通/电信候选项目；按用户指定三角色分别负责公开协议证据、选择模型与桌面、可爱UI。联通/电信仅确认登录入口，缺少真实余量字段和单位证据，当前实现范围仍为移动/广电单选或组合，不提供不可查询的假入口。发布准备新建liuliang-buddy公开仓库，保留旧私有仓库。
+
+main集成首次配置、启动恢复加载、旧connected标记迁移、设置改选、首页过滤。未完成选择不创建WebView或查询，改选提升generation、取消计时器、卸载WebView，旧回调失效。隐藏卡保留本地凭证/记录但停止查询与展示，桌面缓存先清空再发布选中数据，取消旧通知；清除账号数据保留选择。新增集成验证关注首次无默认选、单卡保存/重启、旧连接迁移及损坏配置不重启隐藏卡。实际组件DEMO截图与最终构建/发布结果待核对。
+
+完整Flutter54项、analyze、Node探针通过，原生JUnit7项通过。四张应用内DEMO实际组件截图已重生并逐张检查；选择/管理页390×844、单卡390×1100、多卡390×1360，输出为2倍PNG。首次图CTA中文缺字来自测试Host未覆盖ButtonStyle字体，已为截图host显式使用已加载中文字体，不影响正式APP系统字体。保存流程按先清空桌面再持久化选择，失败回到旧选择；异常类型配置回到首次页。最后源码改动后重建APK，最终哈希及GitHub核对待记录。
+
+最终APK在最后主流程修改后重建，113,901,232字节，SHA-256 fba83e5088d1fcd6143364a483d605542c5d99e39ccb11544b2f273082e97f8b。apksigner v2通过，aapt2确认1.2.0/code5、API24/36；Zip核对libflutter.so仅arm64-v8a。普通debug包，未传DEMO；源码与截图准备公开，工具、缓存、参考下载、APK和用户截图排除，APK放Release。新公开仓库huachen19867/liuliang-buddy已创建并核对isPrivate=false，旧私有仓库未改变。
