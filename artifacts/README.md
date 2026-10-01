@@ -69,3 +69,7 @@ android-system-surfaces-settings-demo.png 为真实Flutter设置组件渲染，D
 1.8.0正式主包18,350,307字节，SHA-256 b8943da4629e17a03c5f74b9e69d9822335c8dea6c9ab99d442d51151f7ee88c，新证书33b11555；旧签名Release过渡包18,376,558字节、SHA-256 5b9785c4edecfbcb14754e21adbb711650637764ce4b386da71edc0cab205c14，旧证书fdf71a4c。两包非debuggable、v2通过、API24/36、仅ARM64、非签名区315项内容相同。130项Flutter/analyze/16项原生通过，系统通知/磁贴和R8后台长期实机行为仍待复测。
 
 1.8.0 此次交付新增两个安卓Release APK与设置组件DEMO截图；现有四张iOS模拟器截图和归档仍属于已验收的1.7.0，不作为1.8.0产物。iOS最终源码云端验证run36838979981进行中，后续以实际回执更新。
+
+## 1.8.1 启动热修
+
+唯一正式APK18,383,087字节，SHA-256 59fe631319748e3ed998ae134cf3a89c6e781856d0fd4a0f1be4adbe66b53caa，证书沿用33b11555。1.8.1/code12、API24/36、ARM64、非debuggable及v2通过。隔离工作树从2afb682仅含Room无参构造保留修复与版本变化，未混入后续UI改版；荣耀Android16原1.8启动崩溃复现、同签名覆盖后冷启动及持续进程通过，老板确认正常。日志/截图保留.tools/android-crash，不作为公开组件预览。详见docs/RELEASE_1.8.1.md。

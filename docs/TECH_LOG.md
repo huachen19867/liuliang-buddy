@@ -249,3 +249,9 @@ Release切换AOT、R8、资源裁剪、ARM64 ABI，拒绝无发布签名的Relea
 
 老板进一步明确旧版升级渠道属于负资产，最终策略收敛为唯一正式签名APK。已撤下Release旧签名升级附件，保留本地历史文件；README、版本说明和构建说明统一移除升级下载引导，构建脚本移除CreateLegacyUpgrade参数与重签名分支，后续不维护双渠道。旧测试版无法跨证书覆盖，说明自行卸载/重新登录和本地记录清除。历史技术日志与验收摘要保留作追溯，不冒充当前分发。此次仅分发呈现及脚本简化，未修改/重建应用二进制；核对PowerShell语法与公开单APK摘要。
 收尾核对：GitHub 1.8.0现只有一个上传资产，uploaded/18,350,307字节/SHA-256 b8943da4629e17a03c5f74b9e69d9822335c8dea6c9ab99d442d51151f7ee88c与本地一致，draft=false/prerelease=false。构建脚本语法通过，补正README旧构建命令，应用二进制未变。
+
+## 2026-10-01：1.8 Release 真机启动闪退热修
+
+老板反馈荣耀/iQOO13等Android16手机打开闪退，连接荣耀BKQ-AN00真机后原1.8日志明确InitializationProvider->WorkManagerInitializer->Room反射创建WorkDatabase_Impl时报无参构造NoSuchMethodException。原Room consumer只keep类而未保留构造；原生单元测试/debug及静态签名校验未覆盖Release初始化，这是1.8验收漏项。精确keep WorkDatabase_Impl.public <init>()，不关闭R8/后台功能，不删除数据库。先对四个原生SO ELF LOAD及zipalign16KB核验通过，JNI/mapping调查未误判为根因，官方依赖复用证据见RELEASE_STARTUP_REVIEW。
+
+仅proguard及pubspec1.8.1+12提交2afb682；隔离.tools/hotfix-1.8.1工作树构建，避免正在工作的UI/备注代码混入。正式Release18,383,087字节，SHA-256 59fe631319748e3ed998ae134cf3a89c6e781856d0fd4a0f1be4adbe66b53caa，原正式证书33b11555/v2、非debuggable、ARM64/API24/36。用户亲自确认系统安装提示后同签名覆盖成功，ADB冷启动进入首次选择页，PID6565持续存在，启动之后crash buffer无新增本应用异常；老板确认“已安装，没有问题”。原始系统日志/截图仅留忽略.tools目录，不公开个人数据。仅本台荣耀实测，不声称iQOO或所有机型已验证；公开1.8.1唯一APK分发回执随后补充。
