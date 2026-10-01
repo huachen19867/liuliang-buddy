@@ -287,3 +287,5 @@ WidgetAccountDetails新增小组件专用secondaryStatus/primarySummary；正常
 Flutter ResortCarrierMark与安卓badge ImageView统一128px资源，添加无障碍运营商名，不再显示CM/CBN或移/广代用品。桌面头部由19dp增24dp容纳23dp标识，不改查询缓存/通知逻辑。完整Flutter144项通过；实际选择页和XML预览目视四家标识正确。原图透明色调在view_image显示成色块，Chrome正常透明渲染与canvas导出证实是原图alpha呈现问题，不擅自改色。正式1.9.2构建进行中。
 
 最终144项Flutter通过/analyze无问题；Release1.9.2/code15、27,313,816字节、SHA256 4c68d09a3a19313f8f80c252ae9c72df519fc83ef5dcada58bc152900ad8291c，v2/正式证书33b11555/非debuggable/ARM64/API24-36/16KB ZIP对齐通过，APK四张Logo存在。pubspec仅声明四张PNG，原图与README不入Logo资源打包。透明标识与两卡预览、四家选择页目视正常；没有新真机验收。
+
+1.9.2已正式公开：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.9.2 ，draft=false/prerelease=false、仓库isPrivate=false，target 74e7120bed7d2c08e7a1ee1c20db6f2d13e0dd07。唯一uploaded APK27,313,816字节，远端digest4c68d09a3a19313f8f80c252ae9c72df519fc83ef5dcada58bc152900ad8291c与本地相同。首次gh create检查因EOF中断，回读确认不存在再重试成功，没有重复发布或换包。源码只推public，当前回执另提交。
