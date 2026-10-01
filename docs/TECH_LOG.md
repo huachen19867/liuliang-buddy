@@ -242,3 +242,7 @@ Release切换AOT、R8、资源裁剪、ARM64 ABI，拒绝无发布签名的Relea
 发布前说明核对：研究中原推荐的磁贴切换通知方案更新为最终前台查询动作，系统设置入口描述与实际引导一致。本次1.8.0聚焦安卓正式分发，不把1.7.0 iOS截图/归档标成新版；最终源码iOS run36838979981尚在云端构建，未记为通过。
 
 公开1.8.0正式发布完成：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.8.0 ，draft=false/prerelease=false，仓库private=false。标签API核对为1d316503b53f367a44f203bcc99d78f304ad2431，app/、scripts/、workflow与已验收构建源码ecb89035a17e941b76b3724862b19df396852ad5逐树相同。三项资产均uploaded：正式APK18,350,307字节/b8943da4，旧证书Release过渡APK18,376,558字节/5b9785c4，设置DEMO截图78,972字节/8477d70f；GitHub digest逐项与本机一致。只推public，私钥及DPAPI凭证ignored。此次正式分发标记不等同实体手机及各省真实账号已验证，iOS最新云端流程仍独立进行。本回执另作main文档提交，不修改已公开标签或APK。
+
+## 2026-10-01：简化公开下载入口
+
+老板反馈Assets五项让用户误以为有五个版本。检查1.8.0实际为两个APK、一个演示PNG及GitHub自动生成的两种源码归档。复用现有Release与已提交截图，移除Release中重复的PNG附件但保留工作区/仓库原图，未删历史版本、源码或安装包。两个APK添加中文用途标签，保持原文件名和下载URL；发布说明与README首屏增加“正式版”和“旧版保留记录升级”直接下载入口，把截图与校验信息改为说明链接。源码ZIP/TAR.GZ由GitHub生成，不能作为普通附件隐藏。仅更改分发呈现，不重建APK或重复应用测试；发布后核对两个资产摘要仍与1.8.0验收一致。

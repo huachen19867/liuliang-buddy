@@ -62,6 +62,8 @@ dashboard-voice-sms-demo.png 来自实际Flutter首页组件，显示通话分�
 
 ## 1.8.0 系统入口与 Release
 
+公开下载页只保留两份安卓安装包，分别标注“安卓正式版 · 首次安装”和“安卓旧版升级 · 保留记录”。设置组件DEMO截图保留在本目录及源码中，从Release附件移除，改为发布说明内的预览链接。两个Source code归档是GitHub自动生成的源码文件，不是安装包。APK内容、文件名、签名和哈希均未改变，既有下载链接保持有效。
+
 android-system-surfaces-settings-demo.png 为真实Flutter设置组件渲染，DEMO标注明确，演示开启通知栏余额与快捷设置入口；不是系统通知或磁贴实拍。主分发改liuliang-buddy-release.apk，旧证书Release过渡包为liuliang-buddy-legacy-upgrade.apk；Debug历史文件不作为新版分发。大小与证书的最终ARM64验收回执如下。
 
 1.8.0正式主包18,350,307字节，SHA-256 b8943da4629e17a03c5f74b9e69d9822335c8dea6c9ab99d442d51151f7ee88c，新证书33b11555；旧签名Release过渡包18,376,558字节、SHA-256 5b9785c4edecfbcb14754e21adbb711650637764ce4b386da71edc0cab205c14，旧证书fdf71a4c。两包非debuggable、v2通过、API24/36、仅ARM64、非签名区315项内容相同。130项Flutter/analyze/16项原生通过，系统通知/磁贴和R8后台长期实机行为仍待复测。

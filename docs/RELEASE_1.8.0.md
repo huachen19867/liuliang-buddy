@@ -1,5 +1,11 @@
 # 1.8.0 通知栏、快捷设置与安卓 Release 分发
 
+**第一次安装或已使用正式版：**下载[安卓正式版（18.35 MB）](https://github.com/huachen19867/liuliang-buddy/releases/download/v1.8.0/liuliang-buddy-release.apk)。
+
+**已安装以前的测试版，要保留记录：**下载[旧版升级包（18.38 MB）](https://github.com/huachen19867/liuliang-buddy/releases/download/v1.8.0/liuliang-buddy-legacy-upgrade.apk)。两个签名渠道不能互相覆盖。
+
+适用 Android 7.0 及以上 ARM64 手机。iPhone 暂无可安装的签名包。GitHub 自动生成的 Source code ZIP / TAR.GZ 是源码，手机安装不需要下载。
+
 安卓“提醒设置”新增通知栏余额与快捷设置入口两个开关，默认关闭、即时保存。通知展示各账号最近查询的流量、状态和原时间；点击打开应用。通知权限或渠道被关时说明原因，不假报开启成功。Android14允许划掉普通持续通知，后续查询更新时可以再次显示。
 
 快捷设置入口启用后还要添加到系统面板。Android13起请求系统确认，取消不算添加成功，可重试；旧版通过下拉菜单编辑手动拖入。磁贴显示缓存摘要，点击打开应用并触发前台查询，不增加新的后台周期。两项仅安卓提供，iOS设置隐藏。
