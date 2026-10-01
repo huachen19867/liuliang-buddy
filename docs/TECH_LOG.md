@@ -263,3 +263,5 @@ Release切换AOT、R8、资源裁剪、ARM64 ABI，拒绝无发布签名的Relea
 修复备注对话框关闭动画期间 TextEditingController 提前销毁，以及测试平台覆盖未清理；截图示例补齐单位，不放松生产校验。Flutter 144 项全部通过，Node fetch/XHR 与联通过期探针回归通过；真实 Chrome 电信合成页面 11 类场景通过（新增正负元余额、费用/KB/缺值拒绝）。这是合成验证，不冒充真实账号。用户已拔 USB，继续构建不等设备。1.8.1 已公开唯一 APK，荣耀验证成功；1.9 新小组件尚待 Launcher 真机验证。
 
 最终 analyze 无问题，JUnit21/Flutter144通过。正常 Flutter Release ARM64 构建成功，未采用 --no-pub 或直接 assembleRelease；wrapper restored，DPAPI私钥不入库。APK27,185,049字节/SHA256 43aa24ea8a1f24804dc410f98dcf6294ad4a5e2274870572cbf16e4a609bfddc；v2/非debuggable/code13/API24-36/ARM64/16KB ZIP对齐通过，正式证书33b11555保持。角色四张PNG新增约7.53MB，整体比1.8.1增加8.80MB。准备唯一APK公开发布，不附源码以外多余二进制。
+
+1.9.0 正式公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.9.0 ，仓库isPrivate=false，Release draft=false/prerelease=false，target a3b85a2443f6dc36bb1e979994b7dfed0b5f5a26。唯一上传资产liuliang-buddy-release.apk，uploaded/27,185,049字节，GitHub digest 43aa24ea8a1f24804dc410f98dcf6294ad4a5e2274870572cbf16e4a609bfddc与本地一致。截图放公开仓库和发布正文，不占Assets；来源/验证边界写明，仅push public。工作区源码提交后无未提交修改，回执单独文档提交，不变更已发布APK或tag。
