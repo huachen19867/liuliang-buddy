@@ -59,3 +59,9 @@ dashboard-voice-sms-demo.png 来自实际Flutter首页组件，显示通话分�
 1.7.0/code10当前安卓包91,439,548字节，SHA-256：9b191abbab3c41abed7c9c188361440289581abcb4dc916bfe33504953a78549，API24/36、ARM64 Flutter、原Android Debug证书、v2验签通过，未启用DEMO。完整123项Flutter和analyze通过。iOS新产物待云端验收回执，历史模拟器截图仍属于1.6.0。
 
 1.7.0的ios-selection/dashboard/widget-guide/settings-simulator.png已更新为run36826003180真实模拟器截图，未连接账号、通话短信等待连接，无真实套餐数据。Release提供未签名模拟器归档56,902,762字节，SHA-256 8304ec122473e14aa5815fb6b921d26bcac13c3dc0dab960cfd024db448a64e6；由云端发布助手run36828372883上传且GitHubdigest核对一致，本机Actions下载超时后使用Release成功取回四张截图。
+
+## 1.8.0 系统入口与 Release
+
+android-system-surfaces-settings-demo.png 为真实Flutter设置组件渲染，DEMO标注明确，演示开启通知栏余额与快捷设置入口；不是系统通知或磁贴实拍。主分发改liuliang-buddy-release.apk，旧证书Release过渡包为liuliang-buddy-legacy-upgrade.apk；Debug历史文件不作为新版分发。大小与证书验收回执待最终ARM64重建核对。
+
+1.8.0正式主包18,350,307字节，SHA-256 8eae226fc13b840ada5623a98d8d1c84bc222d2f80877511bc3efae71b556134，新证书33b11555；旧签名Release过渡包18,376,558字节、SHA-256 8d4ab92783a53208bd164eef44cc0d79775d2acf84ecc3e8c203615412fa4d5e，旧证书fdf71a4c。两包非debuggable、v2通过、API24/36、仅ARM64、非签名区315项内容相同。130项Flutter/analyze/16项原生通过，系统通知/磁贴和R8后台长期实机行为仍待复测。

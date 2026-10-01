@@ -225,3 +225,15 @@ iOS run36826003180已success：Xcode编译、完整123项Flutter、analyze、Swi
 iOS归档改由云端发布助手run36828372883取得run36826003180已验收artifact并上传Release草稿，success；模拟器包56,902,762字节、SHA-256 8304ec122473e14aa5815fb6b921d26bcac13c3dc0dab960cfd024db448a64e6。GitHub digest与云端sha256sum一致；四张原始1206×2622截图改从Release正常下载到本机，逐张目视核对且hash与云端/GitHub一致，复制artifacts索引。首页包含未连接的通话短信面板，设置5GB是阈值，无真实账号或编造余额。截图不是实际系统Widget验收，不交付iPhone签名包。
 
 公开1.7.0发布完成：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.7.0 ，draft=false/prerelease=true，标签与源码目标fb50e4984095ee9286b07775da2ef7f0a24cca44一致。发布树app/、原iOS验证脚本及工作流与已通过run36826003180的e697ecb相同，后来只有文档/截图和已单独成功验收的产物发布助手。七个资产均uploaded，APK9b191abb/91,439,548字节、模拟器8304ec12/56,902,762字节及五张PNG摘要核对一致。只推public，公开仓库private=false；本段回执另作文档提交，不改已发布tag或安装包。
+
+## 2026-10-01：通知栏、快捷设置与 Release 正式分发
+
+老板要求设置中增加两个系统入口开关，公开GitHub分发必须Release，解决旧Debug APK约91.4MB体积。先读技术日志与原通知/Widget缓存，再按Astra轻度官方参考研究、SOL高原生实现、Luna极高设置UI拆分；第三新代理受线程上限，复用既有Luna角色完成。官方android/platform-samples quicksettings精选源码固定0445045与LICENSE已下载，Flutter官方签名/R8资料亦归档，方法见SYSTEM_SURFACES_RESEARCH.md。
+
+通知沿用展示白名单缓存，每账号状态及原查询时间，不创建前台服务；QS磁贴提供明确查询/刷新操作，不声称实时后台查询。设置即时保存，通知系统/渠道阻断显示原因，组件启用不等于已添加；API33用户确认、旧版手动编辑。UI测试首轮旧widget_test漏mock新原生通道导致pumpAndSettle超时，补mock后完整130项通过，analyze无问题；新settings DEMO截图生成。
+
+Release切换AOT、R8、资源裁剪、ARM64 ABI，拒绝无发布签名的Release任务。创建私有RSA3072 PKCS12发布证书，密码仅DPAPI保存，被忽略的.tools/signing目录限当前用户与SYSTEM，不输出密码/提交密钥。新证书不可覆盖旧Debug，因此另提供相同Release内容旧证书过渡包，用户选安装渠道，不由应用删旧数据。构建与原生检查进行中，体积待实测。
+
+原生应用JUnit16项通过（Widget12、调度1、系统面板3），均0失败/错误。Release初次直接assembleRelease与随后Flutter --no-pub均保留dev integration_test注册，导致Java类缺失；本SDK --no-pub会跳过releaseMode插件注册，必须用正常flutter build apk --release，未手工修改生成文件或全局SDK。复用已校验Gradle zip，通过构建脚本临时wrapper URI并finally恢复公开URL；R8成功。首个Release18,587,863字节，非debuggable，但插件其它ABI仍被Flutter默认过滤重设纳入；明确disable-abi-filtering保留应用ARM64过滤，正在最终重建。旧FOREGROUND_SERVICE权限来自原WorkManager合并清单，历史包亦有，本功能未新增服务。
+
+最终ARM64 Release包18,350,307字节（18.35MB/17.50MiB），SHA-256 8eae226fc13b840ada5623a98d8d1c84bc222d2f80877511bc3efae71b556134；新证书33b115558027fdfa667a3f14a9351fbdb29901948c085daf739e16a9055a497e。旧证书Release过渡包18,376,558字节，SHA-256 8d4ab92783a53208bd164eef44cc0d79775d2acf84ecc3e8c203615412fa4d5e，证书保持fdf71a4c。两包315项非META-INF内容逐一SHA相同，均非debuggable、v2签名通过、code11/1.8.0、API24/36、native-code只arm64-v8a；无短信/通话读取权限。相较1.7.0的91,439,548字节主包减少79.93%。原生16项/Flutter130/analyze已经通过，后面仅ABI/签名构建核对，不虚构真机通知或R8后台成功。wrapper公开URI恢复，私钥目录ignored核对，Android.settings DEMO目视无溢出。准备公开源码与启动iOS共用UI验收。

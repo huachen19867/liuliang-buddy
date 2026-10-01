@@ -244,6 +244,24 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, TrafficWidgetProvider::class.java))
             ids.forEach { manager.updateAppWidget(it, createViews(context)) }
+            SystemSurfaces.refresh(context)
+        }
+
+        /** The widget and system surfaces read exactly the same validated display cache. */
+        internal fun displayCards(context: Context): Pair<List<WidgetCardData>, Double> {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val threshold = prefs.getFloat("thresholdGb", DEFAULT_THRESHOLD_GB.toFloat()).toDouble()
+            val hasSelection = prefs.getBoolean("selectionPresent", false)
+            val legacySelected = if (hasSelection) WidgetCarrierSelection.displayOrder(
+                WidgetCarrierSelection.order.filter { prefs.getBoolean("${it}Selected", false) }.toSet()
+            ) else listOf("mobile", "broadnet")
+            val cards = if (prefs.getInt("schema", 1) == 2) {
+                (0 until prefs.getInt("instanceCount", 0).coerceIn(0, WidgetInstances.MAX))
+                    .map { readInstance(context, it) }
+            } else {
+                legacySelected.map { readCard(context, it) }
+            }
+            return cards to threshold
         }
 
         fun installationStatus(context: Context, nowMillis: Long = System.currentTimeMillis()): Map<String, String> {
@@ -396,19 +414,9 @@ class TrafficWidgetProvider : AppWidgetProvider() {
 
         private fun createViews(context: Context): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.traffic_widget)
-            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            val threshold = prefs.getFloat("thresholdGb", DEFAULT_THRESHOLD_GB.toFloat()).toDouble()
+            val (cards, threshold) = displayCards(context)
             val now = System.currentTimeMillis()
-            val hasSelection = prefs.getBoolean("selectionPresent", false)
-            val legacySelected = if (hasSelection) WidgetCarrierSelection.displayOrder(
-                WidgetCarrierSelection.order.filter { prefs.getBoolean("${it}Selected", false) }.toSet()
-            ) else listOf("mobile", "broadnet")
-            val cards = if (prefs.getInt("schema", 1) == 2) {
-                (0 until prefs.getInt("instanceCount", 0).coerceIn(0, WidgetInstances.MAX))
-                    .map { readInstance(context, it) }
-            } else {
-                legacySelected.map { readCard(context, it) }
-            }
+            val legacySelected = cards.mapNotNull { it.carrier }
             val slots = listOf(
                 intArrayOf(R.id.slot_1, R.id.slot_1_name, R.id.slot_1_state, R.id.slot_1_amount, R.id.slot_1_label, R.id.slot_1_time),
                 intArrayOf(R.id.slot_2, R.id.slot_2_name, R.id.slot_2_state, R.id.slot_2_amount, R.id.slot_2_label, R.id.slot_2_time),

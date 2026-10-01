@@ -47,6 +47,18 @@
         <receiver
             android:name=".WidgetPinResultReceiver"
             android:exported="false" />
+        <service
+            android:name=".TrafficQuickSettingsTileService"
+            android:label="流量查询/刷新"
+            android:icon="@drawable/system_surface_icon"
+            android:enabled="false"
+            android:exported="true"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="true" />
+        </service>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

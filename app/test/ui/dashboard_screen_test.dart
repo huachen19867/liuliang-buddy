@@ -11,6 +11,8 @@ import 'package:liuliang_app/data/carrier_accounts.dart';
 import 'package:liuliang_app/data/carrier_selection.dart';
 import 'package:liuliang_app/ui/carrier_selection_screen.dart';
 import 'package:liuliang_app/ui/dashboard_screen.dart';
+import 'package:liuliang_app/ui/system_surfaces_settings.dart';
+import 'package:liuliang_app/services/system_surfaces.dart';
 
 const _previewBoundaryKey = ValueKey<String>('dashboard-preview');
 const _broadnetPreviewBoundaryKey = ValueKey<String>(
@@ -20,6 +22,69 @@ const _gib = 1024 * 1024 * 1024;
 
 void main() {
   setUpAll(_loadPreviewChineseFont);
+
+  testWidgets('生成通知栏与快捷设置组件DEMO截图', (tester) async {
+    _configureViewport(tester, const Size(390, 844));
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemSurfaces.channel,
+      (_) async => {
+        'notificationEnabled': true,
+        'tileEnabled': true,
+        'notificationsAllowed': true,
+        'tileAddSupported': true,
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemSurfaces.channel,
+        null,
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(
+          useMaterial3: true,
+          fontFamily: 'PreviewChinese',
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF75A795)),
+        ),
+        home: RepaintBoundary(
+          key: _previewBoundaryKey,
+          child: Scaffold(
+            backgroundColor: const Color(0xFFFFFBF5),
+            body: SafeArea(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        '照顾好你的流量',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'DEMO · 设置组件示例，非系统通知栏截图',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      SizedBox(height: 24),
+                      SystemSurfacesSettings(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await _writeScreenshot(tester, 'android-system-surfaces-settings-demo.png');
+  });
 
   testWidgets('通话短信逐项展示未知真零超额与原查询时间', (tester) async {
     _configureViewport(tester, const Size(320, 1200));

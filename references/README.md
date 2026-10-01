@@ -1,5 +1,9 @@
 # 参考项目索引
 
+`system-surfaces/` 保存 2026-10-01 下载的 Android 官方 Quick Settings、TileService API、通知权限、通知渠道和 Android 14 ongoing 通知变化网页；`index.json` 记录原始 URL、HTTP 状态与 SHA-256。复用平台方案，不复制业务代码，官方网页按页脚 CC BY 4.0／代码示例 Apache 2.0 使用。API 分界、系统授权与不能承诺不可清除的研究结论见 `docs/SYSTEM_SURFACES_RESEARCH.md`。
+
+同目录 `platform-samples/` 已下载 Google 官方 Quick Settings 模块源码/资源和 Apache-2.0 LICENSE，固定 commit `0445045024fafb3e15104c4f4f7a016e2d0d71ee`，`sample-index.json` 保存文件来源与 blob/SHA-256。`flutter-android-release.md` 是 Flutter 官方网站 Android 发布文档（blob `451913d810c7b80d4ebae5ad4513caf8c15c9af8`），签名与 R8 资料来源见 `flutter-release-index.json`。以上仅参考，不随应用公开打包。
+
 2026-09-30 下载，供调研和复用评估。项目采用的方案与代码引用须记录在技术日志。
 
 | 目录 | 上游 | 许可证 | 用途 |

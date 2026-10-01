@@ -10,6 +10,11 @@
 /references/*
 !/references/README.md
 /artifacts/*.apk
+/artifacts/*.idsig
+*.keystore
+*.jks
+*.p12
+**/key.properties
 /artifacts/apk-*.txt
 /app/android/.gradle/
 /app/android/build/

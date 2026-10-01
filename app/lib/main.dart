@@ -19,6 +19,7 @@ import 'data/parsers.dart';
 import 'services/page_probe.dart';
 import 'services/carrier_web.dart';
 import 'services/background_refresh.dart';
+import 'ui/system_surfaces_settings.dart';
 import 'services/background_refresh_runner.dart';
 import 'services/telecom_page_probe.dart';
 import 'services/response_policy.dart';
@@ -1375,132 +1376,151 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       isScrollControlled: true,
       builder: (context) => StatefulBuilder(
         builder: (context, update) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '照顾好你的流量',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('管理运营商'),
-                  subtitle: Text(
-                    _selection.selectedCarriers.map((c) => c.label).join(' · '),
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(context);
-                    unawaited(_manageCarriers());
-                  },
-                ),
-                for (final account in _visibleAccounts.where(
-                  (a) => !a.isPrimary,
-                ))
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('收起 ${account.label}'),
-                    subtitle: const Text('保留本机查询记录和登录资料，之后可重新加入'),
-                    trailing: const Icon(Icons.remove_circle_outline_rounded),
-                    onTap: () {
-                      Navigator.pop(context);
-                      unawaited(_removeSecondAccount(account.id));
-                    },
-                  ),
-                if (_android)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('桌面卡片后台刷新'),
-                    subtitle: Text(backgroundRefresh.label),
-                    trailing: PopupMenuButton<BackgroundRefreshInterval>(
-                      tooltip: '选择后台刷新间隔',
-                      onSelected: (value) =>
-                          update(() => backgroundRefresh = value),
-                      itemBuilder: (context) => [
-                        for (final value in BackgroundRefreshInterval.values)
-                          PopupMenuItem(value: value, child: Text(value.label)),
-                      ],
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('更改'),
-                            SizedBox(width: 4),
-                            Icon(Icons.expand_more_rounded),
-                          ],
-                        ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * .9,
+            ),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '照顾好你的流量',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
-                if (_ios)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      'iPhone 桌面卡片显示上次查询结果；打开 APP 后会刷新。iOS 暂无定时后台官网查询。',
+                    const SizedBox(height: 16),
+                    if (_android) const SystemSurfacesSettings(),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('管理运营商'),
+                      subtitle: Text(
+                        _selection.selectedCarriers
+                            .map((c) => c.label)
+                            .join(' · '),
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.pop(context);
+                        unawaited(_manageCarriers());
+                      },
                     ),
-                  ),
-                if (_android)
-                  FutureBuilder<BackgroundRefreshStatus>(
-                    future: statusFuture,
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) return const SizedBox.shrink();
-                      final status = snapshot.data!;
-                      final at = status.finishedAt ?? status.startedAt;
-                      final local = at?.toLocal();
-                      final time = local == null
-                          ? ''
-                          : ' · ${local.month}/${local.day} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Text(
-                          '${status.label}$time',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF777D87),
+                    for (final account in _visibleAccounts.where(
+                      (a) => !a.isPrimary,
+                    ))
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('收起 ${account.label}'),
+                        subtitle: const Text('保留本机查询记录和登录资料，之后可重新加入'),
+                        trailing: const Icon(
+                          Icons.remove_circle_outline_rounded,
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          unawaited(_removeSecondAccount(account.id));
+                        },
+                      ),
+                    if (_android)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('桌面卡片后台刷新'),
+                        subtitle: Text(backgroundRefresh.label),
+                        trailing: PopupMenuButton<BackgroundRefreshInterval>(
+                          tooltip: '选择后台刷新间隔',
+                          onSelected: (value) =>
+                              update(() => backgroundRefresh = value),
+                          itemBuilder: (context) => [
+                            for (final value
+                                in BackgroundRefreshInterval.values)
+                              PopupMenuItem(
+                                value: value,
+                                child: Text(value.label),
+                              ),
+                          ],
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('更改'),
+                                SizedBox(width: 4),
+                                Icon(Icons.expand_more_rounded),
+                              ],
+                            ),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                Text('通用流量低于 ${threshold.toStringAsFixed(0)} GB 时提醒'),
-                Slider(
-                  value: threshold,
-                  min: 1,
-                  max: 20,
-                  divisions: 19,
-                  onChanged: (value) => update(() => threshold = value),
+                      ),
+                    if (_ios)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          'iPhone 桌面卡片显示上次查询结果；打开 APP 后会刷新。iOS 暂无定时后台官网查询。',
+                        ),
+                      ),
+                    if (_android)
+                      FutureBuilder<BackgroundRefreshStatus>(
+                        future: statusFuture,
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) return const SizedBox.shrink();
+                          final status = snapshot.data!;
+                          final at = status.finishedAt ?? status.startedAt;
+                          final local = at?.toLocal();
+                          final time = local == null
+                              ? ''
+                              : ' · ${local.month}/${local.day} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Text(
+                              '${status.label}$time',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF777D87),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    Text('通用流量低于 ${threshold.toStringAsFixed(0)} GB 时提醒'),
+                    Slider(
+                      value: threshold,
+                      min: 1,
+                      max: 20,
+                      divisions: 19,
+                      onChanged: (value) => update(() => threshold = value),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('低流量通知'),
+                      value: reminders,
+                      onChanged: (value) => update(() => reminders = value),
+                    ),
+                    const Text(
+                      '后台刷新由 Android 尽力调度，省电模式、网络和运营商响应可能让任务延后。移动、联通、广电可尝试后台网页查询；电信需要打开 APP 查看。前台仍会在打开或返回时查询，并每 5 分钟尝试更新。',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF736F69)),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('保存设置'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _clearData();
+                      },
+                      child: const Text('清除号码连接与本地数据'),
+                    ),
+                  ],
                 ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('低流量通知'),
-                  value: reminders,
-                  onChanged: (value) => update(() => reminders = value),
-                ),
-                const Text(
-                  '后台刷新由 Android 尽力调度，省电模式、网络和运营商响应可能让任务延后。移动、联通、广电可尝试后台网页查询；电信需要打开 APP 查看。前台仍会在打开或返回时查询，并每 5 分钟尝试更新。',
-                  style: TextStyle(fontSize: 13, color: Color(0xFF736F69)),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('保存设置'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _clearData();
-                  },
-                  child: const Text('清除号码连接与本地数据'),
-                ),
-              ],
+              ),
             ),
           ),
         ),

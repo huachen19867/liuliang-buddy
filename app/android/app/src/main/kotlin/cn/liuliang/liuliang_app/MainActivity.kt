@@ -80,6 +80,24 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "cn.liuliang/system_surfaces")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getStatus" -> result.success(SystemSurfaces.status(this))
+                    "setNotificationEnabled" -> {
+                        val enabled = call.arguments as? Boolean
+                        if (enabled == null) result.error("invalid_value", "Expected a boolean", null)
+                        else result.success(SystemSurfaces.setNotificationEnabled(this, enabled))
+                    }
+                    "setTileEnabled" -> {
+                        val enabled = call.arguments as? Boolean
+                        if (enabled == null) result.error("invalid_value", "Expected a boolean", null)
+                        else result.success(SystemSurfaces.setTileEnabled(this, enabled))
+                    }
+                    "requestAddTile" -> SystemSurfaces.requestAddTile(this, result)
+                    else -> result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "cn.liuliang/notifications")
             .setMethodCallHandler { call, result ->
                 when (call.method) {

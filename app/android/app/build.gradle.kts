@@ -4,6 +4,16 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val releaseStore = System.getenv("LIULIANG_KEYSTORE_FILE")
+val releasePassword = System.getenv("LIULIANG_KEYSTORE_PASSWORD")
+val releaseAlias = System.getenv("LIULIANG_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("LIULIANG_KEY_PASSWORD")
+val releaseSigningAvailable = listOf(releaseStore, releasePassword, releaseAlias, releaseKeyPassword)
+    .all { !it.isNullOrBlank() }
+if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) } && !releaseSigningAvailable) {
+    throw GradleException("Release signing is required. Set LIULIANG_KEYSTORE_FILE, LIULIANG_KEYSTORE_PASSWORD, LIULIANG_KEY_ALIAS and LIULIANG_KEY_PASSWORD.")
+}
+
 android {
     namespace = "cn.liuliang.liuliang_app"
     compileSdk = flutter.compileSdkVersion
@@ -23,13 +33,26 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        ndk { abiFilters += listOf("arm64-v8a") }
+    }
+
+    signingConfigs {
+        if (releaseSigningAvailable) {
+            create("distribution") {
+                storeFile = file(releaseStore!!)
+                storePassword = releasePassword
+                keyAlias = releaseAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (releaseSigningAvailable) signingConfig = signingConfigs.getByName("distribution")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }

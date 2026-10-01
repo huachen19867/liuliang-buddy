@@ -391,6 +391,8 @@ void main() {
     dashboard.onSettings();
     await tester.pumpAndSettle();
     expect(find.text('桌面卡片后台刷新'), findsNothing);
+    expect(find.text('通知栏余额'), findsNothing);
+    expect(find.text('快捷设置入口'), findsNothing);
     expect(find.textContaining('iOS 暂无定时后台官网查询'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     debugDefaultTargetPlatformOverride = null;
