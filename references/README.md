@@ -45,3 +45,5 @@ ios-platform-review 保存 2026-10-01 的 Flutter 官方 iOS 开发环境源文�
 通话/短信扩展证据归档在 allowances/：evidence-index.json 记录既有联通/广电/电信官方页面片段的URL、原文件SHA-256和偏移，以及移动MIT参考解析代码；mobile-index.json为2026-10-01重新无账号浏览移动查询页后跳登录的公开请求记录。研究结论与谨慎分类契约见 docs/VOICE_SMS_RESEARCH.md，不含真实号码或余额响应。
 
 carrier-brand/记录2026-10-01四家官网Logo下载调查与公开HTML/CSS，原始资源与具体URL见scripts/carrier-originals/和app/assets/carriers/README.md。仅裁切原版图形保留原色，标识识别使用不改变商标归属；不复制运营商业务代码。
+
+unicom-query-20261001/记录当前联通公开E5/头部JS及无账号会话形态；匿名只验证正常官网函数调用，无登录/验证码或真实余额，观察JSON脱敏为URL、状态、键名和真假标志。研究见docs/UNICOM_QUERY_PROGRESS.md。最小兼容通过官网原函数，不复制认证或令牌生成。

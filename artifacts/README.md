@@ -85,3 +85,5 @@ widget-glass-preview.png由scripts/preview-native-widget.cjs读取实际Android�
 ## 1.9.2 运营商Logo输出
 
 首次选择、首页与widget-glass-preview.png均已更新为四家官网原版图形。图仍分别为Flutter实际组件合成数据截图和Android XML浏览器布局预览，不是运营商或手机实测。标识资源及来源在app/assets/carriers/，原图在scripts/carrier-originals/。
+
+1.9.3将宿主透明框和wrap_content玻璃背景分开，widget-glass-preview.png在400dp宿主验证底色仅贴内容，桌面网格需用户手动缩放。移动Shell与联通兼容风险见对应进展记录，不把这些预览当真实验证码/余量验证。

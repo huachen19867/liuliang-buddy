@@ -289,3 +289,15 @@ Flutter ResortCarrierMark与安卓badge ImageView统一128px资源，添加无�
 最终144项Flutter通过/analyze无问题；Release1.9.2/code15、27,313,816字节、SHA256 4c68d09a3a19313f8f80c252ae9c72df519fc83ef5dcada58bc152900ad8291c，v2/正式证书33b11555/非debuggable/ARM64/API24-36/16KB ZIP对齐通过，APK四张Logo存在。pubspec仅声明四张PNG，原图与README不入Logo资源打包。透明标识与两卡预览、四家选择页目视正常；没有新真机验收。
 
 1.9.2已正式公开：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.9.2 ，draft=false/prerelease=false、仓库isPrivate=false，target 74e7120bed7d2c08e7a1ee1c20db6f2d13e0dd07。唯一uploaded APK27,313,816字节，远端digest4c68d09a3a19313f8f80c252ae9c72df519fc83ef5dcada58bc152900ad8291c与本地相同。首次gh create检查因EOF中断，回读确认不存在再重试成功，没有重复发布或换包。源码只推public，当前回执另提交。
+
+## 2026-10-01：桌面留白、移动验证码与联通兼容
+
+老板真机截图指出组件双卡下面底色多出一块，移动输入手机号后验证码按钮可见无反应，联通仍不可用。先读TECH_LOG、复用官方AppWidget/移动/联通归档；分工SOL高修网页布局，Astra轻度复核联通当前官网与最小查询候选，根修改原生框与集成。桌面透明FrameLayout占宿主，内LinearLayout背景wrap_content，不再把底色撑满。XML预览在400dp宿主测试背景只延伸卡片底部14dp内通过。网格占位仍宿主管理，不能许诺自动释放格子。
+
+移动没有证据表明Flutter/Android平台视图覆盖点击，也无依据盲加EagerGestureRecognizer或伪装UA。官网脚本有号码、状态与协议门禁；新增Shell工具栏单行/图标、键盘出现收长说明、收起键盘按钮和导航区SafeArea。Scaffold.removeViewInsets让子MediaQuery键盘值为0，从上层State context读值传入，四项真实布局/点击回归覆盖，不等同官网验证码实测根因已修。
+
+联通新匿名官网只商城checklogin自然请求，新myLoginObj不初始化旧myE3LoginObj而旧余量仍依赖后者。正常调用官网既有sendRequest匿名返回false且旧精确端点HTTP200，无短信/跳转。最小补丁限定HTTPS/E5/topframe、官网函数齐全、旧状态false/null、新文档一次初始化，仅返回true+server状态true+nettype严格01/02/11调用官网原余额方法；旧已ready不碰。前台仅inFlight文档和后台onLoadStop接线，登录返回刷新后不在旧页再调用。官网函数仍sync无timeout，风险如实记录；不读取凭证或拼token、不复用旧true。Node8组合成与真实匿名原探针+兼容脚本两次只收一次过期事件通过，真实登录后余额仍未验证。
+
+最终Flutter148项通过/analyze无问题，既有Nodefetch/XHR回归通过。没有连接USB，不伪称新包真机通过。老板尚未补联通具体失败阶段，保持候选修复边界。
+
+正式Release1.9.3/code16构建成功，27,314,188字节/SHA256 adcfe6a21c0d0298799f6ca62399debb608d4724e17982b7b6d6aecc4f956bf4；v2/正式证书33b11555/非debuggable/ARM64/API24-36/16KB ZIP对齐通过。wrapper恢复官方配置，源码只push public。版本不能标联通/移动短信已完全修复，已在README关联发布说明和进展边界。

@@ -17,6 +17,7 @@ import 'data/carrier_accounts.dart';
 import 'ui/carrier_selection_screen.dart';
 import 'data/parsers.dart';
 import 'services/page_probe.dart';
+import 'services/unicom_official_query.dart';
 import 'services/carrier_web.dart';
 import 'services/background_refresh.dart';
 import 'ui/system_surfaces_settings.dart';
@@ -30,6 +31,7 @@ import 'services/ios_account_profiles.dart';
 import 'ui/dashboard_screen.dart';
 import 'ui/resort_theme.dart';
 import 'ui/account_identity_dialog.dart';
+import 'ui/carrier_browser_shell.dart';
 
 const demoMode = bool.fromEnvironment('DEMO');
 const _notifications = MethodChannel('cn.liuliang/notifications');
@@ -237,10 +239,27 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         ? null
         : _account(_visibleAccountId!);
     final controller = account == null ? null : _controllers[account.id];
+    if (account != null) await _dismissOfficialKeyboard(account.id);
     if (account?.carrier == Carrier.broadnet && controller != null) {
       await _saveSession(account!, controller, generation);
     }
     if (_current(generation)) setState(() => _visibleAccountId = null);
+  }
+
+  Future<void> _dismissOfficialKeyboard(String accountId) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    try {
+      await _controllers[accountId]?.clearFocus();
+    } on Exception {
+      // The page may have closed while a native focus request was pending.
+    }
+    if (mounted) {
+      try {
+        await SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+      } on PlatformException {
+        // The platform may already have dismissed the keyboard.
+      }
+    }
   }
 
   Future<void> _publishWidget() async {
@@ -913,259 +932,230 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       key: ValueKey('view_${account.id}_$generation'),
       child: Offstage(
         offstage: _visibleAccountId != accountId,
-        child: Column(
-          children: [
-            Material(
-              color: const Color(0xFFFFFAF2),
-              child: SafeArea(
-                bottom: false,
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: _closeOfficialPage,
-                          icon: const Icon(Icons.close),
-                        ),
-                        Expanded(
-                          child: Text(
-                            '${account.label}官方页面',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => _refreshAccount(accountId),
-                          child: const Text('查询流量'),
-                        ),
-                        IconButton(
-                          onPressed: () => _controllers[accountId]?.reload(),
-                          icon: const Icon(Icons.refresh),
-                        ),
-                      ],
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _webMessage ?? '在官网完成验证后点击「查询流量」。关闭此页可回到首页。',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF736F69),
-                            ),
-                          ),
-                          if (carrier == Carrier.mobile)
-                            TextButton(
-                              onPressed: () =>
-                                  _showInfo('移动网页登录帮助', mobileLoginHelpMessage),
-                              child: const Text('登录遇到问题？'),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+        child: CarrierBrowserShell(
+          title: '${account.label}官方页面',
+          message:
+              _webMessage ??
+              (carrier == Carrier.mobile
+                  ? '请在官网自行勾选协议并获取验证码。完成验证后点击上方「查询流量」。'
+                  : '在官网完成验证后点击上方「查询流量」。关闭此页可回到首页。'),
+          onClose: () => unawaited(_closeOfficialPage()),
+          onQuery: () => unawaited(_refreshAccount(accountId)),
+          onReload: () {
+            final controller = _controllers[accountId];
+            if (controller != null) unawaited(controller.reload());
+          },
+          onDismissKeyboard: () =>
+              unawaited(_dismissOfficialKeyboard(accountId)),
+          keyboardVisible: MediaQuery.viewInsetsOf(context).bottom > 0,
+          onHelp: carrier == Carrier.mobile
+              ? () => _showInfo(
+                  '移动网页登录帮助',
+                  '输入完整手机号后，请在官网阅读并自行勾选协议，再点击「获取验证码」。如果按钮没有反应，可先收起键盘，查看官网是否显示协议或错误提示。\n\n$mobileLoginHelpMessage',
+                )
+              : null,
+          child: InAppWebView(
+            key: ValueKey('${account.id}_$_generation'),
+            // Every account is loaded only after its WebView profile is set.
+            initialSettings: AccountWebViewSettings(
+              profileName: _ios ? account.profileName : null,
             ),
-            Expanded(
-              child: InAppWebView(
-                key: ValueKey('${account.id}_$_generation'),
-                // Every account is loaded only after its WebView profile is set.
-                initialSettings: AccountWebViewSettings(
-                  profileName: _ios ? account.profileName : null,
+            initialUserScripts: UnmodifiableListView([
+              UserScript(
+                source: responseCaptureScript,
+                injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+              ),
+              if (carrier == Carrier.telecom)
+                UserScript(
+                  source: telecomRenderedCaptureScript,
+                  injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
                 ),
-                initialUserScripts: UnmodifiableListView([
-                  UserScript(
-                    source: responseCaptureScript,
-                    injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+              if (carrier == Carrier.broadnet)
+                UserScript(
+                  groupName: 'broadnetRestore',
+                  source: broadnetSessionRestoreScript(
+                    _broadnetSessions[accountId],
                   ),
-                  if (carrier == Carrier.telecom)
-                    UserScript(
-                      source: telecomRenderedCaptureScript,
-                      injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-                    ),
-                  if (carrier == Carrier.broadnet)
-                    UserScript(
-                      groupName: 'broadnetRestore',
-                      source: broadnetSessionRestoreScript(
-                        _broadnetSessions[accountId],
-                      ),
-                      injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-                    ),
-                ]),
-                onWebViewCreated: (controller) async {
-                  if (!_current(generation)) return;
-                  if (_ios && account.profileName != null) {
-                    try {
-                      if (!await IOSAccountProfiles.supported()) {
-                        throw StateError(
-                          'Persistent account store unavailable',
-                        );
-                      }
-                    } on Exception {
-                      if (_current(generation)) {
-                        setState(
-                          () => _putSnapshot(
-                            account,
-                            _snapshot(account).copyWith(
-                              status: QueryStatus.error,
-                              message: '此 iPhone 暂无法打开第二张卡的独立登录会话',
-                            ),
-                          ),
-                        );
-                      }
-                      return;
-                    }
+                  injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+                ),
+            ]),
+            onWebViewCreated: (controller) async {
+              if (!_current(generation)) return;
+              if (_ios && account.profileName != null) {
+                try {
+                  if (!await IOSAccountProfiles.supported()) {
+                    throw StateError('Persistent account store unavailable');
                   }
-                  if (_android && account.profileName != null) {
-                    try {
-                      await _store(() async {
-                        if (!_current(generation)) return;
-                        if (await _prefs?.setBool(
-                              'account_profiles_may_exist',
-                              true,
-                            ) !=
-                            true) {
-                          throw StateError(
-                            'Profile ownership could not be saved',
-                          );
-                        }
-                      });
-                      if (!_current(generation)) return;
-                      await (controller.platform
-                              as android_webview.AndroidInAppWebViewController)
-                          .setAccountProfile(account.profileName!);
-                    } catch (_) {
-                      if (_current(generation)) {
-                        setState(
-                          () => _putSnapshot(
-                            account,
-                            _snapshot(account).copyWith(
-                              status: QueryStatus.error,
-                              message: '此手机的网页内核暂不支持第二张同运营商卡',
-                            ),
-                          ),
-                        );
-                      }
-                      return;
-                    }
-                  }
-                  if (!_current(generation)) return;
-                  _controllers[accountId] = controller;
-                  controller.addJavaScriptHandler(
-                    handlerName: 'trafficResponse',
-                    callback: (args) => _receive(account, args, generation),
-                  );
-                  if (_snapshot(account).status == QueryStatus.notConnected) {
-                    try {
-                      await controller.loadUrl(
-                        urlRequest: URLRequest(url: WebUri(_loginUrl(carrier))),
-                      );
-                    } on Exception {
-                      if (_current(generation)) {
-                        setState(
-                          () => _putSnapshot(
-                            account,
-                            _snapshot(account).copyWith(
-                              status: QueryStatus.error,
-                              message: '官方登录页暂时无法打开',
-                            ),
-                          ),
-                        );
-                      }
-                    }
-                  } else {
-                    await _refreshAccount(accountId);
-                  }
-                },
-                shouldOverrideUrlLoading: (controller, action) async =>
-                    _allowedUrl(carrier, action.request.url)
-                    ? NavigationActionPolicy.ALLOW
-                    : NavigationActionPolicy.CANCEL,
-                onUpdateVisitedHistory: (controller, url, isReload) {
-                  if (!_current(generation) || url == null) return;
-                  final uri = Uri.tryParse(url.toString());
-                  if (uri != null && isCarrierLoginPage(uri)) {
-                    _timeouts[accountId]?.cancel();
-                    _inFlight.remove(accountId);
-                    _refreshThrottle.loginOrLoadFailed(accountId);
-                    _awaitingLoginReturn.add(accountId);
+                } on Exception {
+                  if (_current(generation)) {
                     setState(
                       () => _putSnapshot(
                         account,
                         _snapshot(account).copyWith(
-                          status: QueryStatus.authExpired,
-                          message: '请在官方页面验证号码，完成后查询流量',
+                          status: QueryStatus.error,
+                          message: '此 iPhone 暂无法打开第二张卡的独立登录会话',
                         ),
                       ),
                     );
-                    unawaited(_publishWidget());
                   }
-                },
-                onLoadStop: (controller, url) async {
-                  if (!_current(generation)) return;
-                  if (url != null &&
-                      isCarrierLoginPage(Uri.parse(url.toString()))) {
-                    _awaitingLoginReturn.add(accountId);
-                    if (carrier == Carrier.broadnet) {
-                      _broadnetSessions.remove(accountId);
-                      await controller.removeUserScriptsByGroupName(
-                        groupName: 'broadnetRestore',
-                      );
-                      await _store(() async {
-                        if (_current(generation)) {
-                          await _secure.delete(key: account.broadnetSessionKey);
-                        }
-                      });
-                    }
+                  return;
+                }
+              }
+              if (_android && account.profileName != null) {
+                try {
+                  await _store(() async {
                     if (!_current(generation)) return;
-                    _timeouts[accountId]?.cancel();
-                    _inFlight.remove(accountId);
-                    _refreshThrottle.loginOrLoadFailed(accountId);
+                    if (await _prefs?.setBool(
+                          'account_profiles_may_exist',
+                          true,
+                        ) !=
+                        true) {
+                      throw StateError('Profile ownership could not be saved');
+                    }
+                  });
+                  if (!_current(generation)) return;
+                  await (controller.platform
+                          as android_webview.AndroidInAppWebViewController)
+                      .setAccountProfile(account.profileName!);
+                } catch (_) {
+                  if (_current(generation)) {
                     setState(
                       () => _putSnapshot(
                         account,
                         _snapshot(account).copyWith(
-                          status: QueryStatus.authExpired,
-                          message: '请在官方页面验证号码，完成后查询流量',
+                          status: QueryStatus.error,
+                          message: '此手机的网页内核暂不支持第二张同运营商卡',
                         ),
                       ),
                     );
-                    unawaited(_publishWidget());
-                  } else if (carrier == Carrier.broadnet &&
-                      url?.host == 'www.10099.com.cn') {
-                    await _saveSession(account, controller, generation);
                   }
-                  if (_current(generation) &&
-                      url != null &&
-                      !isCarrierLoginPage(Uri.parse(url.toString())) &&
-                      _awaitingLoginReturn.remove(accountId)) {
-                    unawaited(_refreshAccount(accountId));
-                  }
-                },
-                onReceivedError: (controller, request, error) {
-                  if (request.isForMainFrame != true || !_current(generation)) {
-                    return;
-                  }
-                  _timeouts[accountId]?.cancel();
-                  _inFlight.remove(accountId);
-                  _refreshThrottle.loginOrLoadFailed(accountId);
-                  setState(() {
-                    _webMessage = '官方页面暂时无法打开，请检查网络后重试';
-                    _putSnapshot(
-                      account,
-                      _snapshot(account).copyWith(
-                        status: QueryStatus.error,
-                        message: _webMessage,
+                  return;
+                }
+              }
+              if (!_current(generation)) return;
+              _controllers[accountId] = controller;
+              controller.addJavaScriptHandler(
+                handlerName: 'trafficResponse',
+                callback: (args) => _receive(account, args, generation),
+              );
+              if (_snapshot(account).status == QueryStatus.notConnected) {
+                try {
+                  await controller.loadUrl(
+                    urlRequest: URLRequest(url: WebUri(_loginUrl(carrier))),
+                  );
+                } on Exception {
+                  if (_current(generation)) {
+                    setState(
+                      () => _putSnapshot(
+                        account,
+                        _snapshot(account).copyWith(
+                          status: QueryStatus.error,
+                          message: '官方登录页暂时无法打开',
+                        ),
                       ),
                     );
+                  }
+                }
+              } else {
+                await _refreshAccount(accountId);
+              }
+            },
+            shouldOverrideUrlLoading: (controller, action) async =>
+                _allowedUrl(carrier, action.request.url)
+                ? NavigationActionPolicy.ALLOW
+                : NavigationActionPolicy.CANCEL,
+            onUpdateVisitedHistory: (controller, url, isReload) {
+              if (!_current(generation) || url == null) return;
+              final uri = Uri.tryParse(url.toString());
+              if (uri != null && isCarrierLoginPage(uri)) {
+                _timeouts[accountId]?.cancel();
+                _inFlight.remove(accountId);
+                _refreshThrottle.loginOrLoadFailed(accountId);
+                _awaitingLoginReturn.add(accountId);
+                setState(
+                  () => _putSnapshot(
+                    account,
+                    _snapshot(account).copyWith(
+                      status: QueryStatus.authExpired,
+                      message: '请在官方页面验证号码，完成后查询流量',
+                    ),
+                  ),
+                );
+                unawaited(_publishWidget());
+              }
+            },
+            onLoadStop: (controller, url) async {
+              if (!_current(generation)) return;
+              if (url != null &&
+                  isCarrierLoginPage(Uri.parse(url.toString()))) {
+                _awaitingLoginReturn.add(accountId);
+                if (carrier == Carrier.broadnet) {
+                  _broadnetSessions.remove(accountId);
+                  await controller.removeUserScriptsByGroupName(
+                    groupName: 'broadnetRestore',
+                  );
+                  await _store(() async {
+                    if (_current(generation)) {
+                      await _secure.delete(key: account.broadnetSessionKey);
+                    }
                   });
-                  unawaited(_publishWidget());
-                },
-              ),
-            ),
-          ],
+                }
+                if (!_current(generation)) return;
+                _timeouts[accountId]?.cancel();
+                _inFlight.remove(accountId);
+                _refreshThrottle.loginOrLoadFailed(accountId);
+                setState(
+                  () => _putSnapshot(
+                    account,
+                    _snapshot(account).copyWith(
+                      status: QueryStatus.authExpired,
+                      message: '请在官方页面验证号码，完成后查询流量',
+                    ),
+                  ),
+                );
+                unawaited(_publishWidget());
+              } else if (carrier == Carrier.broadnet &&
+                  url?.host == 'www.10099.com.cn') {
+                await _saveSession(account, controller, generation);
+              }
+              if (_current(generation) &&
+                  url != null &&
+                  !isCarrierLoginPage(Uri.parse(url.toString())) &&
+                  _awaitingLoginReturn.remove(accountId)) {
+                unawaited(_refreshAccount(accountId));
+                return;
+              }
+              if (_current(generation) &&
+                  carrier == Carrier.unicom &&
+                  _inFlight.contains(accountId)) {
+                try {
+                  await controller.evaluateJavascript(
+                    source: unicomOfficialQueryScript,
+                  );
+                } on Exception {
+                  // The existing timeout preserves the last verified data.
+                }
+              }
+            },
+            onReceivedError: (controller, request, error) {
+              if (request.isForMainFrame != true || !_current(generation)) {
+                return;
+              }
+              _timeouts[accountId]?.cancel();
+              _inFlight.remove(accountId);
+              _refreshThrottle.loginOrLoadFailed(accountId);
+              setState(() {
+                _webMessage = '官方页面暂时无法打开，请检查网络后重试';
+                _putSnapshot(
+                  account,
+                  _snapshot(
+                    account,
+                  ).copyWith(status: QueryStatus.error, message: _webMessage),
+                );
+              });
+              unawaited(_publishWidget());
+            },
+          ),
         ),
       ),
     );

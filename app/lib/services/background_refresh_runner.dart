@@ -16,6 +16,7 @@ import '../data/models.dart';
 import '../data/parsers.dart';
 import 'carrier_web.dart';
 import 'page_probe.dart';
+import 'unicom_official_query.dart';
 import 'response_policy.dart';
 import 'widget_bridge.dart';
 
@@ -296,6 +297,13 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
             ),
           );
           return;
+        }
+        if (carrier == Carrier.unicom) {
+          try {
+            await created.evaluateJavascript(source: unicomOfficialQueryScript);
+          } on Exception {
+            // Existing bounded task timeout retains the prior snapshot.
+          }
         }
         if (carrier == Carrier.broadnet && uri.host == 'www.10099.com.cn') {
           try {

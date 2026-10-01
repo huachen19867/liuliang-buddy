@@ -114,7 +114,7 @@ async function main() {
     border-radius: 999px; color: #39485d; background: rgba(248,250,252,.56);
     font-size: 11px; line-height: 15px; letter-spacing: .1px; white-space: nowrap;
   }
-  #widget-stage { position: absolute; left: 8px; top: 62px; width: 384px; height: 280px; }
+  #widget-stage { position: absolute; left: 8px; top: 62px; width: 384px; height: 400px; }
   .native-layout { display: flex; min-width: 0; min-height: 0; flex-shrink: 0; overflow: hidden; }
   .native-text {
     min-width: 0; min-height: 0; flex-shrink: 0; overflow: hidden;
@@ -304,7 +304,7 @@ async function main() {
 
     const root = render(documentXml.documentElement);
     root.style.width = '384px';
-    root.style.height = '280px';
+    root.style.height = '400px';
     root.style.position = 'absolute';
     root.style.left = '0';
     root.style.top = '0';
@@ -342,6 +342,7 @@ async function main() {
         hiddenSlots: window.__previewHiddenSlots || [],
         hiddenFields: window.__previewHiddenFields || [],
         title: document.querySelector('.preview-label')?.textContent,
+        paintedBounds: document.getElementById('widget_root').getBoundingClientRect().toJSON(),
         screenshotSize: '800x960 (400x480 logical pixels at 2x)',
         ids: [...document.querySelectorAll('[data-xml-id]')].map((node) => node.dataset.xmlId),
         cards: ['slot_1', 'slot_2'].map((id) => document.getElementById(id).getBoundingClientRect().toJSON()),
@@ -350,6 +351,7 @@ async function main() {
     if (!report.xmlIds || report.hiddenSlots.length || report.hiddenFields.length || report.title !== 'XML布局预览 · 合成数据 · 非手机实拍') {
       throw new Error('Rendered preview checks failed.');
     }
+    if (report.paintedBounds.bottom > report.cards[1].bottom + 16) throw new Error('Widget background extends into empty host space.');
     if (report.cards.some((card) => card.width <= 0 || card.height <= 0)) throw new Error('One of the two cards has no visible layout bounds.');
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     await page.screenshot({ path: outputPath });

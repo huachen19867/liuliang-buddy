@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="8dp" android:background="@drawable/widget_shell">
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent">
+<LinearLayout android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="8dp" android:background="@drawable/widget_shell">
 <LinearLayout android:layout_width="match_parent" android:layout_height="36dp" android:orientation="horizontal" android:gravity="center_vertical">
 <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="流量小伙伴" android:textSize="13sp" android:textStyle="bold" android:textColor="#273244" android:maxLines="1" android:ellipsize="end" />
 <ImageView android:id="@+id/widget_mascot" android:layout_width="52dp" android:layout_height="36dp" android:src="@drawable/widget_mascot" android:scaleType="fitCenter" android:contentDescription="温泉旅伴" />
@@ -80,3 +81,4 @@
 <TextView android:id="@+id/widget_empty" android:layout_width="match_parent" android:layout_height="100dp" android:gravity="center" android:text="先在应用里选择运营商" android:textColor="#657083" android:textSize="12sp" android:visibility="gone" />
 <TextView android:id="@+id/widget_more" android:layout_width="match_parent" android:layout_height="16dp" android:gravity="center_vertical" android:text="" android:visibility="gone" android:textColor="#657083" android:textSize="8sp" android:maxLines="1" android:ellipsize="end" />
 </LinearLayout>
+</FrameLayout>
