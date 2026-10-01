@@ -14,7 +14,11 @@ bash scripts/verify-ios.sh
 
 脚本依次运行 Flutter 静态分析、Flutter 测试、共享快照 Swift 测试，编译未签名模拟器应用并检查嵌入的 `TrafficWidget.appex`，然后启动可用 iPhone 模拟器、安装打开应用并截图。输出为 `app/build/ios/iphonesimulator/Runner.app`、`app/build/ios-verification.log`、`app/build/ios-onboarding.png`。截图只证明初始页面可以启动，不等于真实运营商登录和流量准确性验证。
 
-公开仓库的 `.github/workflows/ios.yml` 在相关源码 push / PR 或手动 workflow_dispatch 时执行上述脚本；使用 macos-15，不需上传 Apple 证书。失败时也保留已生成日志。模拟器应用另存为 `app/build/ios-simulator.tar.gz` 保留执行权限和符号链接。随后用 Flutter integration_test 在真实模拟器检查首次选择→未连接首页、手动添加指引与 iOS 设置，并将两张截图保存到 `app/build/ios-smoke/`。该测试只初始化空的测试偏好，不提供真实号码、会话或余量；原生 bridge 通道未被替换为 mock。Flutter CLI 使用同一 SDK 时串行运行。
+公开仓库的 `.github/workflows/ios.yml` 在相关源码 push / PR 或手动 workflow_dispatch 时执行上述脚本；使用 macos-15，不需上传 Apple 证书。失败时也保留已生成日志。模拟器应用另存为 `app/build/ios-simulator.tar.gz` 保留执行权限和符号链接。随后用 Flutter integration_test 在真实模拟器检查首次选择→未连接首页、手动添加指引与 iOS 设置，并将四张截图保存到 `app/build/ios-smoke/`。该测试只初始化空的测试偏好，不提供真实号码、会话或余量；原生 bridge 通道未被替换为 mock。Flutter CLI 使用同一 SDK 时串行运行。
+
+不自备 Mac 时，可以打开仓库 Actions → iOS simulator → Run workflow；完成后在该次运行的 Artifacts 下载模拟器产物、截图和日志。压缩包只是云端验证产物，不能在 Windows 直接运行或装到 iPhone；公开源码和安卓 APK 可分别从仓库与 Release 获取。
+
+iOS 18.4/18.5 模拟器有 [WebKit 官方确认的 Swift 库打包问题](https://bugs.webkit.org/show_bug.cgi?id=293831#c2)，表现为启动前缺少 `libswiftWebKit.dylib`。验证脚本检查所选 runtime 的库是否实际存在于 Cryptex，满足条件才给模拟器子进程设置官方 fallback 路径，记录在 `build/ios-diagnostics/webkit-runtime.json`。这个设置只服务模拟器，不降低应用 iOS 17 下限、不改产品链接方式。冷启动、崩溃和 Flutter 驱动的失败均保留；驱动等待超过 300 秒终止并报告失败。
 
 依赖统一采用 CocoaPods；脚本关闭 Flutter 的 Swift Package Manager 自动迁移。手动构建时先在 `app` 运行 `flutter config --no-enable-swift-package-manager` 和 `flutter pub get`，再用 `flutter build ios --simulator --debug --no-codesign`。原生编辑应打开 `app/ios/Runner.xcworkspace`，不要单独打开 `.xcodeproj`。
 

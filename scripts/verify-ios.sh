@@ -83,9 +83,10 @@ startup_status=0
 if xcrun simctl launch --stdout="$PWD/build/ios-diagnostics/startup.stdout" --stderr="$PWD/build/ios-diagnostics/startup.stderr" "$SIMULATOR_ID" cn.liuliang.liuliangApp > build/ios-diagnostics/launch.txt 2>&1; then
   cat build/ios-diagnostics/launch.txt
   startup_pid=$(sed -n 's/.*: \([0-9][0-9]*\)$/\1/p' build/ios-diagnostics/launch.txt | tail -1)
-  sleep 15
+  # A newly booted CI simulator may compile Metal shaders for its first frame.
+  sleep 60
   if [[ -z "$startup_pid" ]] || ! kill -0 "$startup_pid" 2>/dev/null; then
-    echo 'ERROR: standalone simulator application exited before the 15-second startup check.'
+    echo 'ERROR: standalone simulator application exited before the 60-second startup check.'
     startup_status=1
   fi
 else

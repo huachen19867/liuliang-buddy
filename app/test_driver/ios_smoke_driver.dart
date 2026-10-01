@@ -8,6 +8,7 @@ Future<void> main() async {
     'ios-dashboard',
     'ios-widget-guide',
     'ios-settings',
+    'ios-failure',
   };
   await integrationDriver(
     writeResponseOnFailure: true,
