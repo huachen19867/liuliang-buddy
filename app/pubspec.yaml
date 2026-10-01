@@ -1,5 +1,5 @@
 name: liuliang_app
-description: "流量小伙伴：移动、联通、电信、广电可选运营商流量查询测试版。"
+description: "流量小伙伴：移动、联通、电信、广电可选运营商流量查询应用。"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

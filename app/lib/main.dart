@@ -1814,7 +1814,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               onAddWidget: _addWidget,
               widgetSupported: _nativeMobile && !demoMode,
               onAbout: () => _showInfo(
-                '流量小伙伴 · 测试版',
+                kReleaseMode ? '流量小伙伴' : '流量小伙伴 · 开发版',
                 '可选择移动、联通、电信、广电，至少一家。数据来自您登录官方网页后的查询结果，通用、定向和用途未知的流量分开展示。\n\n联通展示官网套餐余量；电信按官网已用量和总量的舍入显示值估算，主位标「约」，均不当作已确认通用额度或触发提醒。真实号码登录和余额准确性仍需手机验证，无法识别时请在官方查询页查看。\n\n会话保存在手机本地，广电会话备份使用系统安全存储；不上传第三方服务器，不读取短信或服务密码。Android 可选择桌面卡片后台刷新间隔，但系统可能延迟任务；iPhone 桌面卡片显示上次查询结果，打开 APP 后刷新。电信需要打开 APP 查询。',
               ),
               demo: demoMode,

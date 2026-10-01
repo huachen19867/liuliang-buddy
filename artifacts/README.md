@@ -64,4 +64,4 @@ dashboard-voice-sms-demo.png 来自实际Flutter首页组件，显示通话分�
 
 android-system-surfaces-settings-demo.png 为真实Flutter设置组件渲染，DEMO标注明确，演示开启通知栏余额与快捷设置入口；不是系统通知或磁贴实拍。主分发改liuliang-buddy-release.apk，旧证书Release过渡包为liuliang-buddy-legacy-upgrade.apk；Debug历史文件不作为新版分发。大小与证书验收回执待最终ARM64重建核对。
 
-1.8.0正式主包18,350,307字节，SHA-256 8eae226fc13b840ada5623a98d8d1c84bc222d2f80877511bc3efae71b556134，新证书33b11555；旧签名Release过渡包18,376,558字节、SHA-256 8d4ab92783a53208bd164eef44cc0d79775d2acf84ecc3e8c203615412fa4d5e，旧证书fdf71a4c。两包非debuggable、v2通过、API24/36、仅ARM64、非签名区315项内容相同。130项Flutter/analyze/16项原生通过，系统通知/磁贴和R8后台长期实机行为仍待复测。
+1.8.0正式主包18,350,307字节，SHA-256 b8943da4629e17a03c5f74b9e69d9822335c8dea6c9ab99d442d51151f7ee88c，新证书33b11555；旧签名Release过渡包18,376,558字节、SHA-256 5b9785c4edecfbcb14754e21adbb711650637764ce4b386da71edc0cab205c14，旧证书fdf71a4c。两包非debuggable、v2通过、API24/36、仅ARM64、非签名区315项内容相同。130项Flutter/analyze/16项原生通过，系统通知/磁贴和R8后台长期实机行为仍待复测。
