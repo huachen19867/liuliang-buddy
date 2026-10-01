@@ -11,3 +11,5 @@ flutter_inappwebview_android 来源为 pub.dev 的 1.1.3，保留原 LICENSE。f
 将来上游兼容 AGP 9 且暴露等价的 Android 多 Profile 接口后，才可移除 override 和本地副本；替换前需核对旧默认会话迁移、第二账户隔离、清理失败保护，并重跑查询探针与 Android 构建。
 
 `flutter_inappwebview_ios` 来源为 pub.dev 1.1.2，保留原 Apache-2.0 `LICENSE`。本地 Swift 补丁为第二账号在 WKWebView 创建前设置 iOS 17 的持久 `WKWebsiteDataStore(forIdentifier:)`，并通过插件管理通道检测与清理四个固定账号仓库。主账号继续使用默认持久仓库。配套 Dart 创建参数与清理约束见 `docs/IOS_SESSIONS.md`；将来升级插件需复核创建顺序和完整清理，不可退回共享会话或临时会话。
+
+iOS 18.4/18.5 模拟器的 WebKit Swift overlay 打包缺陷会导致本插件在进入 main 前报 `Library not loaded: /usr/lib/swift/libswiftWebKit.dylib`。见 [WebKit 官方问题 293831](https://bugs.webkit.org/show_bug.cgi?id=293831#c2) 与 [插件上游问题 2636](https://github.com/pichillilorenzo/flutter_inappwebview/issues/2636)。保留 podspec 正常链接及所有 WebKit API；弱链接可能把启动失败延迟到调用时失败，不作为修复。`scripts/verify-ios.sh` 从选中 simulator 的 JSON 动态解析 runtimeRoot，只有普通库路径缺失且 Apple Cryptex 同名库实际存在时，才设置模拟器子进程的 `DYLD_FALLBACK_LIBRARY_PATH`；普通启动与 Flutter drive 共用该环境。真实设备签名产物、最低 iOS 17 与账号隔离不受影响。路径和条件记录在 CI 的 `ios-diagnostics/webkit-runtime.json`；未来正常 runtime 不应用该兼容设置。官方页面与上游回帖已归档至忽略目录 `references/ios-webkit-linker`。

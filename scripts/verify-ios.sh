@@ -30,6 +30,36 @@ fi
 if [[ "$STAGE" == smoke || "$STAGE" == all ]]; then
 SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for runtime,items in d["devices"].items() if "iOS" in runtime for x in items if "iPhone" in x["name"]))')
 mkdir -p build/ios-diagnostics
+# WebKit bug 293831: some iOS simulator runtimes omit the ordinary overlay
+# location although the same Apple library is present inside their Cryptex.
+# Resolve the selected runtime; never weaken product linkage or alter iOS 17.
+xcrun simctl list -j > build/ios-diagnostics/simulator-inventory.json
+SWIFT_FALLBACK=$(python3 - "$SIMULATOR_ID" <<'PY'
+import json, os, sys
+with open('build/ios-diagnostics/simulator-inventory.json') as f:
+    inventory = json.load(f)
+runtime_id = next(key for key, devices in inventory['devices'].items()
+                  if any(device['udid'] == sys.argv[1] for device in devices))
+runtime = next(item for item in inventory['runtimes'] if item['identifier'] == runtime_id)
+root = runtime.get('runtimeRoot') or os.path.join(runtime['bundlePath'], 'Contents/Resources/RuntimeRoot')
+ordinary = os.path.join(root, 'usr/lib/swift/libswiftWebKit.dylib')
+fallback = os.path.join(root, 'System/Cryptexes/OS/usr/lib/swift')
+overlay = os.path.join(fallback, 'libswiftWebKit.dylib')
+result = {'runtime': runtime_id, 'runtimeRoot': root, 'ordinaryExists': os.path.isfile(ordinary),
+          'cryptexExists': os.path.isfile(overlay), 'fallbackApplied': False}
+if not os.path.isfile(ordinary) and os.path.isfile(overlay):
+    result['fallbackApplied'] = True
+    result['fallbackPath'] = fallback
+    print(fallback)
+with open('build/ios-diagnostics/webkit-runtime.json', 'w') as f:
+    json.dump(result, f, indent=2)
+PY
+)
+cat build/ios-diagnostics/webkit-runtime.json
+if [[ -n "$SWIFT_FALLBACK" ]]; then
+  export SIMCTL_CHILD_DYLD_FALLBACK_LIBRARY_PATH="$SWIFT_FALLBACK${SIMCTL_CHILD_DYLD_FALLBACK_LIBRARY_PATH:+:$SIMCTL_CHILD_DYLD_FALLBACK_LIBRARY_PATH}"
+  echo "Applying official simulator-only WebKit 293831 workaround: $SIMCTL_CHILD_DYLD_FALLBACK_LIBRARY_PATH"
+fi
 collect_diagnostics() {
   xcrun simctl spawn "$SIMULATOR_ID" log show --last 10m --style compact --predicate 'process == "Runner" OR eventMessage CONTAINS[c] "cn.liuliang.liuliangApp"' > build/ios-diagnostics/simulator.log 2>&1 || true
   /usr/bin/log show --last 10m --style compact --predicate 'process == "Runner" OR eventMessage CONTAINS[c] "cn.liuliang.liuliangApp"' > build/ios-diagnostics/host.log 2>&1 || true
@@ -67,7 +97,24 @@ xcrun simctl io "$SIMULATOR_ID" screenshot build/ios-onboarding.png || true
 # report the actual UI failure too. Cleanup must not prevent the integration test.
 collect_diagnostics
 xcrun simctl terminate "$SIMULATOR_ID" cn.liuliang.liuliangApp >/dev/null 2>&1 || true
-flutter drive --driver=test_driver/ios_smoke_driver.dart --target=integration_test/ios_smoke_test.dart -d "$SIMULATOR_ID"
+# Bound Flutter debugger discovery as well as the UI run; preserve its exit code.
+python3 - "$SIMULATOR_ID" <<'PY'
+import os, signal, subprocess, sys
+command = ['flutter', 'drive', '--driver=test_driver/ios_smoke_driver.dart',
+           '--target=integration_test/ios_smoke_test.dart', '-d', sys.argv[1]]
+process = subprocess.Popen(command, start_new_session=True)
+try:
+    sys.exit(process.wait(timeout=300))
+except subprocess.TimeoutExpired:
+    os.killpg(process.pid, signal.SIGTERM)
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+    print('ERROR: Flutter simulator smoke exceeded 300 seconds.', flush=True)
+    sys.exit(124)
+PY
 [[ -s build/ios-smoke/ios-selection.png && -s build/ios-smoke/ios-dashboard.png ]]
 if [[ "$startup_status" != 0 ]]; then
   echo 'Flutter-driven smoke completed, but standalone cold launch failed; see ios-diagnostics.'
