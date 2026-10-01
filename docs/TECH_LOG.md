@@ -215,3 +215,5 @@ run36815488725确认官方fallback生效（ordinaryExists=false/cryptexExists=tr
 首页每账号独立服务明细，JSON缓存兼容旧记录，错误/刷新保留原快照时间。联通保留短彩信和整组件successFlow失败门禁；移动汇总与明细不重复；广电未知次数资源不按短信；电信按同单位官网总-已用估算，短信次保留次不强转条。桌面流量协议不扩展。复核发现电信延迟桥接前明细清空会重放旧pending，修为空/过量/结构缺失同步清pending，Chrome增加真实浏览器全本地合成回归10场景通过；不等于真实账号验证。Flutter、构建和公开发布回执随后补充。
 
 集成完整Flutter123项通过，analyze首轮指出电信分支3处多余非空断言，去除后无问题；不是修改解析逻辑。Node原页面探针通过，Chrome电信10场景通过，UI21项及新DEMO截图目视完成。APK与iOS云端验证进行中，未宣称真机值已确认。
+
+安卓1.7.0/code10构建成功，91,439,548字节，SHA-256 9b191abbab3c41abed7c9c188361440289581abcb4dc916bfe33504953a78549。apksigner v2通过，沿用Android Debug证书fdf71a4c15215bf6ffc0a1f62e53a3abdfc21ed9fc0457697e33082e8a320fa8，API24/36，Flutter引擎仅arm64-v8a；aapt2无短信/通话权限，未用DEMO编译参数。实际组件截图已公开，源码e697ecb0dc7f9c0c2780e9d223f993b096c482af只推送public/main。iOS run36826003180进行中，尚未记为通过；真实账号、实体手机和系统组件没有新增实测。
