@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../data/models.dart';
 
@@ -23,8 +24,11 @@ class WidgetPreviewCard extends StatelessWidget {
   bool get _canAdd => widgetSupported && onAddWidget != null;
 
   String get _hint {
-    if (!widgetSupported) return '请在安卓手机添加';
+    if (!widgetSupported) return '请在安卓手机或 iPhone 添加';
     if (onAddWidget == null) return '桌面卡片入口暂不可用';
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      return '长按主屏幕→添加小组件→流量小伙伴；轻点卡片打开应用查询';
+    }
     return '点卡片刷新；若系统没弹窗，长按桌面空白处→小组件→流量小伙伴';
   }
 

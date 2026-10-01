@@ -58,6 +58,7 @@ class BackgroundRefreshStatus {
   final DateTime? finishedAt;
 
   String get label => switch (outcome) {
+    'unsupported_platform' => 'iPhone 暂不支持定时后台官网查询',
     'success' => '最近后台查询成功',
     'partial' => '部分号码后台查询成功',
     'no_result' => '后台未取得新数据，请打开官网验证',

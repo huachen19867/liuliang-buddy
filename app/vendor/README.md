@@ -9,3 +9,5 @@ flutter_inappwebview_android 来源为 pub.dev 的 1.1.3，保留原 LICENSE。f
 清理调用携带是否可能存在独立 Profile 的本地标记。仅使用默认会话、从未创建第二 Profile 的设备即使不支持 MULTI_PROFILE 也可正常清除数据；曾用过第二 Profile 而内核失去能力时，仍保持待清理保护。创建前持久化所属标记，完整清理成功才撤销，避免收起卡片后遗漏历史登录。
 
 将来上游兼容 AGP 9 且暴露等价的 Android 多 Profile 接口后，才可移除 override 和本地副本；替换前需核对旧默认会话迁移、第二账户隔离、清理失败保护，并重跑查询探针与 Android 构建。
+
+`flutter_inappwebview_ios` 来源为 pub.dev 1.1.2，保留原 Apache-2.0 `LICENSE`。本地 Swift 补丁为第二账号在 WKWebView 创建前设置 iOS 17 的持久 `WKWebsiteDataStore(forIdentifier:)`，并通过插件管理通道检测与清理四个固定账号仓库。主账号继续使用默认持久仓库。配套 Dart 创建参数与清理约束见 `docs/IOS_SESSIONS.md`；将来升级插件需复核创建顺序和完整清理，不可退回共享会话或临时会话。

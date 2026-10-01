@@ -9,6 +9,7 @@ import 'package:liuliang_app/data/carrier_accounts.dart';
 import 'package:liuliang_app/data/models.dart';
 import 'package:liuliang_app/ui/carrier_selection_screen.dart';
 import 'package:liuliang_app/ui/dashboard_screen.dart';
+import 'package:liuliang_app/services/ios_account_profiles.dart';
 
 void main() {
   setUp(() {
@@ -193,6 +194,82 @@ void main() {
       },
     );
   }
+
+  testWidgets('iOS second account persists with an isolated-store capability', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    SharedPreferences.setMockInitialValues({});
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(IOSAccountProfiles.channel, (
+      call,
+    ) async {
+      if (call.method == 'liuliangSupportsAccountProfiles') return true;
+      if (call.method == 'liuliangDeleteAccountProfiles') return true;
+      return null;
+    });
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('cn.liuliang/background_refresh_schedule'),
+      (call) async => call.method == 'status'
+          ? {'lastOutcome': 'unsupported_platform'}
+          : null,
+    );
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('cn.liuliang/widgets'),
+      (call) async => call.method == 'consumeLaunchRefresh' ? false : null,
+    );
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('cn.liuliang/notifications'),
+      (_) async => null,
+    );
+    await tester.pumpWidget(const FlowBuddyApp());
+    await tester.pumpAndSettle();
+    var screen = tester.widget<CarrierSelectionScreen>(
+      find.byType(CarrierSelectionScreen),
+    );
+    screen.onSelectionChanged({Carrier.mobile});
+    await tester.pump();
+    screen = tester.widget<CarrierSelectionScreen>(
+      find.byType(CarrierSelectionScreen),
+    );
+    screen.onAddSecondAccount!(Carrier.mobile);
+    await tester.pumpAndSettle();
+    expect(
+      (await SharedPreferences.getInstance()).getBool(
+        'account_profiles_may_exist',
+      ),
+      isTrue,
+    );
+    screen = tester.widget<CarrierSelectionScreen>(
+      find.byType(CarrierSelectionScreen),
+    );
+    screen.onContinue(screen.selectedCarriers);
+    await tester.pumpAndSettle();
+    final dashboard = tester.widget<DashboardScreen>(
+      find.byType(DashboardScreen),
+    );
+    expect(dashboard.accountEntries?.length, 2);
+    expect(dashboard.widgetSupported, isTrue);
+    dashboard.onAddWidget!();
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('添加桌面卡片'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('知道了'));
+    await tester.pumpAndSettle();
+    dashboard.onSettings();
+    await tester.pumpAndSettle();
+    expect(find.text('桌面卡片后台刷新'), findsNothing);
+    expect(find.textContaining('iOS 暂无定时后台官网查询'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
 
   testWidgets(
     'interrupted clear stays pending even after profile deletion succeeds',

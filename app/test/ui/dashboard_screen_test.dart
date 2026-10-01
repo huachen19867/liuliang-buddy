@@ -109,7 +109,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('请在安卓手机添加'), findsOneWidget);
+    expect(find.text('请在安卓手机或 iPhone 添加'), findsOneWidget);
     final button = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, '添加桌面卡片'),
     );
@@ -809,10 +809,26 @@ void _configureViewport(WidgetTester tester, Size size) {
 }
 
 Future<void> _loadPreviewChineseFont() async {
-  const materialIconsPath =
-      r'D:\AI\tools\flutter\bin\cache\artifacts\material_fonts\MaterialIcons-Regular.otf';
-  final materialIconsFile = File(materialIconsPath);
-  if (!await materialIconsFile.exists()) {
+  final sdkRoots = <String>[
+    if (Platform.environment['FLUTTER_ROOT'] case final String root) root,
+    r'D:\AI\tools\flutter',
+  ];
+  var parent = File(Platform.resolvedExecutable).parent;
+  while (parent.parent.path != parent.path) {
+    sdkRoots.add(parent.path);
+    parent = parent.parent;
+  }
+  File? materialIconsFile;
+  for (final root in sdkRoots) {
+    final candidate = File(
+      '$root/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+    );
+    if (await candidate.exists()) {
+      materialIconsFile = candidate;
+      break;
+    }
+  }
+  if (materialIconsFile == null) {
     throw StateError('Flutter Material Icons font was not found.');
   }
   final materialIconsBytes = await materialIconsFile.readAsBytes();
@@ -820,7 +836,17 @@ Future<void> _loadPreviewChineseFont() async {
     'MaterialIcons',
   )..addFont(Future.value(ByteData.sublistView(materialIconsBytes)))).load();
 
-  const paths = [r'C:\Windows\Fonts\msyh.ttc', r'C:\Windows\Fonts\simhei.ttf'];
+  final paths = [
+    if (Platform.environment['LIULIANG_PREVIEW_CHINESE_FONT']
+        case final String path)
+      path,
+    r'C:\Windows\Fonts\msyh.ttc',
+    r'C:\Windows\Fonts\simhei.ttf',
+    '/System/Library/Fonts/PingFang.ttc',
+    '/System/Library/Fonts/STHeiti Medium.ttc',
+    '/System/Library/Fonts/STHeiti Light.ttc',
+    '/System/Library/Fonts/Supplemental/Songti.ttc',
+  ];
   File? fontFile;
   for (final path in paths) {
     final candidate = File(path);
@@ -830,7 +856,9 @@ Future<void> _loadPreviewChineseFont() async {
     }
   }
   if (fontFile == null) {
-    throw StateError('No system Chinese font found for the UI screenshot.');
+    throw StateError(
+      'Set LIULIANG_PREVIEW_CHINESE_FONT to a Chinese font for UI screenshots.',
+    );
   }
 
   final bytes = await fontFile.readAsBytes();

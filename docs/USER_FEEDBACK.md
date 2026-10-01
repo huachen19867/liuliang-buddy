@@ -26,6 +26,6 @@
 
 ## 是否有 iOS
 
-目前提供 Android APK 和 Web 演示，没有可安装的 iOS 版本。项目尚无 iOS Runner 或 WidgetKit 扩展；当前 Windows 工作区也没有 Xcode、iOS 签名或测试设备。Flutter 界面和解析器可复用，但原生通知、桌面组件、账号的 WKWebView 数据隔离和后台调度需要单独适配。iOS 桌面使用 WidgetKit timeline，由系统决定刷新，不能照搬安卓 WorkManager 或承诺定点实时余额。正式 iOS 开发至少需要 macOS/Xcode、签名配置和设备验证；当前未将此条标为已交付功能。
+1.6.0 源码新增 iOS 17 Runner、原生通知、持久化 WKWebView 双账号隔离和 WidgetKit 小/中/大号桌面组件。老板没有 Mac，改用公开仓库 GitHub macOS runner 编译、模拟器启动与截图，详细入口见 [IOS_BUILD.md](IOS_BUILD.md)。当前仍没有可安装的签名 iPhone 版本，也未测试真实运营商账号。组件 timeline 只更新最近快照的展示，不查询运营商，iOS 设置不提供安卓后台周期选项。真实 iPhone 分发需要开发者团队签名、App Group provisioning 与设备验证，未交付 TestFlight 或 App Store 版本。
 
 官方环境参考：[Flutter iOS setup](https://docs.flutter.dev/platform-integration/ios/setup)、[WidgetKit keeping a widget up to date](https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date)。精选官方资料保存在 `references/ios-platform-review/`，来源和下载状态记录在其 `index.json`。

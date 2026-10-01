@@ -179,3 +179,13 @@ Flutter完整74项通过，Node加入联通精确端点/登录与敏感接口排
 最终1.5.0/code8 ARM64 APK重建成功，90,035,780字节，SHA-256 8657856bd3f79380568b6ee786ec03059c877e7225a63ba177a669f6e31a65fa。apksigner v2通过、Android Debug签名，aapt2确认API24/36，Zip确认libflutter.so仅arm64-v8a；未传DEMO。随后串行执行应用模块:app:testDebugUnitTest，最终JUnit XML为12项WidgetPresentationTest与1项BackgroundRefreshScheduleTest，均0失败/错误。不把依赖插件历史XML计入本次验收。两张移动/不限量与四家选择的组件DEMO截图已目视检查，公开发布说明和输出索引更新为1.5.0。adb devices为空，真实不限量、双账号隔离、S25/One UI弹窗、后台调度仍待设备验证。
 
 公开1.5.0发布完成：源码26b080392df0ffe543ff6ce45a9b4d2f96ed0c9f已推送至public远端huachen19867/liuliang-buddy，GitHub main与v1.5.0标签API核对为同一源码提交。Release https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.5.0 为draft=false、prerelease=true；APK state=uploaded、size=90035780、GitHub digest sha256:8657856bd3f79380568b6ee786ec03059c877e7225a63ba177a669f6e31a65fa与本地一致。GitHub仓库private=false，旧私有origin未推送。应用内DEMO截图和问题反馈模板随源码公开；本段发布回执另以文档提交同步main，不改变安装包或版本标签。
+
+## 2026-10-01：iOS 源码适配与云端构建
+
+老板要求增加 iOS 版本，先公开源码，随后明确没有 Mac。交付改为公开源码与 GitHub macOS runner 的未签名模拟器编译验证；没有 Apple 签名配置时不宣称能安装到 iPhone。先复用已有 Flutter/Apple 平台日志，下载固定版本 home_widget 的 BSD-3-Clause 精选源码作为 App Group/WidgetKit 参考，用本地 Flutter 3.44.8 官方模板生成独立 iOS scaffold，不覆盖已有安卓文件。
+
+轻量分工：Astra 轻度处理 Runner/Xcode/云端构建，GPT6 SOL 高处理跨平台查询与持久化 WKWebView 账号隔离。第三个新代理因会话线程上限未能创建，复用上一阶段已完成的原生可靠性代理处理 Swift 展示桥接、通知与 WidgetKit。iOS 采用 17 起的持久化独立 WKWebsiteDataStore，官网前台查询与现有四家严格解析复用；后台初版只展示最近成功快照，不沿用安卓周期刷新承诺。阶段验收继续追加。
+
+iOS17 Runner/UIScene、真实WidgetKit扩展target与Embed接线、App Group快照和本机通知已加入。插件副本在WKWebView创建前绑定四个固定UUID持久仓库，非法参数不创建网页；添加和恢复第二号码前持久化所属标记，清理包括默认和全部四个历史仓库。小组件只含展示白名单，低量通知补前台banner delegate，iOS设置不提供安卓后台周期。官网导航继续仅HTTPS，未扩大ATS例外。iOS图标从已有安卓矢量图自动渲染，不用Flutter默认标识。
+
+本地Flutter完整98项通过，新增iOS创建参数/清理回执及平台设置验证，analyze无问题。首次平台测试缺通知通道mock导致保存等待，补齐后又发现同名按钮/弹窗标题应按AlertDialog定位，已修复并完整重跑；平台覆盖在teardown恢复以免污染其他测试。截图测试此前写死Windows字体与SDK路径，现可发现Flutter根目录并选择macOS中文字体，允许LIULIANG_PREVIEW_CHINESE_FONT覆盖。Xcode项目通过OpenStep解析、源引用/扩展依赖/嵌入断言和12个XML检查；原生编译、Swift快照测试与iOS模拟器smoke仍由公开GitHub macOS CI验证，尚未把静态接线等同编译成功。

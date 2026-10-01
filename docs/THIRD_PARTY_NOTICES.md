@@ -8,6 +8,8 @@
 
 Android 多账户会话隔离使用 AndroidX WebKit 1.12.0 的 ProfileStore 与 WebViewCompat 多 Profile API（Apache-2.0）。项目 vendored 的 flutter_inappwebview_android 1.1.3 仍保留其原 LICENSE；除 AGP 规则修补外，本地增加了首次导航前设置独立 Profile、功能检测和清理入口，具体见 app/vendor/README.md。未复用第三方账户、Cookie 或绕过登录的实现。
 
+iOS 平台复用 Flutter 3.44.8 官方 Runner 模板（Flutter BSD-3-Clause），WKWebView 依赖本地保留原 LICENSE 的 flutter_inappwebview_ios 1.1.2（Apache-2.0）。本地补丁为 iOS 17 持久化独立 WKWebsiteDataStore 与清理入口，不修改全局插件缓存。App Group 与 WidgetKit 的平台接法参考 home_widget 固定版本 a3e6b641e365c0a5d25f206d543ef9b88bdb8617（包内 BSD-3-Clause），精选示例与完整 LICENSE 保存到被忽略的 references/ios-home-widget；未复制其业务实现或后台 worker，也未引入该插件。
+
 ## ChinaMobileMonitor
 
 MIT License

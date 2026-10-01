@@ -1,0 +1,37 @@
+name: iOS simulator
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['app/**', 'scripts/verify-ios.sh', '.github/workflows/ios.yml']
+  pull_request:
+    paths: ['app/**', 'scripts/verify-ios.sh', '.github/workflows/ios.yml']
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  simulator:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          channel: stable
+          cache: true
+      - name: Verify and build unsigned iOS simulator app
+        run: bash scripts/verify-ios.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-simulator-${{ github.sha }}
+          path: |
+            app/build/ios-simulator.tar.gz
+            app/build/ios-verification.log
+            app/build/ios-onboarding.png
+            app/build/ios-smoke/*.png
+          if-no-files-found: warn
+          retention-days: 14

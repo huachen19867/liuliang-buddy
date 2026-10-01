@@ -23,6 +23,7 @@ import 'services/background_refresh_runner.dart';
 import 'services/telecom_page_probe.dart';
 import 'services/response_policy.dart';
 import 'services/widget_bridge.dart';
+import 'services/ios_account_profiles.dart';
 import 'ui/dashboard_screen.dart';
 
 const demoMode = bool.fromEnvironment('DEMO');
@@ -152,6 +153,23 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       return false;
     }
     if (demoMode) return true;
+    if (_ios) {
+      try {
+        if (await IOSAccountProfiles.supported() &&
+            mounted &&
+            await _prefs?.setBool('account_profiles_may_exist', true) == true) {
+          return true;
+        }
+      } on PlatformException {
+        // A missing or older plugin must not share the primary account store.
+      } on MissingPluginException {
+        // A missing or older plugin must not share the primary account store.
+      }
+      if (mounted) {
+        _showInfo('第二张卡暂时无法加入', '无法确认独立网页登录资料已准备好，请稍后重试。');
+      }
+      return false;
+    }
     if (!_android) return false;
     try {
       if (await android_webview
@@ -189,7 +207,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   }
 
   Future<void> _publishWidget() async {
-    if (!_android || demoMode || _clearing) return;
+    if (!_nativeMobile || demoMode || _clearing) return;
     final generation = _generation;
     await _store(() async {
       if (_current(generation)) {
@@ -212,9 +230,16 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   }
 
   Future<void> _addWidget() async {
-    if (!_android || demoMode) return;
+    if (!_nativeMobile || demoMode) return;
     await _publishWidget();
     if (!mounted || _clearing) return;
+    if (_ios) {
+      _showInfo(
+        '添加桌面卡片',
+        '请长按 iPhone 主屏幕空白处，点左上角「编辑」→「添加小组件」，搜索「流量小伙伴」，选择卡片后点「添加小组件」。卡片显示最近一次打开 APP 查询到的数据。',
+      );
+      return;
+    }
     try {
       final result = await _widgetBridge.requestPinDetailed();
       if (!mounted) return;
@@ -241,12 +266,14 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   bool get _android =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get _ios => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+  bool get _nativeMobile => _android || _ios;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (_android && !demoMode) _widgetBridge.onOpen(_openFromWidget);
+    if (_nativeMobile && !demoMode) _widgetBridge.onOpen(_openFromWidget);
     if (demoMode) {
       _selection = CarrierSelection.complete(Carrier.values);
       _accounts = CarrierAccounts.fromSelection(_selection);
@@ -310,9 +337,13 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     _prefs = prefs;
     if (prefs.getBool('account_profiles_cleanup_pending') == true) {
       try {
-        await android_webview
-            .AndroidInAppWebViewController.deleteAccountProfiles();
-      } on PlatformException {
+        if (_android) {
+          await android_webview
+              .AndroidInAppWebViewController.deleteAccountProfiles();
+        } else if (_ios) {
+          await IOSAccountProfiles.clearAll();
+        }
+      } on Exception {
         // Keep the durable pending flag and disable every account.
       }
     }
@@ -332,6 +363,16 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       savedJson: prefs.getString(CarrierAccounts.storageKey),
       selection: restoredSelection,
     );
+    if (_ios &&
+        restoredAccounts.accounts.any((account) => !account.isPrimary)) {
+      try {
+        if (await prefs.setBool('account_profiles_may_exist', true) != true) {
+          _profileClearPending = true;
+        }
+      } catch (_) {
+        _profileClearPending = true;
+      }
+    }
     for (final account in restoredAccounts.accounts.where(
       (a) => a.carrier == Carrier.broadnet,
     )) {
@@ -361,9 +402,11 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _accounts = restoredAccounts;
       _restoring = false;
       _thresholdGb = (prefs.getDouble('threshold_gb') ?? 5).clamp(1, 20);
-      _backgroundRefresh = BackgroundRefreshInterval.fromMinutes(
-        prefs.getInt('background_refresh_minutes'),
-      );
+      _backgroundRefresh = _ios
+          ? BackgroundRefreshInterval.off
+          : BackgroundRefreshInterval.fromMinutes(
+              prefs.getInt('background_refresh_minutes'),
+            );
       _reminders = prefs.getBool('reminders') ?? false;
       for (final account in restoredAccounts.accounts) {
         final raw = prefs.getString(account.snapshotKey);
@@ -404,7 +447,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     });
     await _syncBackgroundSchedule();
     await _publishWidget();
-    if (_android && !demoMode && _current(generation)) {
+    if (_nativeMobile && !demoMode && _current(generation)) {
       if (await _widgetBridge.consumeLaunchRefresh()) await _openFromWidget();
     }
   }
@@ -466,7 +509,17 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   }
 
   Future<bool> _syncBackgroundSchedule() async {
-    if (!_android || demoMode) return true;
+    if (!_nativeMobile || demoMode) return true;
+    if (_ios) {
+      try {
+        await BackgroundRefreshScheduler.configure(
+          BackgroundRefreshInterval.off,
+        );
+        return true;
+      } on Exception {
+        return false;
+      }
+    }
     final hasBackgroundCarrier = _visibleAccounts.any(
       (account) =>
           account.carrier != Carrier.telecom &&
@@ -507,8 +560,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     if (_visibleAccountId == accountId) return;
     final carrier = account.carrier;
     if (_clearing || !_selection.allows(carrier)) return;
-    if (demoMode || !_android) {
-      _showInfo('这是界面预览', '请安装安卓测试包后连接号码。演示流量不是您的实际余额。');
+    if (demoMode || !_nativeMobile) {
+      _showInfo('这是界面预览', '请安装手机测试包后连接号码。演示流量不是您的实际余额。');
       return;
     }
     setState(() {
@@ -653,7 +706,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         ? payload['stage'] as String
         : null;
     if (!isCarrierResponseAllowed(carrier, url, page, stage)) return;
-    if (!_inFlight.contains(accountId)) return;
+    if (!_inFlight.contains(accountId) &&
+        !_awaitingLoginReturn.contains(accountId)) {
+      return;
+    }
     // A delayed response must not revive a page that already returned to login.
     final controller = _controllers[accountId];
     if (controller == null) return;
@@ -715,10 +771,15 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       // plaintext raw success if that event was not observed.
       return;
     }
-    if (!_current(generation) || !_inFlight.contains(accountId)) return;
+    if (!_current(generation) ||
+        (!_inFlight.contains(accountId) &&
+            !_awaitingLoginReturn.contains(accountId))) {
+      return;
+    }
     final hadPreviousQuery = _snapshot(account).queriedAt != null;
     _timeouts[accountId]?.cancel();
     _inFlight.remove(accountId);
+    _awaitingLoginReturn.remove(accountId);
     final displayed = snapshot.status == QueryStatus.success
         ? snapshot
         : _snapshot(
@@ -749,7 +810,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       if (!_current(generation)) return;
       final remaining = snapshot.generalRemainingBytes;
       final low = remaining != null && remaining / 1073741824 <= _thresholdGb;
-      if (low && !(_warnedLow[accountId] ?? false) && _reminders && _android) {
+      if (low &&
+          !(_warnedLow[accountId] ?? false) &&
+          _reminders &&
+          _nativeMobile) {
         try {
           await _notifications.invokeMethod('notify', {
             'id': carrier.index * 2 + (account.isPrimary ? 1 : 2),
@@ -857,12 +921,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               child: InAppWebView(
                 key: ValueKey('${account.id}_$_generation'),
                 // Every account is loaded only after its WebView profile is set.
-                initialSettings: InAppWebViewSettings(
-                  javaScriptEnabled: true,
-                  useShouldOverrideUrlLoading: true,
-                  thirdPartyCookiesEnabled: false,
-                  allowFileAccess: false,
-                  allowContentAccess: false,
+                initialSettings: AccountWebViewSettings(
+                  profileName: _ios ? account.profileName : null,
                 ),
                 initialUserScripts: UnmodifiableListView([
                   UserScript(
@@ -885,7 +945,29 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                 ]),
                 onWebViewCreated: (controller) async {
                   if (!_current(generation)) return;
-                  if (account.profileName != null) {
+                  if (_ios && account.profileName != null) {
+                    try {
+                      if (!await IOSAccountProfiles.supported()) {
+                        throw StateError(
+                          'Persistent account store unavailable',
+                        );
+                      }
+                    } on Exception {
+                      if (_current(generation)) {
+                        setState(
+                          () => _putSnapshot(
+                            account,
+                            _snapshot(account).copyWith(
+                              status: QueryStatus.error,
+                              message: '此 iPhone 暂无法打开第二张卡的独立登录会话',
+                            ),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+                  }
+                  if (_android && account.profileName != null) {
                     try {
                       await _store(() async {
                         if (!_current(generation)) return;
@@ -925,9 +1007,23 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                     callback: (args) => _receive(account, args, generation),
                   );
                   if (_snapshot(account).status == QueryStatus.notConnected) {
-                    await controller.loadUrl(
-                      urlRequest: URLRequest(url: WebUri(_loginUrl(carrier))),
-                    );
+                    try {
+                      await controller.loadUrl(
+                        urlRequest: URLRequest(url: WebUri(_loginUrl(carrier))),
+                      );
+                    } on Exception {
+                      if (_current(generation)) {
+                        setState(
+                          () => _putSnapshot(
+                            account,
+                            _snapshot(account).copyWith(
+                              status: QueryStatus.error,
+                              message: '官方登录页暂时无法打开',
+                            ),
+                          ),
+                        );
+                      }
+                    }
                   } else {
                     await _refreshAccount(accountId);
                   }
@@ -1114,7 +1210,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     try {
       await _store(() async {
         if (_current(generation)) {
-          if (_android && !demoMode) {
+          if (_nativeMobile && !demoMode) {
             await _widgetBridge.clear();
           }
           final saved = await _prefs?.setString(
@@ -1126,7 +1222,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
             CarrierAccounts.storageKey,
             _accounts.toStorageString(),
           );
-          if (_android && !demoMode) {
+          if (_nativeMobile && !demoMode) {
             try {
               await _notifications.invokeMethod('cancelAll');
             } on PlatformException {
@@ -1282,53 +1378,65 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                       unawaited(_removeSecondAccount(account.id));
                     },
                   ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('桌面卡片后台刷新'),
-                  subtitle: Text(backgroundRefresh.label),
-                  trailing: PopupMenuButton<BackgroundRefreshInterval>(
-                    tooltip: '选择后台刷新间隔',
-                    onSelected: (value) =>
-                        update(() => backgroundRefresh = value),
-                    itemBuilder: (context) => [
-                      for (final value in BackgroundRefreshInterval.values)
-                        PopupMenuItem(value: value, child: Text(value.label)),
-                    ],
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('更改'),
-                          SizedBox(width: 4),
-                          Icon(Icons.expand_more_rounded),
-                        ],
+                if (_android)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('桌面卡片后台刷新'),
+                    subtitle: Text(backgroundRefresh.label),
+                    trailing: PopupMenuButton<BackgroundRefreshInterval>(
+                      tooltip: '选择后台刷新间隔',
+                      onSelected: (value) =>
+                          update(() => backgroundRefresh = value),
+                      itemBuilder: (context) => [
+                        for (final value in BackgroundRefreshInterval.values)
+                          PopupMenuItem(value: value, child: Text(value.label)),
+                      ],
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('更改'),
+                            SizedBox(width: 4),
+                            Icon(Icons.expand_more_rounded),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                FutureBuilder<BackgroundRefreshStatus>(
-                  future: statusFuture,
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) return const SizedBox.shrink();
-                    final status = snapshot.data!;
-                    final at = status.finishedAt ?? status.startedAt;
-                    final local = at?.toLocal();
-                    final time = local == null
-                        ? ''
-                        : ' · ${local.month}/${local.day} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        '${status.label}$time',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF777D87),
+                if (_ios)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      'iPhone 桌面卡片显示上次查询结果；打开 APP 后会刷新。iOS 暂无定时后台官网查询。',
+                    ),
+                  ),
+                if (_android)
+                  FutureBuilder<BackgroundRefreshStatus>(
+                    future: statusFuture,
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const SizedBox.shrink();
+                      final status = snapshot.data!;
+                      final at = status.finishedAt ?? status.startedAt;
+                      final local = at?.toLocal();
+                      final time = local == null
+                          ? ''
+                          : ' · ${local.month}/${local.day} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          '${status.label}$time',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF777D87),
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
+                      );
+                    },
+                  ),
                 Text('通用流量低于 ${threshold.toStringAsFixed(0)} GB 时提醒'),
                 Slider(
                   value: threshold,
@@ -1367,7 +1475,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     );
     if (save != true || !mounted) return;
     var permitted = reminders;
-    if (reminders && _android) {
+    if (reminders && _nativeMobile) {
       try {
         permitted =
             await _notifications.invokeMethod<bool>('requestPermission') ??
@@ -1380,14 +1488,16 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     setState(() {
       _thresholdGb = threshold;
       _reminders = permitted;
-      _backgroundRefresh = backgroundRefresh;
+      _backgroundRefresh = _ios
+          ? BackgroundRefreshInterval.off
+          : backgroundRefresh;
       _warnedLow.clear();
     });
     await _prefs?.setDouble('threshold_gb', threshold);
     await _prefs?.setBool('reminders', permitted);
     await _prefs?.setInt(
       'background_refresh_minutes',
-      backgroundRefresh.minutes,
+      _ios ? 0 : backgroundRefresh.minutes,
     );
     final scheduled = await _syncBackgroundSchedule();
     if (!scheduled &&
@@ -1448,7 +1558,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _inFlight.clear();
       _awaitingLoginReturn.clear();
     });
-    if (_android && !demoMode) {
+    if (_nativeMobile && !demoMode) {
       try {
         await BackgroundRefreshScheduler.configure(
           BackgroundRefreshInterval.off,
@@ -1473,9 +1583,9 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     );
     await WidgetsBinding.instance.endOfFrame;
     await _storageTasks;
-    var profilesCleared = !_android || demoMode;
+    var profilesCleared = !_nativeMobile || demoMode;
     var otherDataCleared = true;
-    if (_android) {
+    if (_nativeMobile) {
       try {
         await CookieManager.instance().deleteAllCookies();
         await WebStorageManager.instance().deleteAllData();
@@ -1483,20 +1593,25 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         otherDataCleared = false;
       }
       try {
-        profilesCleared =
-            await android_webview
-                .AndroidInAppWebViewController.deleteAccountProfiles(
-              profilesMayExist:
-                  (_prefs?.getBool('account_profiles_may_exist') ?? false) ||
-                  _accounts.accounts.any((account) => !account.isPrimary) ||
-                  Carrier.values.any(
-                    (carrier) =>
-                        (_prefs?.containsKey('connected_${carrier.name}_2') ??
-                            false) ||
-                        (_prefs?.containsKey('snapshot_${carrier.name}_2') ??
-                            false),
-                  ),
-            );
+        if (_android) {
+          profilesCleared =
+              await android_webview
+                  .AndroidInAppWebViewController.deleteAccountProfiles(
+                profilesMayExist:
+                    (_prefs?.getBool('account_profiles_may_exist') ?? false) ||
+                    _accounts.accounts.any((account) => !account.isPrimary) ||
+                    Carrier.values.any(
+                      (carrier) =>
+                          (_prefs?.containsKey('connected_${carrier.name}_2') ??
+                              false) ||
+                          (_prefs?.containsKey('snapshot_${carrier.name}_2') ??
+                              false),
+                    ),
+              );
+        } else if (_ios) {
+          await IOSAccountProfiles.clearAll();
+          profilesCleared = true;
+        }
       } catch (_) {
         profilesCleared = false;
       }
@@ -1644,14 +1759,14 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               onRefreshAll: _refreshAll,
               onSettings: _settings,
               onAddWidget: _addWidget,
-              widgetSupported: _android && !demoMode,
+              widgetSupported: _nativeMobile && !demoMode,
               onAbout: () => _showInfo(
                 '流量小伙伴 · 测试版',
-                '可选择移动、联通、电信、广电，至少一家。数据来自您登录官方网页后的查询结果，通用、定向和用途未知的流量分开展示。\n\n联通展示官网套餐余量；电信按官网已用量和总量的舍入显示值估算，主位标「约」，均不当作已确认通用额度或触发提醒。真实号码登录和余额准确性仍需手机验证，无法识别时请在官方查询页查看。\n\n会话保存在手机本地，广电会话备份使用系统安全存储；不上传第三方服务器，不读取短信或服务密码。桌面卡片可在提醒设置中选择后台刷新间隔；Android 可能延迟任务，电信需要打开 APP 查询。',
+                '可选择移动、联通、电信、广电，至少一家。数据来自您登录官方网页后的查询结果，通用、定向和用途未知的流量分开展示。\n\n联通展示官网套餐余量；电信按官网已用量和总量的舍入显示值估算，主位标「约」，均不当作已确认通用额度或触发提醒。真实号码登录和余额准确性仍需手机验证，无法识别时请在官方查询页查看。\n\n会话保存在手机本地，广电会话备份使用系统安全存储；不上传第三方服务器，不读取短信或服务密码。Android 可选择桌面卡片后台刷新间隔，但系统可能延迟任务；iPhone 桌面卡片显示上次查询结果，打开 APP 后刷新。电信需要打开 APP 查询。',
               ),
               demo: demoMode,
             ),
-          if (_android && !demoMode)
+          if (_nativeMobile && !demoMode)
             if (!_restoring && !_savingSelection)
               for (final account in _visibleAccounts.where(
                 (a) => _connected.contains(a.id) && !_profileClearPending,
@@ -1664,7 +1779,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    if (_android && !demoMode) _widgetBridge.onOpen(null);
+    if (_nativeMobile && !demoMode) _widgetBridge.onOpen(null);
     WidgetsBinding.instance.removeObserver(this);
     _foregroundTimer?.cancel();
     for (final timer in _timeouts.values) {

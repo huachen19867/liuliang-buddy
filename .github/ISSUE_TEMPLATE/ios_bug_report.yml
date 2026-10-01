@@ -1,0 +1,32 @@
+name: iOS 源码与测试反馈
+description: 报告 iOS 编译、官网查询或 WidgetKit 桌面组件问题
+title: "[iOS] "
+body:
+  - type: markdown
+    attributes:
+      value: "当前 iOS 为源码与未签名模拟器验证阶段。请打码手机号，不提供 Cookie、验证码、服务密码、Apple 签名证书或其他凭证。"
+  - type: input
+    id: version
+    attributes:
+      label: 版本或源码提交
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: iPhone/iOS 或模拟器、Xcode 与 Flutter 版本
+      description: 使用 GitHub 云端构建时可直接填写失败的 Actions 链接。
+    validations:
+      required: true
+  - type: input
+    id: carrier
+    attributes:
+      label: 运营商、套餐类型与是否两个同运营商账号
+      description: 无需提供手机号。
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 操作、预期与实际结果
+      description: 桌面请注明组件尺寸与查询时间；编译请提供相关报错文字。
+    validations:
+      required: true

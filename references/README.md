@@ -20,6 +20,8 @@ android-workmanager-sample 使用 sparse checkout 下载，仅保留 WorkManager
 
 ios-platform-review 保存 2026-10-01 的 Flutter 官方 iOS 开发环境源文档和 Apple WidgetKit 刷新说明。Flutter 文档站 HTTPS 请求在本机 TLS 失败后，改从 flutter/website 的官方 GitHub 内容 API 获取 `sites/docs/src/content/platform-integration/ios/setup.md`；来源、blob SHA 和下载状态记于目录内 index.json。仅用于平台可行性研究，不表示已有 iOS 构建或签名。
 
+2026-10-01 的 iOS 实施新增 `ios-home-widget/` 精选参考，来自 [ABausG/home_widget](https://github.com/ABausG/home_widget)，固定 commit `a3e6b641e365c0a5d25f206d543ef9b88bdb8617`。下载包内 BSD-3-Clause LICENSE、WidgetKit 示例、App Group entitlements、Xcode target 配置和原生桥接源码，来源及 blob SHA 保存到目录内 index.json。仅复用 App Group + WidgetKit 的平台方案，未引入该插件或其后台执行代码；现有 payload 直接由本项目桥接展示。官方 Flutter 3.44.8 iOS 模板通过本地 Flutter SDK 生成到 `.tools/ios-scaffold/`，只复制 iOS 子树到应用，保留现有安卓业务。
+
 广电失败复核记录位于 broadnet-public/failure-review/，使用新的公开官网加载与本地合成响应核对两套 jQuery 实例、原探针漏数及修复后桥接。可复用的验证脚本收录于 scripts/test-broadnet-browser.cjs；证据范围和复用方法见 docs/PROTOCOL_RESEARCH.md，不含真实账号或凭证。
 
 新增联通/电信精选参考：`ChinaUnicomMonitor/` 来源 https://github.com/dengfhqqq/ChinaUnicomMonitor （未发现LICENSE）；`FlowLite/` 来源 https://github.com/nongchengqi/FlowLite （未发现LICENSE）；`ChinaTelecomMonitor/` 来源 https://github.com/Cp0204/ChinaTelecomMonitor （AGPL-3.0，附LICENSE）。仅协议研究，不复制到应用，这些项目依赖APP认证，不能作为网页登录已接通的依据。
