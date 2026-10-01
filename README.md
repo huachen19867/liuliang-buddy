@@ -134,7 +134,7 @@ D:\AI\tools\flutter\bin\flutter.bat test
 node test/services/page_probe_js_test.cjs
 ```
 
-使用标准 Android 环境并注入自己的私有签名后，在 app/ 执行 `flutter build apk --release --target-platform android-arm64`。本工作区根目录可运行 `./scripts/build-android.ps1 -Mode Release -CreateLegacyUpgrade`，外部环境签名变量与迁移说明见 [ANDROID_RELEASE.md](docs/ANDROID_RELEASE.md)。缺签名会拒绝 Release，私钥和密码不在公开仓库中；需要镜像时加 `-UseMirrors`，临时wrapper与镜像配置会恢复。
+使用标准 Android 环境并注入自己的私有签名后，在 app/ 执行 `flutter build apk --release --target-platform android-arm64`。本工作区根目录可运行 `./scripts/build-android.ps1 -Mode Release`，外部环境签名变量与迁移说明见 [ANDROID_RELEASE.md](docs/ANDROID_RELEASE.md)。缺签名会拒绝 Release，私钥和密码不在公开仓库中；需要镜像时加 `-UseMirrors`，临时wrapper与镜像配置会恢复。
 
 广电公开页面回归验证在根目录执行 `node scripts/test-broadnet-browser.cjs`，再加 `--delayed-bridge` 验证桥接延迟。需要已安装 Chrome 与 Playwright；本工作区复用 .tools/browser/node_modules/playwright，其他环境可通过 LIULIANG_PLAYWRIGHT_MODULE 指定该包路径，通过 LIULIANG_CHROME_PATH 指定浏览器路径。请求由本地 route 拦截，响应为合成数据，不使用账号、不发送验证码。该检查需要官网可访问，官网 bundle 改版也可能使其失败。
 
