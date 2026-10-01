@@ -8,9 +8,9 @@
 
 新增 WidgetKit 小、中、大号桌面组件与 App Group 展示快照，显示最近查询的余量、状态和时间。桌面需要用户手动添加，轻点卡片打开应用查询。iOS 设置不提供尚未实现的定时后台官网查询，timeline 更新只是重绘旧快照。低流量提醒支持本机通知授权及前台横幅，仍只使用有限通用额度。
 
-Windows 本地完整 Flutter 104 项测试和静态分析通过，Node 页面探针与 Chrome 全本地合成电信 DOM 验证通过。Xcode 工程静态解析、扩展嵌入/依赖接线与 plist 检查通过。公开仓库的 [iOS 验证工作流](https://github.com/huachen19867/liuliang-buddy/actions/workflows/ios.yml)使用 GitHub macOS 环境，运行 Flutter/Swift 回归、编译模拟器应用和扩展、安装启动及界面烟雾测试，不需要老板自备 Mac。对应原生构建结果以该工作流的提交记录为准，最终回执追加到技术日志。
+Windows 本地完整 Flutter 107 项测试和静态分析通过，Node 页面探针与 Chrome 全本地合成电信 DOM 验证通过。Xcode 工程静态解析、扩展嵌入/依赖接线与 plist 检查通过。公开仓库的 [iOS 验证工作流](https://github.com/huachen19867/liuliang-buddy/actions/workflows/ios.yml)使用 GitHub macOS 环境，运行 Flutter/Swift 回归、编译模拟器应用和扩展、安装启动及界面烟雾测试，不需要老板自备 Mac。对应原生构建结果以该工作流的提交记录为准，最终回执追加到技术日志。
 
-安卓 [1.6.0 测试包](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.6.0)为 `liuliang-buddy-debug.apk`，115,893,050 字节，versionCode 9、API 24 起、target API 36，Flutter 引擎仅 ARM64。使用与上一版相同的 Android Debug 证书，APK v2 验签通过，未启用 DEMO。SHA-256：`cffde603402c2ceb5877c9bc9ce49fec9d7de0e2236e57b594deee954d218ecd`。构建、元数据及架构检查通过；历史版本保留。
+安卓 [1.6.0 测试包](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.6.0)为 `liuliang-buddy-debug.apk`，115,893,713 字节，versionCode 9、API 24 起、target API 36，Flutter 引擎仅 ARM64。使用与上一版相同的 Android Debug 证书，APK v2 验签通过，未启用 DEMO。SHA-256：`a251e90ac55ffcdd36057f8a057bdee102897d08bc12f5adceeb5d278e45647d`。构建、元数据及架构检查通过；历史版本保留。
 
 模拟器产物是未签名的 Runner.app 压缩归档，不适用于 iPhone。真实 iPhone 安装需要 Apple 团队签名与 App Group provisioning；具体方法见 [IOS_BUILD.md](IOS_BUILD.md)。项目未上传证书、私钥或个人团队配置。
 

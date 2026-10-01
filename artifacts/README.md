@@ -44,4 +44,4 @@ liuliang-buddy-debug.apk已更新为1.5.0+8，90,035,780字节（约85.9MiB）�
 
 ## 1.6.0 当前安装包
 
-liuliang-buddy-debug.apk为1.6.0+9，115,893,050字节，API24/36，libflutter.so仅ARM64；插件自身还含其他ABI库，不代表应用能在其他架构运行。Android Debug证书沿用，v2验签通过，未启用DEMO。SHA-256：cffde603402c2ceb5877c9bc9ce49fec9d7de0e2236e57b594deee954d218ecd。104项Flutter、analyze、Node及Chrome本地合成DOM8场景通过，Android构建45秒成功；新版日志为android-build.log，旧native-tests.log仅代表1.5.0原生回归，不能算本轮新测试。公开发布说明见docs/RELEASE_1.6.0.md，真实联通登录与特殊移动卡仍待手机复测。
+liuliang-buddy-debug.apk为1.6.0+9，115,893,713字节，API24/36，libflutter.so仅ARM64；插件自身还含其他ABI库，不代表应用能在其他架构运行。Android Debug证书沿用，v2验签通过，未启用DEMO。SHA-256：a251e90ac55ffcdd36057f8a057bdee102897d08bc12f5adceeb5d278e45647d。107项Flutter、analyze、Node及Chrome本地合成DOM8场景通过，最终Android构建28秒成功；新版日志为android-build.log，旧native-tests.log仅代表1.5.0原生回归，不能算本轮新测试。公开发布说明见docs/RELEASE_1.6.0.md，真实联通登录与特殊移动卡仍待手机复测。
