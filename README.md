@@ -2,7 +2,7 @@
 
 一个可自行选择运营商的流量查询测试应用。首次选择移动、联通、电信、广电，至少一家；同一家有两个号码时可连续点两下加入第二张卡，各自在官网登录。每家最多两个、同时最多展示四个账号；第二账号需要系统 WebView 支持独立 Profile，不支持时明确阻止添加。设置可改选运营商或收起第二张卡，保留历史本地记录。联通读取官网套餐余量，电信按官网已用/总量显示值估算并标「约」，均不混入已确认通用额度或提醒。首页采用奶油背景、圆润卡片与水滴插画，展示每个账号的余量、时间、状态和明细；官网明确标记不限量时结束加载并显示不限量，不生成零或无限 GB。
 
-当前版本 1.6.0+9：[GitHub 仓库](https://github.com/huachen19867/liuliang-buddy)、[安卓测试包与版本说明](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.6.0)。修复联通登录返回被刷新限制挡住和历史加载状态持续转圈，移动连接页补充官方 App 人脸验证的帮助。本轮新增 iOS 17 及以上的 Runner、持久化双账号会话和 WidgetKit 工程，尚无签名的 iPhone 安装包。
+当前开发版本 1.7.0+10：首页新增每个账号的套餐通话与短信余量，保留官网名称和单位，各项独立展示，缺失不是零。联通“短、彩信”保留合并口径，电信同单位显示值差标估算；不读取短信和通话记录。字段证据和未验证边界见 [通话短信研究](docs/VOICE_SMS_RESEARCH.md)，桌面组件仍展示流量。已公开的上一版：[1.6.0 下载](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.6.0)。iOS 17 源码含持久化双账号会话和 WidgetKit 工程，尚无签名的 iPhone 安装包。
 
 没有 Mac 也可通过 [GitHub Actions](https://github.com/huachen19867/liuliang-buddy/actions/workflows/ios.yml)执行 macOS 编译、模拟器启动与截图。操作和签名说明见 [iOS 构建说明](docs/IOS_BUILD.md)，实现边界见 [会话隔离](docs/IOS_SESSIONS.md)与 [iOS 小组件](docs/IOS_WIDGET.md)。模拟器应用不适用于 iPhone；iOS 初版前台查询，组件展示最近结果，点击打开应用更新，设置不提供安卓后台周期选项。
 
@@ -52,6 +52,10 @@
 | docs/ONBOARDING_DESIGN.md | 选择流程、旧版迁移与本地记录行为 |
 | docs/UNICOM_TELECOM_RESEARCH.md | 联通、电信入口及尚未接通的证据边界 |
 | app/lib/data/ | 四家数据模型、移动/广电/联通响应解析与电信DOM估算 |
+| docs/VOICE_SMS_RESEARCH.md | 四家通话短信字段、单位、公开证据与限制 |
+| docs/VOICE_SMS_UI_PROGRESS.md | 每账号服务余量展示与组件截图验证 |
+| docs/RELEASE_1.7.0.md | 通话短信新增功能与本轮交付验证 |
+| artifacts/dashboard-voice-sms-demo.png | 通话短信首页真实组件渲染，明确演示数据 |
 | app/lib/data/traffic_summary.dart | 首页与桌面共享的通用余额/广电套餐明细摘要 |
 | app/lib/services/page_probe.dart | 限定接口的响应观察、移动解码与广电会话脚本 |
 | app/lib/services/response_policy.dart | 广电明文成功结果回退与迟到原始响应门禁 |

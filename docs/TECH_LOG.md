@@ -207,3 +207,11 @@ run36815488725确认官方fallback生效（ordinaryExists=false/cryptexExists=tr
 最终macOS run36817117891完成且conclusion=success。Xcode16.4/iOS18.5 ARM64上107项Flutter、analyze、Swift快照、Runner/嵌入TrafficWidget编译、独立冷启动及完整界面smoke全部通过。冷启动60秒原始系统截图已显示选择页，四张原始1206×2622 Flutter截图目视核对后复制到artifacts/ios-*-simulator.png，索引记录空账号及5GB阈值语义；不把页面内卡片示意当系统Widget。正常入口模拟器归档在smoke改编测试入口前生成，56,893,081字节，SHA-256 b5f39594fc16f463bb5abb896d0708c14a53092ff3105d6798cf92d4aed7d21d。验证后只有说明/截图变化，不重复无关测试。Release草稿APK已上传，GitHub digest与最终本地a251e90a一致，待补模拟器产物/截图并公开发布。
 
 公开1.6.0发布完成：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.6.0 ，draft=false/prerelease=true。源码标签核对为4ae8f14c65452fe82ab883ca30346d58023e7fa1，发布树的app/、验证脚本和workflow与已成功验收的387c8a3完全相同，之后只补文档与截图。APK、未签名模拟器归档和四张PNG均state=uploaded；GitHub各asset SHA-256分别与本地一致，APK a251e90a/115893713字节、模拟器b5f39594/56893081字节。源码仓库private=false，只推送public远端；发布说明内文档链接转换为完整GitHub地址。真机签名/官方账号/系统Widget尚未验收，本版不提供iPhone IPA或TestFlight；联通真实套餐与移动特殊卡需要用户手机复测。该回执作为发布后文档提交同步main，不修改已发布标签或安装包。
+
+## 2026-10-01：通话与短信套餐余量
+
+老板的新反馈要求增加通话和短信余量。先定位本日志与已有四家协议资料，补下载移动MIT参考与官方公开页面，证据索引存references/allowances，结论见VOICE_SMS_RESEARCH.md。按老板分工复用Astra研究、SOL解析模型、Luna首页角色；不新增短信或通话权限，不抓取登录凭证。
+
+首页每账号独立服务明细，JSON缓存兼容旧记录，错误/刷新保留原快照时间。联通保留短彩信和整组件successFlow失败门禁；移动汇总与明细不重复；广电未知次数资源不按短信；电信按同单位官网总-已用估算，短信次保留次不强转条。桌面流量协议不扩展。复核发现电信延迟桥接前明细清空会重放旧pending，修为空/过量/结构缺失同步清pending，Chrome增加真实浏览器全本地合成回归10场景通过；不等于真实账号验证。Flutter、构建和公开发布回执随后补充。
+
+集成完整Flutter123项通过，analyze首轮指出电信分支3处多余非空断言，去除后无问题；不是修改解析逻辑。Node原页面探针通过，Chrome电信10场景通过，UI21项及新DEMO截图目视完成。APK与iOS云端验证进行中，未宣称真机值已确认。

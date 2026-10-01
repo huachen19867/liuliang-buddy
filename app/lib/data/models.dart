@@ -23,6 +23,99 @@ enum QueryStatus { notConnected, loading, success, authExpired, error }
 
 enum BucketKind { general, directed, unknown }
 
+enum AllowanceKind { voice, sms }
+
+/// Voice values are minutes; SMS values retain the official count unit (条 or
+/// 次). Each row is an official package or summary, never implicitly summed.
+class ServiceAllowance {
+  const ServiceAllowance({
+    required this.kind,
+    required this.label,
+    this.scope,
+    this.remaining,
+    this.total,
+    this.overage,
+    this.rawRemaining,
+    this.rawUnit,
+    this.isUnlimited = false,
+    this.isEstimated = false,
+  });
+
+  final AllowanceKind kind;
+  final String label;
+  final String? scope;
+  final num? remaining;
+  final num? total;
+  final num? overage;
+  final String? rawRemaining;
+  final String? rawUnit;
+  final bool isUnlimited;
+  final bool isEstimated;
+
+  String get canonicalUnit => kind == AllowanceKind.voice
+      ? '分钟'
+      : rawUnit == '次'
+      ? '次'
+      : '条';
+
+  Map<String, dynamic> toJson() => {
+    'kind': kind.name,
+    'label': label,
+    'scope': scope,
+    'remaining': remaining,
+    'total': total,
+    'overage': overage,
+    'rawRemaining': rawRemaining,
+    'rawUnit': rawUnit,
+    'isUnlimited': isUnlimited,
+    'isEstimated': isEstimated,
+  };
+
+  factory ServiceAllowance.fromJson(Map<String, dynamic> json) {
+    final kind = AllowanceKind.values.where(
+      (value) => value.name == json['kind'],
+    );
+    final label = json['label'];
+    if (kind.isEmpty || label is! String || label.trim().isEmpty) {
+      throw const FormatException('Invalid service allowance');
+    }
+    num? value(String key) {
+      final raw = json[key];
+      if (raw == null) return null;
+      if (raw is! num ||
+          !raw.isFinite ||
+          raw < 0 ||
+          raw > 1000000000 ||
+          (kind.first == AllowanceKind.sms && raw != raw.roundToDouble())) {
+        throw const FormatException('Invalid service allowance amount');
+      }
+      return raw;
+    }
+
+    final remaining = value('remaining');
+    final total = value('total');
+    final overage = value('overage');
+    final unlimited = json['isUnlimited'] == true;
+    if ((unlimited || overage != null) && remaining != null) {
+      throw const FormatException('Conflicting service allowance amounts');
+    }
+    return ServiceAllowance(
+      kind: kind.first,
+      label: label,
+      scope: json['scope'] is String ? json['scope'] as String : null,
+      remaining: remaining,
+      total: total,
+      overage: overage,
+      rawRemaining: json['rawRemaining'] is String
+          ? json['rawRemaining'] as String
+          : null,
+      rawUnit: json['rawUnit'] is String ? json['rawUnit'] as String : null,
+      isUnlimited: unlimited,
+      isEstimated: json['isEstimated'] == true,
+    );
+  }
+}
+
 class TrafficBucket {
   const TrafficBucket({
     required this.name,
@@ -81,6 +174,7 @@ class CarrierSnapshot {
     this.queriedAt,
     this.phoneMasked,
     this.buckets = const [],
+    this.allowances = const [],
     this.message,
   });
 
@@ -89,6 +183,7 @@ class CarrierSnapshot {
   final DateTime? queriedAt;
   final String? phoneMasked;
   final List<TrafficBucket> buckets;
+  final List<ServiceAllowance> allowances;
   final String? message;
 
   bool get hasUnlimitedAllowance => buckets.any((bucket) => bucket.isUnlimited);
@@ -118,6 +213,7 @@ class CarrierSnapshot {
     Object? queriedAt = _unset,
     Object? phoneMasked = _unset,
     List<TrafficBucket>? buckets,
+    List<ServiceAllowance>? allowances,
     Object? message = _unset,
   }) => CarrierSnapshot(
     carrier: carrier ?? this.carrier,
@@ -129,6 +225,7 @@ class CarrierSnapshot {
         ? this.phoneMasked
         : phoneMasked as String?,
     buckets: buckets ?? this.buckets,
+    allowances: allowances ?? this.allowances,
     message: identical(message, _unset) ? this.message : message as String?,
   );
 
@@ -138,11 +235,13 @@ class CarrierSnapshot {
     'queriedAt': queriedAt?.toIso8601String(),
     'phoneMasked': phoneMasked,
     'buckets': buckets.map((bucket) => bucket.toJson()).toList(),
+    'allowances': allowances.map((allowance) => allowance.toJson()).toList(),
     'message': message,
   };
 
   factory CarrierSnapshot.fromJson(Map<String, dynamic> json) {
     final rawBuckets = json['buckets'];
+    final rawAllowances = json['allowances'];
     final carrierName = json['carrier'];
     if (!Carrier.values.any((carrier) => carrier.name == carrierName)) {
       throw const FormatException('Unknown carrier in saved snapshot');
@@ -168,6 +267,21 @@ class CarrierSnapshot {
                   (item) =>
                       TrafficBucket.fromJson(Map<String, dynamic>.from(item)),
                 )
+                .toList()
+          : const [],
+      allowances: rawAllowances is List
+          ? rawAllowances
+                .whereType<Map>()
+                .map((item) {
+                  try {
+                    return ServiceAllowance.fromJson(
+                      Map<String, dynamic>.from(item),
+                    );
+                  } on FormatException {
+                    return null;
+                  }
+                })
+                .whereType<ServiceAllowance>()
                 .toList()
           : const [],
       message: json['message'] is String ? json['message'] as String : null,

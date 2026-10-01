@@ -221,17 +221,17 @@ void main() {
     );
     expect(parseBroadnetH5({}).status, QueryStatus.error);
     expect(parseBroadnetH5({'respCode': '999999'}).status, QueryStatus.error);
-    expect(
-      parseBroadnetH5({
-        'respCode': '000000',
-        'intfResultBean': {
-          'userResList': [
-            {'busiType': '1', 'discntName': '语音', 'balance': '200'},
-          ],
-        },
-      }).status,
-      QueryStatus.error,
-    );
+    final voiceOnly = parseBroadnetH5({
+      'respCode': '000000',
+      'intfResultBean': {
+        'userResList': [
+          {'busiType': '1', 'discntName': '语音', 'balance': '200'},
+        ],
+      },
+    });
+    expect(voiceOnly.status, QueryStatus.success);
+    expect(voiceOnly.buckets, isEmpty);
+    expect(voiceOnly.allowances.single.remaining, 200);
   });
 
   test('authentication and malformed bodies never become success', () {

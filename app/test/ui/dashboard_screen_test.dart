@@ -21,6 +21,107 @@ const _gib = 1024 * 1024 * 1024;
 void main() {
   setUpAll(_loadPreviewChineseFont);
 
+  testWidgets('通话短信逐项展示未知真零超额与原查询时间', (tester) async {
+    _configureViewport(tester, const Size(320, 1200));
+    await tester.pumpWidget(
+      _host(
+        snapshots: [_serviceDemo(QueryStatus.authExpired)],
+        demo: false,
+        textScale: 1.4,
+        selectedCarriers: const {Carrier.mobile},
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('剩余 120 分钟'), findsOneWidget);
+    expect(find.text('剩余 0 条'), findsOneWidget);
+    expect(find.text('剩余待确认'), findsOneWidget);
+    expect(find.text('超出 2 条'), findsOneWidget);
+    expect(find.textContaining('显示上次查询'), findsNothing);
+    expect(find.textContaining('以下为上次查询'), findsOneWidget);
+    expect(find.textContaining('10:20'), findsOneWidget);
+    expect(find.text('仅限本地拨打'), findsOneWidget);
+    expect(find.text('剩余 150 分钟'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('四卡通话短信未知状态在窄屏无溢出', (tester) async {
+    _configureViewport(tester, const Size(320, 1800));
+    await tester.pumpWidget(
+      _host(
+        snapshots: const [],
+        demo: false,
+        textScale: 1.4,
+        selectedCarriers: Carrier.values.toSet(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('等待连接'), findsNWidgets(8));
+    expect(find.text('剩余 0 条'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('仅通话短信缓存保留时间且估算不限量不混淆', (tester) async {
+    _configureViewport(tester, const Size(390, 1200));
+    await tester.pumpWidget(
+      _host(
+        snapshots: [
+          CarrierSnapshot(
+            carrier: Carrier.telecom,
+            status: QueryStatus.error,
+            queriedAt: DateTime(2026, 10, 1, 10, 20),
+            allowances: const [
+              ServiceAllowance(
+                kind: AllowanceKind.voice,
+                label: '国内语音',
+                remaining: 18.5,
+                isEstimated: true,
+              ),
+              ServiceAllowance(
+                kind: AllowanceKind.voice,
+                label: '指定亲情号',
+                isUnlimited: true,
+              ),
+              ServiceAllowance(
+                kind: AllowanceKind.sms,
+                label: '短信资源',
+                rawUnit: '次',
+                remaining: 19,
+                total: 20,
+                isEstimated: true,
+              ),
+            ],
+          ),
+        ],
+        demo: false,
+        textScale: 1,
+        selectedCarriers: const {Carrier.telecom},
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('约剩余 18.5 分钟'), findsOneWidget);
+    expect(find.text('不限量'), findsOneWidget);
+    expect(find.text('约剩余 19 次'), findsOneWidget);
+    expect(find.text('共 20 次'), findsOneWidget);
+    expect(find.textContaining('显示上次查询'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('生成流量通话短信实际组件DEMO截图', (tester) async {
+    _configureViewport(tester, const Size(390, 1520));
+    await tester.pumpWidget(
+      _host(
+        snapshots: [_serviceDemo(QueryStatus.success)],
+        demo: true,
+        textScale: 1,
+        selectedCarriers: const {Carrier.mobile},
+        previewBoundaryKey: _previewBoundaryKey,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await _writeScreenshot(tester, 'dashboard-voice-sms-demo.png');
+  });
+
   testWidgets('未连接与演示数据在小屏和常见屏幕宽度无布局异常', (tester) async {
     _configureViewport(tester, const Size(320, 640));
     for (final size in const [Size(320, 640), Size(390, 844)]) {
@@ -716,6 +817,43 @@ List<CarrierSnapshot> _demoSnapshots() => [
     ],
   ),
 ];
+
+CarrierSnapshot _serviceDemo(QueryStatus status) => CarrierSnapshot(
+  carrier: Carrier.mobile,
+  status: status,
+  queriedAt: DateTime(2026, 10, 1, 10, 20),
+  phoneMasked: '138****2468',
+  buckets: const [
+    TrafficBucket(
+      name: '通用流量',
+      kind: BucketKind.general,
+      remainingBytes: 12 * _gib,
+      totalBytes: 30 * _gib,
+    ),
+  ],
+  allowances: const [
+    ServiceAllowance(
+      kind: AllowanceKind.voice,
+      label: '国内通话',
+      remaining: 120,
+      total: 300,
+    ),
+    ServiceAllowance(
+      kind: AllowanceKind.voice,
+      label: '本地赠送通话',
+      remaining: 30,
+      scope: '仅限本地拨打',
+    ),
+    ServiceAllowance(
+      kind: AllowanceKind.sms,
+      label: '国内短信',
+      remaining: 0,
+      total: 100,
+    ),
+    ServiceAllowance(kind: AllowanceKind.sms, label: '短、彩信共享包'),
+    ServiceAllowance(kind: AllowanceKind.sms, label: '已超出套餐短信', overage: 2),
+  ],
+);
 
 CarrierSnapshot _unicomDemoSnapshot() => CarrierSnapshot(
   carrier: Carrier.unicom,

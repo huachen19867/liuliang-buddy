@@ -3,16 +3,18 @@
   "syntheticOnly": true,
   "actualAccountVerified": false,
   "networkPolicy": "Every browser request fulfilled or aborted locally",
-  "fulfilled": 7,
+  "fulfilled": 9,
   "aborted": 0,
   "cases": [
-    "hidden modal, mixed units/NBSP, voice/SMS excluded",
+    "hidden modal, mixed units/NBSP, separate voice/SMS rows",
     "SPA Home to login suppresses stale rows",
     "initial login route rejected",
     "similar marketing text outside exact container rejected",
     "late bridge ready flushes captured rows once",
     "incomplete row preserved as null without synthesized aggregate",
     "explicit unlimited total preserved for terminal Dart parsing",
-    "login invalidates pending bridge payload"
+    "login invalidates pending bridge payload",
+    "voice-only response emitted, ambiguous type2 excluded, missing SMS preserved",
+    "removed official rows invalidate pending bridge payload"
   ]
 }

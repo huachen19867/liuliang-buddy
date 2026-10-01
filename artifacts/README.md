@@ -51,3 +51,7 @@ liuliang-buddy-debug.apk为1.6.0+9，115,893,713字节，API24/36，libflutter.s
 ios-selection-simulator.png、ios-dashboard-simulator.png、ios-widget-guide-simulator.png、ios-settings-simulator.png 为 [run36817117891](https://github.com/huachen19867/liuliang-buddy/actions/runs/36817117891) 在 iOS18.5 ARM64 模拟器生成的1206×2622实际应用画面，未加工。分别显示首次选择、未连接移动首页、手动添加指引和设置；不包含真实号码、会话或流量样本。设置中的5GB是提醒阈值，不是套餐余额；首页中的卡片预览不是系统Widget截图。未验证真实Widget摆放、通知授权或官网登录。
 
 该次CI已通过107项Flutter、analyze、Swift快照检查、Runner及Widget扩展编译、独立冷启动和界面烟雾流程。正常入口模拟器应用在Release以ios-simulator.tar.gz交付，56,893,081字节，SHA-256 b5f39594fc16f463bb5abb896d0708c14a53092ff3105d6798cf92d4aed7d21d；不能安装到iPhone。云端详细日志和诊断保存在忽略的.tools/ios-ci/final，不上传系统日志到应用源码。
+
+## 1.7.0 通话与短信预览
+
+dashboard-voice-sms-demo.png 来自实际Flutter首页组件，显示通话分钟、真实零短信样本、未知短彩信共享包与超额短信样本，各套餐分开展示，顶部标界面演示。数值都是合成样本，不代表真实运营商账户。UI定向21项已通过，截图目视无截断或溢出；其他历史DEMO由同一测试同步更新为新布局。桌面示意仍只显示流量。

@@ -37,3 +37,5 @@ ios-platform-review 保存 2026-10-01 的 Flutter 官方 iOS 开发环境源文�
 深入官网记录位于carrier-public-deep/和telecom-public-deep/，每个index.json保留原URL与HTTP状态。联通已取得userinfoE5query请求、resource.remainFlow字段、MB单位与登录门禁原文；电信省分/全国页面仍在正常执行防护后返回空白。ahBot/精选文件来自https://github.com/WM9116/ahBot，未发现LICENSE，仅小程序线索研究。工具为carrier-web-deep.cjs，未输入账号或发送短信。
 
 电信新官网Account结构的可复用浏览器验收脚本为 scripts/test-telecom-rendered-browser.cjs，全部网页请求本地拦截，结果 artifacts/telecom-rendered-browser.json。它验证探针与已归档公开DOM结构，不验证真实账号，也不调用电信余额接口。
+
+通话/短信扩展证据归档在 allowances/：evidence-index.json 记录既有联通/广电/电信官方页面片段的URL、原文件SHA-256和偏移，以及移动MIT参考解析代码；mobile-index.json为2026-10-01重新无账号浏览移动查询页后跳登录的公开请求记录。研究结论与谨慎分类契约见 docs/VOICE_SMS_RESEARCH.md，不含真实号码或余额响应。

@@ -664,7 +664,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       if (!_current(generation) || !_inFlight.remove(accountId)) return;
       final failed = _snapshot(
         account,
-      ).copyWith(status: QueryStatus.error, message: '未取得可识别的流量结果，请打开官方查询页确认');
+      ).copyWith(status: QueryStatus.error, message: '未取得可识别的套餐余量，请打开官方查询页确认');
       setState(() => _putSnapshot(account, failed));
       unawaited(
         _store(() async {

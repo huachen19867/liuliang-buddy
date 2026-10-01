@@ -12,10 +12,13 @@ CarrierSnapshot parseTelecomRendered(
     message: '电信官网明细或单位尚无法确认，请打开官方查询页查看',
   );
   final rows = response['rows'];
+  final rawAllowances = response['allowanceRows'];
   if (response['source'] != 'officialRendered' ||
       rows is! List ||
-      rows.isEmpty ||
-      rows.length > 200) {
+      rows.length > 200 ||
+      rawAllowances != null &&
+          (rawAllowances is! List || rawAllowances.length > 200) ||
+      rows.isEmpty && (rawAllowances is! List || rawAllowances.isEmpty)) {
     return fail();
   }
   int? displayedBytes(Object? value) {
@@ -61,9 +64,44 @@ CarrierSnapshot parseTelecomRendered(
       ),
     );
   }
+  final allowances = <ServiceAllowance>[];
+  for (final row in rawAllowances is List ? rawAllowances : const []) {
+    if (row is! Map) continue;
+    final name = row['name'] is String ? (row['name'] as String).trim() : '';
+    if (name.isEmpty || name.length > 200) continue;
+    final kind = switch (row['kind']) {
+      'voice' => AllowanceKind.voice,
+      'sms' when RegExp(r'短信|短、彩信|短彩信').hasMatch(name) => AllowanceKind.sms,
+      _ => null,
+    };
+    if (kind == null) continue;
+    final used = _telecomAmount(row['used'], kind);
+    final total = _telecomAmount(row['total'], kind);
+    final unlimited = _isUnlimitedValue(row['total']);
+    final comparable = used != null && total != null && used.$2 == total.$2;
+    // Only values displayed with the same unit can be subtracted.
+    final remaining = comparable ? total.$1 - used.$1 : null;
+    allowances.add(
+      ServiceAllowance(
+        kind: kind,
+        label: name,
+        remaining: remaining != null && remaining >= 0 ? remaining : null,
+        total: comparable ? total.$1 : null,
+        overage: remaining != null && remaining < 0 ? -remaining : null,
+        rawRemaining: unlimited ? '不限量' : _text(row['total']),
+        rawUnit: used?.$2 ?? (kind == AllowanceKind.voice ? '分钟' : null),
+        isUnlimited: unlimited,
+        isEstimated: comparable,
+      ),
+    );
+  }
   if (buckets.every(
-    (bucket) => bucket.remainingBytes == null && !bucket.isUnlimited,
-  )) {
+        (bucket) => bucket.remainingBytes == null && !bucket.isUnlimited,
+      ) &&
+      !allowances.any(
+        (item) =>
+            item.remaining != null || item.overage != null || item.isUnlimited,
+      )) {
     return fail();
   }
   return CarrierSnapshot(
@@ -71,12 +109,28 @@ CarrierSnapshot parseTelecomRendered(
     status: QueryStatus.success,
     queriedAt: queriedAt ?? DateTime.now(),
     buckets: buckets,
-    message: buckets.any((bucket) => bucket.isUnlimited)
+    allowances: allowances,
+    message: buckets.isEmpty
+        ? '官网仅返回通话或短信套餐明细；显示值为估算，适用范围以官网为准'
+        : buckets.any((bucket) => bucket.isUnlimited)
         ? '官网标记含不限量套餐，达量限速和适用范围以套餐规则为准'
         : buckets.any((bucket) => bucket.remainingBytes == null)
         ? '部分官网明细无法估算，暂不显示合计；请核对官方查询页'
         : '根据官网已用量和总量的显示值估算，存在舍入误差，套餐适用范围以官网为准',
   );
+}
+
+(num, String)? _telecomAmount(Object? raw, AllowanceKind kind) {
+  if (raw is! String || raw.length > 60) return null;
+  final match = RegExp(
+    kind == AllowanceKind.voice
+        ? r'^(\d+(?:\.\d+)?)\s*(分钟|分)$'
+        : r'^(\d+)\s*(次|条)$',
+  ).firstMatch(raw.trim());
+  if (match == null) return null;
+  final value = _allowanceAmount(match.group(1), kind);
+  if (value == null) return null;
+  return (value, kind == AllowanceKind.voice ? '分钟' : match.group(2)!);
 }
 
 /// Official iservice E5 resource summary; commonsFormat.getFlow takes MB.
@@ -98,10 +152,45 @@ CarrierSnapshot parseUnicomWeb(
     return fail(QueryStatus.error, '中国联通查询失败（HTTP $httpStatus）');
   }
   final resource = _map(response['resource']);
-  if (resource == null ||
-      resource['successFlow'] == false ||
-      resource['successFlow'] == 'false') {
+  if (resource == null) {
     return fail(QueryStatus.error, '联通官网未返回可确认的流量余量');
+  }
+  final allowances = <ServiceAllowance>[
+    if (_officialFlag(resource['voiceFlag']))
+      _unicomAllowance(
+        kind: AllowanceKind.voice,
+        label: '语音',
+        remaining: resource['remainVoice'],
+        overage: resource['overVoice'],
+      ),
+    if (_officialFlag(resource['smsFlag']))
+      _unicomAllowance(
+        kind: AllowanceKind.sms,
+        label: '短、彩信',
+        remaining: resource['remainSms'],
+        overage: resource['overSms'],
+      ),
+  ];
+  CarrierSnapshot noFlow(String message) {
+    if (!allowances.any(
+      (allowance) =>
+          allowance.remaining != null ||
+          allowance.overage != null ||
+          allowance.isUnlimited,
+    )) {
+      return fail(QueryStatus.error, message);
+    }
+    return CarrierSnapshot(
+      carrier: Carrier.unicom,
+      status: QueryStatus.success,
+      queriedAt: queriedAt ?? DateTime.now(),
+      allowances: allowances,
+      message: '$message；通话或短彩结果已更新',
+    );
+  }
+
+  if (resource['successFlow'] == false || resource['successFlow'] == 'false') {
+    return fail(QueryStatus.error, '联通官网余量组件查询失败');
   }
   final unlimited = resource['hasNolimitedFlow'];
   // The official page checks JavaScript truthiness, including string flags.
@@ -121,20 +210,18 @@ CarrierSnapshot parseUnicomWeb(
           rawRemaining: '不限量',
         ),
       ],
+      allowances: allowances,
       message: '官网按不限量套餐展示已用流量，达量限速和适用范围请在官方页面确认',
     );
   }
-  if (resource['flowFlag'] != true &&
-      resource['flowFlag'] != 1 &&
-      resource['flowFlag'] != '1' &&
-      resource['flowFlag'] != 'true') {
-    return fail(QueryStatus.error, '联通官网没有可确认的流量额度，请查看官方查询页');
+  if (!_officialFlag(resource['flowFlag'])) {
+    return noFlow('联通官网没有可确认的流量额度，请查看官方查询页');
   }
   final over = num.tryParse(resource['overFlow']?.toString() ?? '');
   final remaining = resource['remainFlow'];
   final amount = num.tryParse(remaining?.toString() ?? '');
   if (over != null && (!over.isFinite || over < 0)) {
-    return fail(QueryStatus.error, '联通官网超额字段无法确认');
+    return noFlow('联通官网超额字段无法确认');
   }
   final exhausted = over != null && over > 0;
   if (!exhausted &&
@@ -142,10 +229,10 @@ CarrierSnapshot parseUnicomWeb(
           !amount.isFinite ||
           amount < 0 ||
           amount > 1000000000)) {
-    return fail(QueryStatus.error, '联通官网剩余额无法确认');
+    return noFlow('联通官网剩余额无法确认');
   }
   final bytes = exhausted ? 0 : _toBytes(remaining, 'MB');
-  if (bytes == null) return fail(QueryStatus.error, '联通官网剩余额格式无法确认');
+  if (bytes == null) return noFlow('联通官网剩余额格式无法确认');
   return CarrierSnapshot(
     carrier: Carrier.unicom,
     status: QueryStatus.success,
@@ -159,8 +246,43 @@ CarrierSnapshot parseUnicomWeb(
         rawUnit: 'MB',
       ),
     ],
+    allowances: allowances,
     message: exhausted ? '官网显示流量已超出套餐额度，适用规则请查看官网' : '官网套餐余量，用途以套餐规则为准',
   );
+}
+
+bool _officialFlag(Object? value) =>
+    value == true || value == 1 || value == '1' || value == 'true';
+
+ServiceAllowance _unicomAllowance({
+  required AllowanceKind kind,
+  required String label,
+  required Object? remaining,
+  required Object? overage,
+}) {
+  final over = _allowanceAmount(overage, kind);
+  final exceeded = over != null && over > 0;
+  return ServiceAllowance(
+    kind: kind,
+    label: label,
+    remaining: exceeded ? null : _allowanceAmount(remaining, kind),
+    overage: exceeded ? over : null,
+    rawRemaining: exceeded ? null : _text(remaining),
+    rawUnit: kind == AllowanceKind.voice ? '分钟' : '条',
+  );
+}
+
+num? _allowanceAmount(Object? raw, AllowanceKind kind) {
+  if (raw is bool || raw == null) return null;
+  final text = raw.toString().trim();
+  if (text.length > 80 ||
+      !RegExp(
+        kind == AllowanceKind.sms ? r'^\d+$' : r'^\d+(?:\.\d+)?$',
+      ).hasMatch(text)) {
+    return null;
+  }
+  final value = num.tryParse(text);
+  return value != null && value.isFinite && value <= 1000000000 ? value : null;
 }
 
 /// Parses a decoded getNewMarginInfo response from wx.10086.cn.
@@ -184,10 +306,59 @@ CarrierSnapshot parseMobile(
   if (httpStatus != null && (httpStatus < 200 || httpStatus >= 300)) {
     return failed(QueryStatus.error, '中国移动查询失败（HTTP $httpStatus）');
   }
+  if (_isAuthFailure(response)) {
+    return failed(QueryStatus.authExpired, '中国移动登录已失效');
+  }
 
   final resultData = _map(_map(response['data'])?['resultData']);
   final flow = _map(resultData?['planRemianFlowInfo']);
-  if (flow == null) {
+  final allowances = <ServiceAllowance>[];
+  void addAllowanceGroup(
+    String source,
+    AllowanceKind kind,
+    List<(String, String)> fields,
+  ) {
+    final group = _map(resultData?[source]);
+    if (group == null) return;
+    final groupRows = <ServiceAllowance>[];
+    for (final (field, label) in fields) {
+      final entry = _map(group[field]);
+      if (entry == null) continue;
+      final unit = _text(entry['unit']);
+      if (unit != (kind == AllowanceKind.voice ? '01' : '02')) continue;
+      final remaining = _allowanceAmount(entry['remainNum'], kind);
+      final total = _allowanceAmount(entry['sumNum'], kind);
+      final isUnlimited =
+          _isUnlimitedValue(entry['remainNum']) ||
+          _isUnlimitedValue(entry['sumNum']);
+      if (remaining == null && !isUnlimited) continue;
+      groupRows.add(
+        ServiceAllowance(
+          kind: kind,
+          label: label,
+          scope: field == 'totalInfo' ? '官网汇总' : '套餐明细',
+          remaining: isUnlimited ? null : remaining,
+          total: isUnlimited ? null : total,
+          rawRemaining: _text(entry['remainNum']),
+          rawUnit: kind == AllowanceKind.voice ? '分钟' : '条',
+          isUnlimited: isUnlimited,
+        ),
+      );
+    }
+    final summaries = groupRows.where((row) => row.scope == '官网汇总');
+    allowances.addAll(summaries.isNotEmpty ? summaries : groupRows);
+  }
+
+  addAllowanceGroup('planRemianVoiceInfo', AllowanceKind.voice, const [
+    ('planRemian', '套餐内通话'),
+    ('otherRemian', '其他通话'),
+    ('totalInfo', '通话汇总'),
+  ]);
+  addAllowanceGroup('planRemianMSGInfo', AllowanceKind.sms, const [
+    ('notePlanRemian', '套餐短信'),
+    ('totalInfo', '短信汇总'),
+  ]);
+  if (flow == null && allowances.isEmpty) {
     return failed(
       _isAuthFailure(response) ? QueryStatus.authExpired : QueryStatus.error,
       _isAuthFailure(response) ? '中国移动登录已失效' : '未识别中国移动流量响应',
@@ -196,7 +367,7 @@ CarrierSnapshot parseMobile(
 
   final buckets = <TrafficBucket>[];
   void add(String field, String name, BucketKind kind) {
-    final raw = _map(flow[field]);
+    final raw = _map(flow?[field]);
     if (raw == null) return;
     final remaining = raw['remainNum'];
     final unit = _text(raw['unit']);
@@ -220,16 +391,19 @@ CarrierSnapshot parseMobile(
     );
   }
 
-  add('planRemian', '通用流量', BucketKind.general);
-  add('directionalFlowInfo', '定向流量', BucketKind.directed);
-  add('otherRemian', '其他流量', BucketKind.unknown);
-  // This is the official aggregate and may already include all other buckets.
-  add('totalInfo', '流量总览', BucketKind.unknown);
+  if (flow != null) {
+    add('planRemian', '通用流量', BucketKind.general);
+    add('directionalFlowInfo', '定向流量', BucketKind.directed);
+    add('otherRemian', '其他流量', BucketKind.unknown);
+    // This is the official aggregate and may already include all other buckets.
+    add('totalInfo', '流量总览', BucketKind.unknown);
+  }
 
-  if (buckets.isEmpty ||
-      buckets.every(
-        (bucket) => bucket.remainingBytes == null && !bucket.isUnlimited,
-      )) {
+  if ((buckets.isEmpty ||
+          buckets.every(
+            (bucket) => bucket.remainingBytes == null && !bucket.isUnlimited,
+          )) &&
+      allowances.isEmpty) {
     return failed(QueryStatus.error, '中国移动流量单位或剩余额无法确认');
   }
   return CarrierSnapshot(
@@ -238,6 +412,7 @@ CarrierSnapshot parseMobile(
     queriedAt: queriedAt ?? DateTime.now(),
     phoneMasked: phoneMasked,
     buckets: buckets,
+    allowances: allowances,
     message: buckets.any((bucket) => bucket.isUnlimited)
         ? '官网标记含不限量套餐，达量限速和适用范围以套餐规则为准'
         : null,
@@ -365,9 +540,36 @@ CarrierSnapshot parseBroadnetH5(
   }
 
   final buckets = <TrafficBucket>[];
+  final allowances = <ServiceAllowance>[];
   for (final item in items) {
     final entry = _map(item);
-    if (entry == null || _text(entry['busiType']) != '5') continue;
+    if (entry == null) continue;
+    final busiType = _text(entry['busiType']);
+    if (busiType != '5') {
+      final name = _text(entry['discntName']);
+      final kind = busiType == '1'
+          ? AllowanceKind.voice
+          : name != null && RegExp(r'短信|短、彩信|短彩信').hasMatch(name)
+          ? AllowanceKind.sms
+          : null;
+      if (kind == null || name == null || name.isEmpty) continue;
+      final remaining = _allowanceAmount(entry['balance'], kind);
+      final total = _allowanceAmount(entry['highFee'], kind);
+      final unlimited = _isUnlimitedValue(entry['balance']);
+      if (remaining == null && !unlimited) continue;
+      allowances.add(
+        ServiceAllowance(
+          kind: kind,
+          label: name,
+          remaining: unlimited ? null : remaining,
+          total: unlimited ? null : total,
+          rawRemaining: _text(entry['balance']),
+          rawUnit: kind == AllowanceKind.voice ? '分钟' : '条',
+          isUnlimited: unlimited,
+        ),
+      );
+      continue;
+    }
     final name = _text(entry['discntName']);
     final named = name != null && name.isNotEmpty;
     final rawRemaining = _text(entry['balance']);
@@ -390,10 +592,11 @@ CarrierSnapshot parseBroadnetH5(
     );
   }
 
-  if (buckets.isEmpty ||
-      buckets.every(
-        (bucket) => bucket.remainingBytes == null && !bucket.isUnlimited,
-      )) {
+  if ((buckets.isEmpty ||
+          buckets.every(
+            (bucket) => bucket.remainingBytes == null && !bucket.isUnlimited,
+          )) &&
+      allowances.isEmpty) {
     return failed(QueryStatus.error, '中国广电未返回可确认的流量套餐');
   }
   final incomplete = buckets.any((bucket) => bucket.remainingBytes == null);
@@ -403,6 +606,7 @@ CarrierSnapshot parseBroadnetH5(
     queriedAt: queriedAt ?? DateTime.now(),
     phoneMasked: phoneMasked,
     buckets: buckets,
+    allowances: allowances,
     message: buckets.any((bucket) => bucket.isUnlimited)
         ? '官网标记含不限量套餐，达量限速和适用范围以套餐规则为准'
         : incomplete

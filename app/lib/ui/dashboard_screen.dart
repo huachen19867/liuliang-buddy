@@ -824,6 +824,8 @@ class _CarrierCard extends StatelessWidget {
               style: TextStyle(color: Color(0xFF8A8E95), fontSize: 12),
             ),
           ],
+          const SizedBox(height: 12),
+          _ServiceAllowances(snapshot: snapshot, status: status),
           if (_detailBuckets.isNotEmpty) ...[
             const SizedBox(height: 12),
             _TrafficBucketList(
@@ -921,6 +923,145 @@ class _CarrierCard extends StatelessWidget {
   }
 }
 
+class _ServiceAllowances extends StatelessWidget {
+  const _ServiceAllowances({required this.snapshot, required this.status});
+
+  final CarrierSnapshot? snapshot;
+  final QueryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final tiles = [
+      _tile(context, AllowanceKind.voice),
+      _tile(context, AllowanceKind.sms),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 300 ||
+            MediaQuery.textScalerOf(context).scale(12) > 15) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [tiles[0], const SizedBox(height: 8), tiles[1]],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: tiles[0]),
+            const SizedBox(width: 8),
+            Expanded(child: tiles[1]),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _tile(BuildContext context, AllowanceKind kind) {
+    final voice = kind == AllowanceKind.voice;
+    final items =
+        snapshot?.allowances.where((item) => item.kind == kind).toList() ??
+        const <ServiceAllowance>[];
+    final ink = voice ? const Color(0xFF547F76) : const Color(0xFF857297);
+    final hasMms = items.any((item) => item.label.contains('彩信'));
+    return Container(
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: voice ? const Color(0xFFF0F8F4) : const Color(0xFFF7F2FA),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                voice ? Icons.phone_rounded : Icons.chat_bubble_outline_rounded,
+                size: 15,
+                color: ink,
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  voice
+                      ? '通话余量'
+                      : hasMms
+                      ? '短信 / 彩信余量'
+                      : '短信余量',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: ink,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          if (items.isEmpty)
+            Text(
+              status == QueryStatus.notConnected ? '等待连接' : '余量待确认',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF7D838C)),
+            )
+          else
+            for (var index = 0; index < items.length; index++) ...[
+              if (index > 0) const Divider(height: 17),
+              Text(
+                items[index].label,
+                style: const TextStyle(fontSize: 11, color: Color(0xFF707580)),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                items[index].overage != null
+                    ? '${items[index].isEstimated ? '约超出' : '超出'} ${_number(items[index].overage!)} ${items[index].canonicalUnit}'
+                    : items[index].isUnlimited
+                    ? '不限量'
+                    : items[index].remaining == null
+                    ? '剩余待确认'
+                    : '${items[index].isEstimated ? '约剩余' : '剩余'} ${_number(items[index].remaining!)} ${items[index].canonicalUnit}',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: ink,
+                ),
+              ),
+              if (items[index].total != null)
+                Text(
+                  '共 ${_number(items[index].total!)} ${items[index].canonicalUnit}',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF858A92),
+                  ),
+                ),
+              if (items[index].scope?.trim().isNotEmpty ?? false)
+                Text(
+                  items[index].scope!,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF858A92),
+                  ),
+                ),
+              if (items[index].remaining == null &&
+                  items[index].overage == null &&
+                  !items[index].isUnlimited &&
+                  items[index].rawUnit?.trim().isNotEmpty == true &&
+                  items[index].rawUnit != items[index].canonicalUnit)
+                Text(
+                  '官网单位：${items[index].rawUnit}，暂未换算',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF858A92),
+                  ),
+                ),
+            ],
+        ],
+      ),
+    );
+  }
+
+  String _number(num value) =>
+      value % 1 == 0 ? value.toInt().toString() : value.toString();
+}
+
 class _BigUsageValue extends StatelessWidget {
   const _BigUsageValue({required this.bytes, this.isEstimate = false});
 
@@ -981,7 +1122,11 @@ class _DataFootnote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasCached = snapshot?.buckets.isNotEmpty ?? false;
+    final hasCached =
+        snapshot != null &&
+        (snapshot!.buckets.isNotEmpty ||
+            snapshot!.allowances.isNotEmpty ||
+            snapshot!.hasUnlimitedAllowance);
     final queriedAt = snapshot?.queriedAt;
     final color = const Color(0xFF8A8E95);
     String text;

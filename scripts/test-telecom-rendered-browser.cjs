@@ -55,8 +55,10 @@ const modal = rows => `<div id="balanceModal" style="display:none"><div class="m
     assert.equal(f.messages.length, 1, 'hidden v-show modal captured without clicking');
     let data = JSON.parse(f.messages[0].body);
     assert.equal(f.messages[0].stage, 'telecomRendered');
-    assert.deepEqual(data, {source: 'officialRendered', rows: [{name: '测试套餐', used: '512MB', total: '2GB'}]});
-    cases.push('hidden modal, mixed units/NBSP, voice/SMS excluded');
+    assert.deepEqual(data, {source: 'officialRendered', rows: [{name: '测试套餐', used: '512MB', total: '2GB'}],
+      allowanceRows: [{kind: 'voice', name: '语音', used: '10分钟', total: '100分钟'},
+        {kind: 'sms', name: '短信', used: '1次', total: '20次'}]});
+    cases.push('hidden modal, mixed units/NBSP, separate voice/SMS rows');
     const before = f.messages.length;
     await f.page.evaluate(() => {location.hash = '#/login';});
     await f.page.locator('.bill-title').first().evaluate(e => {e.textContent = 'stale account';});
@@ -110,6 +112,25 @@ const modal = rows => `<div id="balanceModal" style="display:none"><div class="m
     await f.page.waitForTimeout(450);
     assert.equal(f.messages.length, 0, 'queued Home rows discarded when bridge becomes ready on login');
     cases.push('login invalidates pending bridge payload');
+    await f.context.close();
+    f = await fixture(modal(row('国内通话', '已使用10分钟 / 100分钟', '1') +
+      row('未知业务', '已使用1次 / 20次', '2') + row('短信', '已使用-- / 20条', '2')));
+    data = JSON.parse(f.messages[0].body);
+    assert.deepEqual(data.rows, []);
+    assert.deepEqual(data.allowanceRows, [
+      {kind: 'voice', name: '国内通话', used: '10分钟', total: '100分钟'},
+      {kind: 'sms', name: '短信', used: null, total: null}]);
+    cases.push('voice-only response emitted, ambiguous type2 excluded, missing SMS preserved');
+    await f.context.close();
+    f = await fixture(sample, {bridge: false});
+    await f.page.locator('#balanceModal .bill-list').evaluate(e => e.replaceChildren());
+    await f.page.evaluate(() => {
+      window.flutter_inappwebview = {callHandler: (...args) => window.captureTest(...args)};
+      window.dispatchEvent(new Event('flutterInAppWebViewPlatformReady'));
+    });
+    await f.page.waitForTimeout(450);
+    assert.equal(f.messages.length, 0, 'cleared official component cannot replay queued balances');
+    cases.push('removed official rows invalidate pending bridge payload');
     await f.context.close();
     const report = {passed: true, syntheticOnly: true, actualAccountVerified: false,
       networkPolicy: 'Every browser request fulfilled or aborted locally', fulfilled, aborted, cases};
