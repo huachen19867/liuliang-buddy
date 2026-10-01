@@ -4,6 +4,41 @@ import 'package:liuliang_app/services/carrier_web.dart';
 
 void main() {
   test(
+    'Unicom session signal requires its exact minimized response identity',
+    () {
+      final page = Uri.parse(carrierQueryUrl(Carrier.unicom));
+      final url = Uri.parse(
+        'https://iservice.10010.com/e3/static/check/checklogin/',
+      );
+      expect(
+        isCarrierResponseAllowed(Carrier.unicom, url, page, 'unicomSession'),
+        isTrue,
+      );
+      for (final invalid in [
+        url.replace(query: 'profile=private'),
+        url.replace(fragment: 'private'),
+        url.replace(path: '/e3/static/check/checklogin/extra'),
+        url.replace(host: 'uac.10010.com'),
+        url.replace(path: '/e3/static/query/userinfoE5query'),
+      ]) {
+        expect(
+          isCarrierResponseAllowed(
+            Carrier.unicom,
+            invalid,
+            page,
+            'unicomSession',
+          ),
+          isFalse,
+        );
+      }
+      expect(
+        isCarrierResponseAllowed(Carrier.unicom, url, page, 'raw'),
+        isFalse,
+      );
+    },
+  );
+
+  test(
     'four carrier URLs and SSO navigation stay with their intended carrier',
     () {
       for (final carrier in Carrier.values) {

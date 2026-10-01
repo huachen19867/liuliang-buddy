@@ -5,7 +5,7 @@ import '../data/models.dart';
 import '../data/carrier_selection.dart';
 import '../data/traffic_summary.dart';
 
-/// Display-only snapshot. No phone numbers, credentials or raw responses.
+/// Display-only snapshot. Only masked phone hints, no credentials or raw data.
 Map<String, Object?> buildWidgetPayload(
   Iterable<CarrierSnapshot> snapshots, {
   required double thresholdGb,
@@ -65,10 +65,40 @@ Map<String, Object?> buildWidgetPayload(
           snapshot.queriedAt != null &&
           summary == null &&
           snapshot.hasUnlimitedAllowance;
+      final general = snapshot == null
+          ? const TrafficGroupSummary()
+          : summarizeTrafficGroup(snapshot, BucketKind.general);
+      final directed = snapshot == null
+          ? const TrafficGroupSummary()
+          : summarizeTrafficGroup(snapshot, BucketKind.directed);
+      final other = snapshot == null
+          ? const TrafficGroupSummary()
+          : summarizeTrafficGroup(snapshot, BucketKind.unknown);
+      final voice = snapshot == null ? null : summarizeVoice(snapshot);
       instances.add({
         'accountId': account.id,
         'carrier': account.carrier.name,
         'accountLabel': account.label,
+        'name': account.displayName,
+        'phoneHint': account.phoneHint,
+        'balanceYuan': snapshot?.queriedAt == null
+            ? null
+            : snapshot?.balanceYuan,
+        'generalRemainingBytes': general.remainingBytes,
+        'generalState': general.state,
+        'directedRemainingBytes': directed.remainingBytes,
+        'directedState': directed.state,
+        'otherRemainingBytes': other.remainingBytes,
+        'otherState': other.state,
+        'trafficEstimated':
+            general.isEstimated || directed.isEstimated || other.isEstimated,
+        'voiceRemainingMinutes': voice?.remaining,
+        'voiceState': voice?.isUnlimited == true
+            ? 'unlimited'
+            : voice?.remaining != null
+            ? 'provided'
+            : 'unavailable',
+        'voiceEstimated': voice?.isEstimated ?? false,
         'status': snapshot?.status.name ?? QueryStatus.notConnected.name,
         'primaryValue': summary?.remainingBytes,
         'primaryLabel': unlimited ? '含不限量套餐' : summary?.label ?? '余额待确认',

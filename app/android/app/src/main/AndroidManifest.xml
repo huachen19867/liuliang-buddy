@@ -5,7 +5,7 @@
         android:label="流量小伙伴"
         android:allowBackup="false"
         android:name="${applicationName}"
-        android:icon="@drawable/app_icon">
+        android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"

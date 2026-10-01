@@ -173,6 +173,7 @@ class CarrierSnapshot {
     required this.status,
     this.queriedAt,
     this.phoneMasked,
+    this.balanceYuan,
     this.buckets = const [],
     this.allowances = const [],
     this.message,
@@ -182,6 +183,9 @@ class CarrierSnapshot {
   final QueryStatus status;
   final DateTime? queriedAt;
   final String? phoneMasked;
+
+  /// Officially confirmed currency only. Null is not an inferred zero.
+  final num? balanceYuan;
   final List<TrafficBucket> buckets;
   final List<ServiceAllowance> allowances;
   final String? message;
@@ -212,6 +216,7 @@ class CarrierSnapshot {
     QueryStatus? status,
     Object? queriedAt = _unset,
     Object? phoneMasked = _unset,
+    Object? balanceYuan = _unset,
     List<TrafficBucket>? buckets,
     List<ServiceAllowance>? allowances,
     Object? message = _unset,
@@ -224,6 +229,9 @@ class CarrierSnapshot {
     phoneMasked: identical(phoneMasked, _unset)
         ? this.phoneMasked
         : phoneMasked as String?,
+    balanceYuan: identical(balanceYuan, _unset)
+        ? this.balanceYuan
+        : balanceYuan as num?,
     buckets: buckets ?? this.buckets,
     allowances: allowances ?? this.allowances,
     message: identical(message, _unset) ? this.message : message as String?,
@@ -234,6 +242,7 @@ class CarrierSnapshot {
     'status': status.name,
     'queriedAt': queriedAt?.toIso8601String(),
     'phoneMasked': phoneMasked,
+    'balanceYuan': balanceYuan,
     'buckets': buckets.map((bucket) => bucket.toJson()).toList(),
     'allowances': allowances.map((allowance) => allowance.toJson()).toList(),
     'message': message,
@@ -259,6 +268,12 @@ class CarrierSnapshot {
           : null,
       phoneMasked: json['phoneMasked'] is String
           ? json['phoneMasked'] as String
+          : null,
+      balanceYuan:
+          json['balanceYuan'] is num &&
+              (json['balanceYuan'] as num).isFinite &&
+              (json['balanceYuan'] as num).abs() <= 1000000000
+          ? json['balanceYuan'] as num
           : null,
       buckets: rawBuckets is List
           ? rawBuckets

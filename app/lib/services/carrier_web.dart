@@ -60,7 +60,11 @@ bool isCarrierResponseAllowed(
       page.host == 'iservice.10010.com' &&
           ['/e5/index.html', '/e5/query.html'].contains(page.path) &&
           url.host == page.host &&
-          url.path == '/e3/static/query/userinfoE5query',
+          ((stage == 'raw' && url.path == '/e3/static/query/userinfoE5query') ||
+              (stage == 'unicomSession' &&
+                  url.path == '/e3/static/check/checklogin/' &&
+                  !url.hasQuery &&
+                  !url.hasFragment)),
     Carrier.telecom =>
       stage == 'telecomRendered' &&
           page.host == 'e.dlife.cn' &&

@@ -3,6 +3,25 @@ import 'package:liuliang_app/data/models.dart';
 import 'package:liuliang_app/services/response_policy.dart';
 
 void main() {
+  test(
+    'Unicom session expiry requires only an explicit false flag and 2xx',
+    () {
+      expect(isUnicomSessionExpired({'isLogin': false}, 200), isTrue);
+      for (final data in <Map<String, dynamic>>[
+        {},
+        {'isLogin': true},
+        {'isLogin': 'false'},
+        {'isLogin': 0},
+        {'isLogin': false, 'userInfo': {}},
+      ]) {
+        expect(isUnicomSessionExpired(data, 200), isFalse);
+      }
+      for (final status in <int?>[null, 0, 199, 300, 401, 500]) {
+        expect(isUnicomSessionExpired({'isLogin': false}, status), isFalse);
+      }
+    },
+  );
+
   test('accepts verified plaintext success before decoded event arrives', () {
     expect(
       shouldApplyBroadnetResponse(

@@ -1,5 +1,78 @@
 import 'models.dart';
 
+class TrafficGroupSummary {
+  const TrafficGroupSummary({
+    this.remainingBytes,
+    this.isUnlimited = false,
+    this.isComplete = false,
+    this.isEstimated = false,
+  });
+
+  final int? remainingBytes;
+  final bool isUnlimited;
+  final bool isComplete;
+  final bool isEstimated;
+  String get state => isUnlimited
+      ? 'unlimited'
+      : isComplete
+      ? 'provided'
+      : 'unavailable';
+}
+
+/// Keeps unknown purposes separate. Mobile's official aggregate includes other
+/// categories already, so it never joins the "other" package sum.
+TrafficGroupSummary summarizeTrafficGroup(
+  CarrierSnapshot snapshot,
+  BucketKind kind,
+) {
+  if (snapshot.queriedAt == null ||
+      snapshot.status == QueryStatus.notConnected) {
+    return const TrafficGroupSummary();
+  }
+  final rows = snapshot.buckets
+      .where(
+        (bucket) =>
+            bucket.kind == kind &&
+            !(snapshot.carrier == Carrier.mobile && bucket.name == '流量总览'),
+      )
+      .toList();
+  if (rows.isEmpty) return const TrafficGroupSummary();
+  // The single Unicom unknown row is explicitly an official package aggregate.
+  // It may include the general and directed portions and cannot mean "other".
+  if (snapshot.carrier == Carrier.unicom &&
+      rows.any(
+        (bucket) => bucket.name == '官网套餐余量' || bucket.name == '官网不限量套餐',
+      )) {
+    return const TrafficGroupSummary();
+  }
+  if (rows.any((bucket) => bucket.isUnlimited)) {
+    return const TrafficGroupSummary(isUnlimited: true);
+  }
+  if (rows.any((bucket) => !_hasVerifiedUnit(bucket.rawUnit))) {
+    return const TrafficGroupSummary();
+  }
+  final sum = _completeSum(rows, (bucket) => bucket.remainingBytes);
+  return TrafficGroupSummary(
+    remainingBytes: sum,
+    isComplete: sum != null,
+    isEstimated: snapshot.carrier == Carrier.telecom,
+  );
+}
+
+/// Voice packages can share an allowance; do not add rows without evidence.
+ServiceAllowance? summarizeVoice(CarrierSnapshot snapshot) {
+  if (snapshot.queriedAt == null ||
+      snapshot.status == QueryStatus.notConnected) {
+    return null;
+  }
+  final rows = snapshot.allowances
+      .where((row) => row.kind == AllowanceKind.voice)
+      .toList();
+  final official = rows.where((row) => row.scope == '官网汇总').toList();
+  if (official.length == 1) return official.single;
+  return rows.length == 1 ? rows.single : null;
+}
+
 /// A number for presentation. It never changes the carrier's general balance.
 class TrafficSummary {
   const TrafficSummary({
@@ -92,6 +165,7 @@ int? _completeSum(
     if (bucket.isUnlimited) return null;
     final value = select(bucket);
     if (value == null || value < 0) return null;
+    if (value > 9223372036854775807 - sum) return null;
     sum += value;
   }
   return sum;

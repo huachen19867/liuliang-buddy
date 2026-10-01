@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
 import '../data/models.dart';
+import 'resort_theme.dart';
 
 /// A native-widget feature entry with a visual-only preview.
 ///
@@ -35,30 +36,20 @@ class WidgetPreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF4F5EF),
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: const Color(0xFFEAECE4)),
-      ),
+    return ResortPaper(
+      color: ResortPalette.mintWash,
+      borderRadius: 22,
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE9F0F6),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(
-                  Icons.widgets_rounded,
-                  color: Color(0xFF6482A7),
-                  size: 21,
-                ),
+              ResortSticker(
+                icon: Icons.widgets_rounded,
+                label: '桌面',
+                color: ResortPalette.mint,
+                background: Colors.white,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -82,6 +73,22 @@ class WidgetPreviewCard extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: 7),
+              SizedBox(
+                width: 40,
+                height: 42,
+                child: ExcludeSemantics(
+                  child: Image.asset(
+                    'assets/resort/mascot.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.face_3_rounded,
+                      color: ResortPalette.mint,
+                      size: 30,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 13),
@@ -93,11 +100,11 @@ class WidgetPreviewCard extends StatelessWidget {
           FilledButton.icon(
             onPressed: _canAdd ? onAddWidget : null,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF526B85),
+              backgroundColor: ResortPalette.mint,
               foregroundColor: Colors.white,
               disabledBackgroundColor: const Color(0xFFE4E6E4),
               disabledForegroundColor: const Color(0xFF898E94),
-              minimumSize: const Size(0, 46),
+              minimumSize: const Size(0, 50),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
@@ -145,11 +152,11 @@ class _WidgetCardIllustration extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [
             Colors.white.withValues(alpha: .91),
-            const Color(0xFFEAF0F2).withValues(alpha: .84),
+            ResortPalette.mintWash.withValues(alpha: .94),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: .92)),
+        border: Border.all(color: ResortPalette.border),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0C3C5060),

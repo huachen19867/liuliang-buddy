@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
+import 'resort_theme.dart';
 
 /// Lets the user choose which supported carriers the app should show.
 ///
@@ -32,9 +33,9 @@ class CarrierSelectionScreen extends StatelessWidget {
   final bool isInitialSetup;
   final bool demo;
 
-  static const _ink = Color(0xFF293448);
-  static const _mutedInk = Color(0xFF777D87);
-  static const _canvas = Color(0xFFFFF9F1);
+  static const _ink = ResortPalette.ink;
+  static const _mutedInk = ResortPalette.muted;
+  static const _canvas = ResortPalette.canvas;
   static const _palette = <Color>[
     Color(0xFF4E83D9),
     Color(0xFFE58C79),
@@ -62,16 +63,16 @@ class CarrierSelectionScreen extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(22, 28, 22, 26),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildHeader(title),
                   if (demo) ...[
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 13),
                     const _DemoNotice(),
                   ],
-                  const SizedBox(height: 23),
+                  const SizedBox(height: 15),
                   Text(
                     subtitle,
                     style: const TextStyle(
@@ -80,23 +81,20 @@ class CarrierSelectionScreen extends StatelessWidget {
                       height: 1.55,
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  Container(
+                  const SizedBox(height: 14),
+                  ResortPaper(
+                    color: const Color(0xFFF0F6F0),
+                    borderRadius: 18,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 15,
-                      vertical: 13,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFEBDD),
-                      borderRadius: BorderRadius.circular(19),
-                      border: Border.all(color: const Color(0xFFF4DCCB)),
+                      horizontal: 13,
+                      vertical: 11,
                     ),
                     child: const Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
                           Icons.lightbulb_outline_rounded,
-                          color: Color(0xFFBA785E),
+                          color: ResortPalette.mint,
                           size: 20,
                         ),
                         SizedBox(width: 10),
@@ -104,7 +102,7 @@ class CarrierSelectionScreen extends StatelessWidget {
                           child: Text(
                             '这里只决定首页展示和查询哪些运营商，不读取 SIM 卡槽。每家运营商的查询支持状态会单独标明；取消选择只会隐藏对应卡片，不会删除已有本地记录或登录状态。',
                             style: TextStyle(
-                              color: Color(0xFF765B50),
+                              color: ResortPalette.ink,
                               fontSize: 12,
                               height: 1.5,
                             ),
@@ -113,7 +111,7 @@ class CarrierSelectionScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 17),
                   Row(
                     children: [
                       const Expanded(
@@ -195,7 +193,7 @@ class CarrierSelectionScreen extends StatelessWidget {
                           ? () => onContinue(Set.unmodifiable(orderedSelection))
                           : null,
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF4E83D9),
+                        backgroundColor: ResortPalette.mint,
                         foregroundColor: Colors.white,
                         disabledBackgroundColor: const Color(0xFFE1DED8),
                         disabledForegroundColor: const Color(0xFF8C8A85),
@@ -222,46 +220,12 @@ class CarrierSelectionScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(String title) {
-    return Row(
-      children: [
-        Container(
-          width: 54,
-          height: 54,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFE6D7),
-            borderRadius: BorderRadius.circular(19),
-          ),
-          child: const Center(
-            child: Icon(
-              Icons.water_drop_rounded,
-              color: Color(0xFFE58C79),
-              size: 31,
-            ),
-          ),
-        ),
-        const SizedBox(width: 13),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: _ink,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -.4,
-                ),
-              ),
-              const SizedBox(height: 3),
-              const Text(
-                '挑选你想一起关注的流量伙伴',
-                style: TextStyle(color: _mutedInk, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      ],
+    return ResortMiniScene(
+      title: title,
+      subtitle: '把每个账号的余量收在一处',
+      eyebrow: '海滨温泉 · 卡片整理所',
+      mascotMessage: '每个账号都有自己的小房间。',
+      height: 118,
     );
   }
 }
@@ -274,9 +238,9 @@ class _DemoNotice extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFE9B8),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1D58F)),
+        color: const Color(0xFFFFF2D4),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: const Color(0xFFEEDCA7)),
       ),
       child: const Row(
         children: [
@@ -320,7 +284,7 @@ class _CarrierOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = selected ? accent : const Color(0xFFECE4DA);
+    final borderColor = selected ? accent : ResortPalette.border;
     return Semantics(
       button: true,
       selected: selected,
@@ -330,13 +294,13 @@ class _CarrierOption extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           onDoubleTap: onDoubleTap,
-          borderRadius: BorderRadius.circular(21),
+          borderRadius: BorderRadius.circular(18),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
+            duration: resortMotionDuration(context, 160),
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
             decoration: BoxDecoration(
-              color: selected ? const Color(0xFFFFF1E8) : Colors.white,
-              borderRadius: BorderRadius.circular(21),
+              color: selected ? ResortPalette.mintWash : ResortPalette.paper,
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: borderColor, width: selected ? 1.8 : 1),
               boxShadow: selected
                   ? const []
@@ -350,20 +314,8 @@ class _CarrierOption extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Container(
-                  width: 43,
-                  height: 43,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: .13),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Icon(
-                    Icons.signal_cellular_alt_rounded,
-                    color: accent,
-                    size: 23,
-                  ),
-                ),
-                const SizedBox(width: 13),
+                ResortCarrierMark(carrier: carrier),
+                const SizedBox(width: 11),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -400,7 +352,7 @@ class _CarrierOption extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
+                  duration: resortMotionDuration(context, 160),
                   width: 26,
                   height: 26,
                   decoration: BoxDecoration(

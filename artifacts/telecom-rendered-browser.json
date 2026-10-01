@@ -3,9 +3,10 @@
   "syntheticOnly": true,
   "actualAccountVerified": false,
   "networkPolicy": "Every browser request fulfilled or aborted locally",
-  "fulfilled": 9,
+  "fulfilled": 14,
   "aborted": 0,
   "cases": [
+    "exact official balance label, signed yuan, ambiguous money rejected",
     "hidden modal, mixed units/NBSP, separate voice/SMS rows",
     "SPA Home to login suppresses stale rows",
     "initial login route rejected",

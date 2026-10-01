@@ -1,10 +1,10 @@
 # 流量小伙伴
 
-**安卓下载：**[下载正式版（18.38 MB）](https://github.com/huachen19867/liuliang-buddy/releases/download/v1.8.1/liuliang-buddy-release.apk)。适用 Android 7.0 及以上 ARM64 手机。旧测试版需自行卸载后安装并重新登录，卸载会清除应用本地记录。iPhone 暂无可安装的签名包。
+**安卓下载：**[下载正式版（27.19 MB）](https://github.com/huachen19867/liuliang-buddy/releases/download/v1.9.0/liuliang-buddy-release.apk)。适用 Android 7.0 及以上 ARM64 手机。旧测试版需自行卸载后安装并重新登录，卸载会清除应用本地记录。iPhone 暂无可安装的签名包。
 
 一个可自行选择运营商的流量查询应用。首次选择移动、联通、电信、广电，至少一家；同一家有两个号码时可连续点两下加入第二张卡，各自在官网登录。每家最多两个、同时最多展示四个账号；第二账号需要系统 WebView 支持独立 Profile，不支持时明确阻止添加。设置可改选运营商或收起第二张卡，保留历史本地记录。联通读取官网套餐余量，电信按官网已用/总量显示值估算并标「约」，均不混入已确认通用额度或提醒。首页采用奶油背景、圆润卡片与水滴插画，展示每个账号的余量、时间、状态和明细；官网明确标记不限量时结束加载并显示不限量，不生成零或无限 GB。
 
-当前版本 1.8.1+12：安卓设置新增“通知栏显示余额”和“快捷设置查询入口”两个开关，默认关闭。通知显示最近余额与查询时间，快捷设置点击打开应用刷新，启用后还需要添加到系统面板。[GitHub 正式发布页](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.8.1)提供独立发布证书签名的 Release ARM64 主包，约18.38MB。签名与安装说明见[安卓分发说明](docs/ANDROID_RELEASE.md)。首页保留每账号通话与短信余量，不读取短信和通话记录；字段边界见[通话短信研究](docs/VOICE_SMS_RESEARCH.md)。iOS 17 源码包含持久化双账号会话和 WidgetKit 工程，尚无签名的 iPhone 安装包。
+当前版本 1.8.1+12：安卓设置新增“通知栏显示余额”和“快捷设置查询入口”两个开关，默认关闭。通知显示最近余额与查询时间，快捷设置点击打开应用刷新，启用后还需要添加到系统面板。[GitHub 正式发布页](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.9.0)提供独立发布证书签名的 Release ARM64 主包，约27.19MB。签名与安装说明见[安卓分发说明](docs/ANDROID_RELEASE.md)。首页保留每账号通话与短信余量，不读取短信和通话记录；字段边界见[通话短信研究](docs/VOICE_SMS_RESEARCH.md)。iOS 17 源码包含持久化双账号会话和 WidgetKit 工程，尚无签名的 iPhone 安装包。
 
 没有 Mac 也可通过 [GitHub Actions](https://github.com/huachen19867/liuliang-buddy/actions/workflows/ios.yml)执行 macOS 编译、模拟器启动与截图。操作和签名说明见 [iOS 构建说明](docs/IOS_BUILD.md)，实现边界见 [会话隔离](docs/IOS_SESSIONS.md)与 [iOS 小组件](docs/IOS_WIDGET.md)。模拟器应用不适用于 iPhone；iOS 初版前台查询，组件展示最近结果，点击打开应用更新，设置不提供安卓后台周期选项。
 
@@ -21,6 +21,8 @@
 点击“添加桌面卡片”后会说明是否已添加、等待系统确认或需要手动添加。没有系统弹窗时，长按桌面空白处，进入“小组件”，找到“流量小伙伴”拖到桌面。桌面支持两个同运营商账号分别占位，并提供点击刷新入口。目前没有 iOS 安装版；S25 Ultra 反馈、iOS 开发条件和各条用户反馈处理范围见 [反馈说明](docs/USER_FEEDBACK.md)，欢迎到 [GitHub Issues](https://github.com/huachen19867/liuliang-buddy/issues)提交设备与复现信息。
 
 广电已同步但套餐用途不明确时，卡片主位显示“套餐明细合计”，只有全部明细的剩余额和单位都可确认才计算。这是各项余量的数学合计，用途以各套餐规则为准，不能代表全都可通用；不进入通用总览或低量提醒。首页和桌面使用同一摘要，明细可展开并点击查看完整名称。移动的“流量总览”可能包含分类，不纳入这个合计。
+
+新版使用奶油白与青瓷绿的微缩温泉少女风，角色只在页头和桌面卡片边缘陪衬。支持卡片备注与脱敏号码；无可确认数据时显示待确认。页面演示见[首次选择](artifacts/carrier-selection-four-demo.png)、[双移动卡](artifacts/dashboard-two-mobile-unlimited-demo.png)、[首页](artifacts/ui-preview.png)。素材来源见[素材索引](app/assets/resort/README.md)。
 
 ## 文件索引
 
@@ -45,12 +47,18 @@
 | docs/IOS_WIDGET.md | 小/中/大号组件、通知与手动添加的范围 |
 | docs/IOS_FOUNDATION_PROGRESS.md | Xcode 工程接线与本地静态检查 |
 | scripts/verify-ios.sh | macOS Flutter/Swift 验证、编译、模拟器安装与截图 |
-| scripts/generate-ios-icons.cjs | 从已有安卓矢量图标生成不透明 iOS 图标 |
+| scripts/generate-ios-icons.cjs | 复用统一少女风素材生成 Android/iOS 图标 |
 | .github/workflows/ios.yml | GitHub macOS 构建、日志与模拟器产物 |
 | .github/workflows/publish-ios-artifact.yml | 手动取回已成功验收的主分支产物并上传现有发布草稿 |
 | .github/ISSUE_TEMPLATE/ios_bug_report.yml | iOS 编译、查询和组件反馈模板 |
-| app/lib/ui/dashboard_screen.dart | 按所选运营商展示的可爱首页与各种连接状态 |
-| app/lib/ui/carrier_selection_screen.dart | 首次运营商选择与后续改选页面 |
+| app/lib/ui/dashboard_screen.dart | 海滨温泉主题首页、每账号余额分类与状态操作 |
+| app/lib/ui/carrier_selection_screen.dart | 海滨温泉主题的首次运营商选择与后续改选页面 |
+| app/lib/ui/resort_theme.dart | 青瓷绿主题、参考角色小互动与票券组件 |
+| docs/RELEASE_1.9.0.md | 新界面、账号身份、正式 APK 与验证边界 |
+| docs/ACCOUNT_IDENTITY_PROGRESS.md | 备注、脱敏号码与分类余额 |
+| docs/WIDGET_RESORT_PROGRESS.md | 原生小组件布局和缩放 |
+| scripts/generate-brand-assets.cjs | 统一素材导出双平台图标和安卓桌面贴纸 |
+| docs/RESORT_UI_PROGRESS.md | 首页少女风重做范围、数据展示约束与验证状态 |
 | app/lib/data/carrier_selection.dart | 选择保存、旧版迁移及查询门禁 |
 | docs/ONBOARDING_DESIGN.md | 选择流程、旧版迁移与本地记录行为 |
 | docs/UNICOM_TELECOM_RESEARCH.md | 联通、电信入口及尚未接通的证据边界 |

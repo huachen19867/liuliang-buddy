@@ -25,6 +25,19 @@ data class WidgetCardData(
     val accountId: String? = null,
     val carrier: String? = null,
     val accountLabel: String? = null,
+    val name: String? = null,
+    val phoneHint: String? = null,
+    val balanceYuan: Double? = null,
+    val generalState: String = "unavailable",
+    val generalRemainingBytes: Long? = null,
+    val directedState: String = "unavailable",
+    val directedRemainingBytes: Long? = null,
+    val otherState: String = "unavailable",
+    val otherRemainingBytes: Long? = null,
+    val trafficEstimated: Boolean = false,
+    val voiceState: String = "unavailable",
+    val voiceRemainingMinutes: Double? = null,
+    val voiceEstimated: Boolean = false,
 )
 
 data class WidgetCardPresentation(
@@ -101,12 +114,11 @@ object WidgetInstances {
             if (status !in setOf("notConnected", "loading", "success", "authExpired", "error")) {
                 return@mapNotNull null
             }
-            val accountLabel = (map["accountLabel"] as? String)
-                ?.takeIf { it.isNotBlank() && it.length <= 40 } ?: carrierLabel(carrier)
-            val amount = (map["primaryValue"] as? Number)?.toLong()?.takeIf { it >= 0L }
-            val primaryLabel = map["primaryLabel"] as? String ?: "余额待确认"
-            val queriedAt = (map["queriedAt"] as? Number)?.toLong()?.takeIf { it > 0L }
-            WidgetCardData(
+            val accountLabel = WidgetAccountDetails.safeName(map["accountLabel"]) ?: carrierLabel(carrier)
+            val amount = WidgetAccountDetails.safeBytes(map["primaryValue"])
+            val primaryLabel = WidgetAccountDetails.safeLabel(map["primaryLabel"])
+            val queriedAt = WidgetAccountDetails.safeBytes(map["queriedAt"])?.takeIf { it > 0L }
+            WidgetAccountDetails.attach(WidgetCardData(
                 status = status,
                 remainingBytes = amount,
                 label = primaryLabel,
@@ -115,7 +127,7 @@ object WidgetInstances {
                 accountId = accountId,
                 carrier = carrier,
                 accountLabel = accountLabel,
-            )
+            ), map)
         }.take(MAX)
     }
 
@@ -183,11 +195,11 @@ object WidgetPresentation {
 
 class TrafficWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        ids.forEach { manager.updateAppWidget(it, createViews(context)) }
+        ids.forEach { manager.updateAppWidget(it, createViews(context, manager.getAppWidgetOptions(it))) }
     }
 
     override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle) {
-        manager.updateAppWidget(appWidgetId, createViews(context))
+        manager.updateAppWidget(appWidgetId, createViews(context, newOptions))
     }
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
@@ -206,7 +218,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
         internal const val PIN_ACTION = "cn.liuliang.liuliang_app.WIDGET_PIN_CONFIRMED"
         private const val DEFAULT_THRESHOLD_GB = 5.0
 
-        /** Stores only the whitelisted display snapshot. No number or session is accepted. */
+        /** Stores only whitelisted display fields, including strictly masked phone hints. */
         fun saveData(context: Context, root: Map<*, *>) {
             val schema = (root["schema"] as? Number)?.toInt()
             if (schema !in setOf(1, 2)) {
@@ -243,7 +255,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
         fun updateAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, TrafficWidgetProvider::class.java))
-            ids.forEach { manager.updateAppWidget(it, createViews(context)) }
+            ids.forEach { manager.updateAppWidget(it, createViews(context, manager.getAppWidgetOptions(it))) }
             SystemSurfaces.refresh(context)
         }
 
@@ -360,9 +372,9 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             val status = (map["status"] as? String)?.takeIf {
                 it in setOf("notConnected", "loading", "success", "authExpired", "error")
             } ?: return WidgetCardData()
-            val amount = (map["remainingBytes"] as? Number)?.toLong()?.takeIf { it >= 0L }
-            val queriedAt = (map["queriedAt"] as? Number)?.toLong()?.takeIf { it > 0L }
-            val label = map["label"] as? String ?: "通用剩余"
+            val amount = WidgetAccountDetails.safeBytes(map["remainingBytes"])
+            val queriedAt = WidgetAccountDetails.safeBytes(map["queriedAt"])?.takeIf { it > 0L }
+            val label = WidgetAccountDetails.safeLabel(map["label"])
             return WidgetCardData(status = status, remainingBytes = amount, label = label, queriedAt = queriedAt,
                 unlimited = map["unlimited"] == true || map["isUnlimited"] == true)
         }
@@ -376,6 +388,19 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             putBoolean("instance_${index}_unlimited", card.unlimited)
             card.remainingBytes?.let { putLong("instance_${index}_remainingBytes", it) }
             card.queriedAt?.let { putLong("instance_${index}_queriedAt", it) }
+            putString("instance_${index}_name", WidgetAccountDetails.safeName(card.name))
+            putString("instance_${index}_phoneHint", WidgetAccountDetails.safePhoneHint(card.phoneHint))
+            card.balanceYuan?.let { putString("instance_${index}_balanceYuan", it.toString()) }
+            putString("instance_${index}_generalState", card.generalState)
+            card.generalRemainingBytes?.let { putLong("instance_${index}_generalRemainingBytes", it) }
+            putString("instance_${index}_directedState", card.directedState)
+            card.directedRemainingBytes?.let { putLong("instance_${index}_directedRemainingBytes", it) }
+            putString("instance_${index}_otherState", card.otherState)
+            card.otherRemainingBytes?.let { putLong("instance_${index}_otherRemainingBytes", it) }
+            putBoolean("instance_${index}_trafficEstimated", card.trafficEstimated)
+            putString("instance_${index}_voiceState", card.voiceState)
+            card.voiceRemainingMinutes?.let { putString("instance_${index}_voiceRemainingMinutes", it.toString()) }
+            putBoolean("instance_${index}_voiceEstimated", card.voiceEstimated)
         }
 
         private fun android.content.SharedPreferences.Editor.writeCard(prefix: String, card: WidgetCardData) {
@@ -392,7 +417,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
                 carrier = prefix,
                 status = prefs.getString("${prefix}_status", "notConnected") ?: "notConnected",
                 remainingBytes = if (prefs.contains("${prefix}_remainingBytes")) prefs.getLong("${prefix}_remainingBytes", -1L) else null,
-                label = prefs.getString("${prefix}_label", "通用剩余") ?: "通用剩余",
+                label = WidgetAccountDetails.safeLabel(prefs.getString("${prefix}_label", "通用剩余")),
                 queriedAt = if (prefs.contains("${prefix}_queriedAt")) prefs.getLong("${prefix}_queriedAt", 0L) else null,
                 unlimited = prefs.getBoolean("${prefix}_unlimited", false),
             )
@@ -400,40 +425,51 @@ class TrafficWidgetProvider : AppWidgetProvider() {
 
         private fun readInstance(context: Context, index: Int): WidgetCardData {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            return WidgetCardData(
+            val card = WidgetCardData(
                 accountId = prefs.getString("instance_${index}_id", null),
                 carrier = prefs.getString("instance_${index}_carrier", null),
-                accountLabel = prefs.getString("instance_${index}_accountLabel", null),
+                accountLabel = WidgetAccountDetails.safeName(prefs.getString("instance_${index}_accountLabel", null)),
                 status = prefs.getString("instance_${index}_status", "notConnected") ?: "notConnected",
                 remainingBytes = if (prefs.contains("instance_${index}_remainingBytes")) prefs.getLong("instance_${index}_remainingBytes", -1L) else null,
-                label = prefs.getString("instance_${index}_label", "余额待确认") ?: "余额待确认",
+                label = WidgetAccountDetails.safeLabel(prefs.getString("instance_${index}_label", "余额待确认")),
                 queriedAt = if (prefs.contains("instance_${index}_queriedAt")) prefs.getLong("instance_${index}_queriedAt", 0L) else null,
                 unlimited = prefs.getBoolean("instance_${index}_unlimited", false),
             )
+            return WidgetAccountDetails.attach(card, mapOf(
+                "name" to prefs.getString("instance_${index}_name", null),
+                "phoneHint" to prefs.getString("instance_${index}_phoneHint", null),
+                "balanceYuan" to prefs.getString("instance_${index}_balanceYuan", null)?.toDoubleOrNull(),
+                "generalState" to prefs.getString("instance_${index}_generalState", null),
+                "generalRemainingBytes" to if (prefs.contains("instance_${index}_generalRemainingBytes")) prefs.getLong("instance_${index}_generalRemainingBytes", -1L) else null,
+                "directedState" to prefs.getString("instance_${index}_directedState", null),
+                "directedRemainingBytes" to if (prefs.contains("instance_${index}_directedRemainingBytes")) prefs.getLong("instance_${index}_directedRemainingBytes", -1L) else null,
+                "otherState" to prefs.getString("instance_${index}_otherState", null),
+                "otherRemainingBytes" to if (prefs.contains("instance_${index}_otherRemainingBytes")) prefs.getLong("instance_${index}_otherRemainingBytes", -1L) else null,
+                "trafficEstimated" to prefs.getBoolean("instance_${index}_trafficEstimated", false),
+                "voiceState" to prefs.getString("instance_${index}_voiceState", null),
+                "voiceRemainingMinutes" to prefs.getString("instance_${index}_voiceRemainingMinutes", null)?.toDoubleOrNull(),
+                "voiceEstimated" to prefs.getBoolean("instance_${index}_voiceEstimated", false),
+            ))
         }
 
-        private fun createViews(context: Context): RemoteViews {
+        private fun createViews(context: Context, options: android.os.Bundle): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.traffic_widget)
             val (cards, threshold) = displayCards(context)
             val now = System.currentTimeMillis()
-            val legacySelected = cards.mapNotNull { it.carrier }
+            val visible = WidgetAccountLayout.visibleCount(cards.size, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 280))
             val slots = listOf(
-                intArrayOf(R.id.slot_1, R.id.slot_1_name, R.id.slot_1_state, R.id.slot_1_amount, R.id.slot_1_label, R.id.slot_1_time),
-                intArrayOf(R.id.slot_2, R.id.slot_2_name, R.id.slot_2_state, R.id.slot_2_amount, R.id.slot_2_label, R.id.slot_2_time),
-                intArrayOf(R.id.slot_3, R.id.slot_3_name, R.id.slot_3_state, R.id.slot_3_amount, R.id.slot_3_label, R.id.slot_3_time),
-                intArrayOf(R.id.slot_4, R.id.slot_4_name, R.id.slot_4_state, R.id.slot_4_amount, R.id.slot_4_label, R.id.slot_4_time),
+                intArrayOf(R.id.slot_1, R.id.slot_1_badge, R.id.slot_1_name, R.id.slot_1_state, R.id.slot_1_phone, R.id.slot_1_balance, R.id.slot_1_summary, R.id.slot_1_time, R.id.slot_1_general, R.id.slot_1_directed, R.id.slot_1_other, R.id.slot_1_voice),
+                intArrayOf(R.id.slot_2, R.id.slot_2_badge, R.id.slot_2_name, R.id.slot_2_state, R.id.slot_2_phone, R.id.slot_2_balance, R.id.slot_2_summary, R.id.slot_2_time, R.id.slot_2_general, R.id.slot_2_directed, R.id.slot_2_other, R.id.slot_2_voice),
+                intArrayOf(R.id.slot_3, R.id.slot_3_badge, R.id.slot_3_name, R.id.slot_3_state, R.id.slot_3_phone, R.id.slot_3_balance, R.id.slot_3_summary, R.id.slot_3_time, R.id.slot_3_general, R.id.slot_3_directed, R.id.slot_3_other, R.id.slot_3_voice),
+                intArrayOf(R.id.slot_4, R.id.slot_4_badge, R.id.slot_4_name, R.id.slot_4_state, R.id.slot_4_phone, R.id.slot_4_balance, R.id.slot_4_summary, R.id.slot_4_time, R.id.slot_4_general, R.id.slot_4_directed, R.id.slot_4_other, R.id.slot_4_voice),
             )
             slots.forEachIndexed { index, ids ->
                 val card = cards.getOrNull(index)
-                val carrier = card?.carrier ?: legacySelected.getOrNull(index)
-                views.setViewVisibility(ids[0], if (card == null) View.GONE else View.VISIBLE)
-                if (card != null && carrier != null) bindCard(views, ids, carrier, card, threshold, now, cards.size >= 3)
+                val carrier = card?.carrier
+                views.setViewVisibility(ids[0], if (card == null || index >= visible) View.GONE else View.VISIBLE)
+                if (card != null && carrier != null && index < visible) bindCard(views, ids, carrier, card, threshold, now)
             }
-            views.setViewVisibility(R.id.top_row, if (cards.isEmpty()) View.GONE else View.VISIBLE)
-            views.setViewVisibility(R.id.top_divider, if (cards.size >= 2) View.VISIBLE else View.GONE)
-            views.setViewVisibility(R.id.bottom_row, if (cards.size >= 3) View.VISIBLE else View.GONE)
-            views.setViewVisibility(R.id.bottom_divider, if (cards.size >= 4) View.VISIBLE else View.GONE)
-            views.setViewVisibility(R.id.row_divider, if (cards.size >= 3) View.VISIBLE else View.GONE)
+            views.setTextViewText(R.id.widget_more, if (cards.size > visible) "另${cards.size - visible}张，请打开应用" else "上次查询记录 · 点击打开并刷新")
             views.setViewVisibility(R.id.widget_empty, if (cards.isEmpty()) View.VISIBLE else View.GONE)
             val intent = Intent(context, MainActivity::class.java).apply {
                 action = "cn.liuliang.liuliang_app.OPEN_WIDGET"
@@ -449,23 +485,28 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             return views
         }
 
-        private fun bindCard(views: RemoteViews, ids: IntArray, carrier: String, card: WidgetCardData, threshold: Double, now: Long, compact: Boolean) {
+        private fun bindCard(views: RemoteViews, ids: IntArray, carrier: String, card: WidgetCardData, threshold: Double, now: Long) {
             val display = WidgetPresentation.present(card, threshold, now)
-            val (defaultName, normal) = when (carrier) {
-                "mobile" -> "中国移动" to Color.rgb(51, 116, 188)
-                "broadnet" -> "中国广电" to Color.rgb(201, 121, 115)
-                "unicom" -> "中国联通" to Color.rgb(219, 94, 105)
-                else -> "中国电信" to Color.rgb(92, 113, 207)
+            val (defaultName, badge) = when (carrier) {
+                "mobile" -> "中国移动" to "移"
+                "broadnet" -> "中国广电" to "广"
+                "unicom" -> "中国联通" to "联"
+                else -> "中国电信" to "电"
             }
-            views.setTextViewText(ids[1], card.accountLabel ?: defaultName)
-            views.setTextViewText(ids[2], display.state)
-            views.setTextViewText(ids[3], display.amount)
-            views.setTextViewText(ids[4], display.label)
-            views.setTextViewText(ids[5], if (compact) display.time.removePrefix("上次查询 ") else display.time)
-            views.setTextColor(ids[1], normal)
+            val valid = WidgetAccountDetails.validQuery(card, now)
+            views.setTextViewText(ids[1], badge)
+            views.setTextViewText(ids[2], WidgetAccountDetails.safeName(card.name) ?: card.accountLabel ?: defaultName)
+            views.setTextViewText(ids[3], display.state)
+            views.setTextViewText(ids[4], WidgetAccountDetails.safePhoneHint(card.phoneHint) ?: "号码未备注")
+            views.setTextViewText(ids[5], WidgetAccountDetails.balance(card, now))
+            views.setTextViewText(ids[6], "${display.label} ${display.amount}")
+            views.setTextViewText(ids[7], display.time.removePrefix("上次查询 "))
+            views.setTextViewText(ids[8], WidgetAccountDetails.traffic(card.generalState, card.generalRemainingBytes, card.trafficEstimated, valid))
+            views.setTextViewText(ids[9], WidgetAccountDetails.traffic(card.directedState, card.directedRemainingBytes, card.trafficEstimated, valid))
+            views.setTextViewText(ids[10], WidgetAccountDetails.traffic(card.otherState, card.otherRemainingBytes, card.trafficEstimated, valid))
+            views.setTextViewText(ids[11], WidgetAccountDetails.voice(card, now))
             val warning = Color.rgb(184, 86, 74)
-            views.setTextColor(ids[3], if (display.low) warning else normal)
-            views.setTextColor(ids[2], if (display.low || display.stale || card.status == "error" || card.status == "authExpired") warning else Color.rgb(111, 127, 145))
+            views.setTextColor(ids[3], if (display.low || display.stale || card.status == "error" || card.status == "authExpired") warning else Color.rgb(89, 112, 106))
         }
     }
 }

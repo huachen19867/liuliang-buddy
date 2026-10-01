@@ -4,6 +4,7 @@ import '../data/models.dart';
 import '../data/carrier_accounts.dart';
 import '../data/traffic_summary.dart';
 import 'widget_preview_card.dart';
+import 'resort_theme.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({
@@ -20,6 +21,7 @@ class DashboardScreen extends StatelessWidget {
     this.cleanupPending = false,
     this.onConnectAccount,
     this.onRefreshAccount,
+    this.onEditAccount,
     this.onManageCarriers,
     this.onAddWidget,
     this.widgetSupported = true,
@@ -38,14 +40,14 @@ class DashboardScreen extends StatelessWidget {
   final bool cleanupPending;
   final ValueChanged<String>? onConnectAccount;
   final ValueChanged<String>? onRefreshAccount;
+  final ValueChanged<String>? onEditAccount;
   final VoidCallback? onManageCarriers;
   final VoidCallback? onAddWidget;
   final bool widgetSupported;
   final bool demo;
 
-  static const _ink = Color(0xFF293448);
-  static const _mutedInk = Color(0xFF777D87);
-  static const _canvas = Color(0xFFFFF9F1);
+  static const _mutedInk = ResortPalette.muted;
+  static const _canvas = ResortPalette.canvas;
   static const _mobileBlue = Color(0xFF4E83D9);
   static const _broadnetPeach = Color(0xFFE58C79);
   static const _carrierPalette = <Color>[
@@ -68,6 +70,7 @@ class DashboardScreen extends StatelessWidget {
                 accountId: carrier.name,
                 carrier: carrier,
                 slotLabel: _carrierCardLabel(carrier),
+                balanceYuan: _snapshotFor(carrier)?.balanceYuan,
                 snapshot: _snapshotFor(carrier),
                 accent: _carrierPalette[carrier.index % _carrierPalette.length],
               ),
@@ -77,7 +80,9 @@ class DashboardScreen extends StatelessWidget {
               _DashboardCarrier(
                 accountId: entry.account.id,
                 carrier: entry.account.carrier,
-                slotLabel: entry.account.label,
+                slotLabel: entry.account.displayName,
+                phoneHint: entry.account.phoneHint,
+                balanceYuan: entry.snapshot?.balanceYuan,
                 snapshot: entry.snapshot,
                 accent:
                     _carrierPalette[entry.account.carrier.index %
@@ -90,21 +95,22 @@ class DashboardScreen extends StatelessWidget {
       backgroundColor: _canvas,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
+          padding: const EdgeInsets.fromLTRB(15, 12, 15, 26),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildHeader(context, carriers),
+                  _buildHeader(carriers),
                   if (cleanupPending) ...[
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(13),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFEBDD),
+                        color: ResortPalette.mintWash,
                         borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: ResortPalette.border),
                       ),
                       child: const Text(
                         '本地登录资料还没清理完。请到提醒设置重试清除，完成前已暂停所有号码查询。',
@@ -128,10 +134,20 @@ class DashboardScreen extends StatelessWidget {
                   for (var index = 0; index < entries.length; index++) ...[
                     SizedBox(height: index == 0 ? 18 : 13),
                     _CarrierCard(
+                      key: ValueKey('account-card-${entries[index].accountId}'),
                       carrier: entries[index].carrier,
                       slotLabel: entries[index].slotLabel,
+                      phoneHint:
+                          entries[index].phoneHint ??
+                          _safeMaskedPhone(
+                            entries[index].snapshot?.phoneMasked,
+                          ),
+                      balanceYuan: entries[index].balanceYuan,
                       snapshot: entries[index].snapshot,
                       accent: entries[index].accent,
+                      onEdit: onEditAccount == null
+                          ? null
+                          : () => onEditAccount!(entries[index].accountId),
                       onConnect: () => onConnectAccount == null
                           ? onConnect(entries[index].carrier)
                           : onConnectAccount!(entries[index].accountId),
@@ -174,7 +190,7 @@ class DashboardScreen extends StatelessWidget {
                     onAddWidget: onAddWidget,
                     selectedCarriers: entries.map((e) => e.carrier).toList(),
                     selectedAccountLabels: accountEntries
-                        ?.map((e) => e.account.label)
+                        ?.map((e) => e.account.displayName)
                         .toList(),
                   ),
                   const SizedBox(height: 12),
@@ -195,61 +211,18 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, List<Carrier> carriers) {
-    final theme = Theme.of(context);
+  Widget _buildHeader(List<Carrier> carriers) {
     final carrierCaption = carriers.isEmpty
         ? '先选择运营商'
         : carriers.length == 1
         ? '${carriers.single.label}的流量，清楚一点'
         : '多家运营商的流量，清楚一点';
-    return Row(
-      children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFE6D7),
-            borderRadius: BorderRadius.circular(17),
-          ),
-          child: const Center(
-            child: CustomPaint(
-              size: Size(30, 30),
-              painter: _CuteDropMarkPainter(),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '流量小伙伴',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: _ink,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -.4,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                carrierCaption,
-                style: theme.textTheme.bodySmall?.copyWith(color: _mutedInk),
-              ),
-            ],
-          ),
-        ),
-        IconButton.filledTonal(
-          onPressed: carriers.isEmpty ? null : onRefreshAll,
-          tooltip: '刷新所选运营商',
-          style: IconButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: _ink,
-            fixedSize: const Size(46, 46),
-          ),
-          icon: const Icon(Icons.refresh_rounded),
-        ),
-      ],
+    return ResortMiniScene(
+      title: '流量小伙伴',
+      subtitle: carrierCaption,
+      eyebrow: '海滨温泉 · 余量小站',
+      mascotMessage: '查询一下，今天也安心出发。',
+      height: 118,
     );
   }
 
@@ -266,6 +239,8 @@ class _DashboardCarrier {
     required this.accountId,
     required this.carrier,
     required this.slotLabel,
+    this.phoneHint,
+    this.balanceYuan,
     required this.snapshot,
     required this.accent,
   });
@@ -273,8 +248,20 @@ class _DashboardCarrier {
   final String accountId;
   final Carrier carrier;
   final String slotLabel;
+  final String? phoneHint;
+  final num? balanceYuan;
   final CarrierSnapshot? snapshot;
   final Color accent;
+}
+
+String? _safeMaskedPhone(String? value) {
+  final text = value?.trim();
+  if (text == null || text.isEmpty) return null;
+  if (RegExp(r'^\d{1,4}\*{2,}\d{2,4}$').hasMatch(text)) return text;
+  final digits = text.replaceAll(RegExp(r'\D'), '');
+  if (digits.length < 7) return null;
+  final prefixLength = digits.length >= 10 ? 3 : 1;
+  return '${digits.substring(0, prefixLength)}****${digits.substring(digits.length - 4)}';
 }
 
 class DashboardAccountEntry {
@@ -299,9 +286,9 @@ class _DemoNotice extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFE9B8),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1D58F)),
+        color: const Color(0xFFFFF2D4),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: const Color(0xFFEEDCA7)),
       ),
       child: const Row(
         children: [
@@ -408,135 +395,132 @@ class _SummaryCard extends StatelessWidget {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: const Color(0xFFFFE7D9),
-        borderRadius: BorderRadius.circular(27),
-        border: Border.all(color: const Color(0xFFF3D7C8)),
+        color: const Color(0xFFEAF4EF),
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: const Color(0xFFD6E6DC), width: 1.15),
       ),
-      child: Stack(
-        children: [
-          const Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            width: 142,
-            child: IgnorePointer(
-              child: CustomPaint(painter: _CloudDropPainter()),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 18, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(13, 11, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        headline,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: const Color(0xFF5D514B),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                Expanded(
+                  child: Text(
+                    headline,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: ResortPalette.ink,
+                      fontWeight: FontWeight.w700,
                     ),
-                    TextButton.icon(
-                      onPressed: entries.isEmpty ? null : onRefreshAll,
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF6D5147),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      icon: const Icon(Icons.sync_rounded, size: 17),
-                      label: const Text('刷新所选'),
-                    ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 11),
-                if (showAmount) ...[
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (hasSingleEstimate)
-                        const Padding(
-                          padding: EdgeInsets.only(right: 5, bottom: 4),
-                          child: Text(
-                            '约',
-                            style: TextStyle(
-                              color: Color(0xFF71645D),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      Text(
-                        _formatGb(bytes),
-                        style: theme.textTheme.displaySmall?.copyWith(
-                          color: const Color(0xFF3A414D),
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -1.5,
-                          height: .95,
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.only(left: 6, bottom: 4),
-                        child: Text(
-                          'GB',
-                          style: TextStyle(
-                            color: Color(0xFF71645D),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
+                TextButton.icon(
+                  onPressed: entries.isEmpty ? null : onRefreshAll,
+                  style: TextButton.styleFrom(
+                    foregroundColor: ResortPalette.mint,
+                    minimumSize: const Size(48, 48),
+                    padding: const EdgeInsets.symmetric(horizontal: 9),
                   ),
-                  const SizedBox(height: 7),
-                  Text(
-                    explanation,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFF71645D),
-                    ),
-                  ),
-                  if (hasGeneralTotal) ...[
-                    const SizedBox(height: 12),
-                    _ThresholdHint(thresholdGb: thresholdGb),
-                  ],
-                  if (hasSinglePackageTotal) ...[
-                    const SizedBox(height: 12),
-                    const _SummaryScopeNote(),
-                  ],
-                ] else ...[
-                  Text(
-                    explanation,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF71645D),
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 9),
-                  Wrap(
-                    spacing: 13,
-                    runSpacing: 6,
-                    children: [
-                      for (final entry in entries)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _MiniCarrierDot(color: entry.accent),
-                            const SizedBox(width: 6),
-                            Text(
-                              entry.slotLabel,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ],
+                  icon: const Icon(Icons.sync_rounded, size: 17),
+                  label: const Text('刷新所选'),
+                ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 3),
+            if (showAmount) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (hasSingleEstimate)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 3, bottom: 3),
+                      child: Text(
+                        '约',
+                        style: TextStyle(
+                          color: ResortPalette.muted,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  Text(
+                    _formatGb(bytes),
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      color: ResortPalette.ink,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1,
+                      height: 1,
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4, bottom: 3),
+                    child: Text(
+                      'GB',
+                      style: TextStyle(
+                        color: ResortPalette.muted,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        explanation,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: ResortPalette.muted,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (hasGeneralTotal) ...[
+                const SizedBox(height: 7),
+                _ThresholdHint(thresholdGb: thresholdGb),
+              ],
+              if (hasSinglePackageTotal) ...[
+                const SizedBox(height: 5),
+                const _SummaryScopeNote(),
+              ],
+            ] else ...[
+              Text(
+                explanation,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: ResortPalette.muted,
+                  height: 1.3,
+                ),
+              ),
+              if (entries.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 13,
+                  runSpacing: 5,
+                  children: [
+                    for (final entry in entries)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _MiniCarrierDot(color: entry.accent),
+                          const SizedBox(width: 6),
+                          Text(
+                            entry.slotLabel,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -597,18 +581,25 @@ class _ThresholdHint extends StatelessWidget {
 
 class _CarrierCard extends StatelessWidget {
   const _CarrierCard({
+    super.key,
     required this.carrier,
     required this.slotLabel,
+    required this.phoneHint,
+    required this.balanceYuan,
     required this.snapshot,
     required this.accent,
+    required this.onEdit,
     required this.onConnect,
     required this.onRefresh,
   });
 
   final Carrier carrier;
   final String slotLabel;
+  final String? phoneHint;
+  final num? balanceYuan;
   final CarrierSnapshot? snapshot;
   final Color accent;
+  final VoidCallback? onEdit;
   final VoidCallback onConnect;
   final VoidCallback onRefresh;
 
@@ -660,85 +651,128 @@ class _CarrierCard extends StatelessWidget {
     final isBusy = status == QueryStatus.loading;
     final theme = Theme.of(context);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: const Color(0xFFF1ECE5)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A54462E),
-            blurRadius: 16,
-            offset: Offset(0, 7),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 15, 16, 15),
+    return ResortPaper(
+      ticketNotches: true,
+      padding: const EdgeInsets.fromLTRB(13, 13, 13, 13),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Container(
-                width: 43,
-                height: 43,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(
-                  Icons.signal_cellular_alt_rounded,
-                  color: accent,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 11),
+              ResortCarrierMark(carrier: carrier),
+              const SizedBox(width: 9),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Flexible(
+                        Expanded(
                           child: Text(
                             carrier.label,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.titleMedium?.copyWith(
-                              color: const Color(0xFF303845),
+                              color: ResortPalette.ink,
                               fontWeight: FontWeight.w800,
+                              fontSize: 15,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 7),
-                        _SlotTag(label: slotLabel, accent: accent),
                       ],
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      snapshot?.phoneMasked ?? _statusSubtitle(status),
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF8A8E95),
-                        fontSize: 11,
-                      ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 5,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _SlotTag(label: slotLabel, accent: accent),
+                        Text(
+                          phoneHint ?? '号码未备注',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: ResortPalette.muted,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 7),
-              _StatusBadge(status: status),
+              const SizedBox(width: 4),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _StatusBadge(status: status),
+                  if (onEdit != null) ...[
+                    const SizedBox(height: 2),
+                    SizedBox(
+                      width: 48,
+                      height: 42,
+                      child: IconButton(
+                        tooltip: '编辑备注与号码',
+                        onPressed: onEdit,
+                        style: IconButton.styleFrom(
+                          foregroundColor: ResortPalette.lavender,
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(48, 42),
+                        ),
+                        icon: const Icon(Icons.edit_note_rounded, size: 21),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 15),
           Container(
-            padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+            padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFFBF7),
-              borderRadius: BorderRadius.circular(19),
+              color: const Color(0xFFFFF8F4),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFF4E6E8)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.account_balance_wallet_outlined,
+                            color: ResortPalette.pink,
+                            size: 15,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '话费余额',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: ResortPalette.muted,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      balanceYuan == null
+                          ? '--'
+                          : '¥${balanceYuan!.toStringAsFixed(2)}',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: ResortPalette.ink,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 9),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -749,7 +783,7 @@ class _CarrierCard extends StatelessWidget {
                           Text(
                             remainingLabel,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: const Color(0xFF777D87),
+                              color: ResortPalette.muted,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -764,7 +798,7 @@ class _CarrierCard extends StatelessWidget {
                             Text(
                               '不限量',
                               style: theme.textTheme.headlineMedium?.copyWith(
-                                color: const Color(0xFF424B5A),
+                                color: ResortPalette.ink,
                                 fontWeight: FontWeight.w800,
                               ),
                             )
@@ -772,7 +806,7 @@ class _CarrierCard extends StatelessWidget {
                             Text(
                               '--',
                               style: theme.textTheme.headlineMedium?.copyWith(
-                                color: const Color(0xFF424B5A),
+                                color: ResortPalette.ink,
                                 fontWeight: FontWeight.w800,
                                 height: 1,
                               ),
@@ -786,7 +820,7 @@ class _CarrierCard extends StatelessWidget {
                         child: Text(
                           '共 ${_formatGb(totalBytes)} GB',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: const Color(0xFF8A8E95),
+                            color: ResortPalette.muted,
                           ),
                         ),
                       ),
@@ -817,6 +851,8 @@ class _CarrierCard extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 9),
+          _TrafficCategoryRow(snapshot: snapshot, status: status),
           if (remainingBytes == null && status == QueryStatus.notConnected) ...[
             const SizedBox(height: 9),
             const Text(
@@ -841,9 +877,9 @@ class _CarrierCard extends StatelessWidget {
                 child: FilledButton.tonalIcon(
                   onPressed: onConnect,
                   style: FilledButton.styleFrom(
-                    backgroundColor: accent.withValues(alpha: .12),
+                    backgroundColor: accent.withValues(alpha: .13),
                     foregroundColor: accent,
-                    minimumSize: const Size(0, 43),
+                    minimumSize: const Size(0, 48),
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w700,
@@ -864,12 +900,13 @@ class _CarrierCard extends StatelessWidget {
               ),
               const SizedBox(width: 9),
               SizedBox(
-                height: 43,
+                height: 48,
                 child: OutlinedButton.icon(
                   onPressed: isBusy ? null : onRefresh,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF656D79),
-                    side: const BorderSide(color: Color(0xFFECE7E0)),
+                    foregroundColor: ResortPalette.ink,
+                    side: const BorderSide(color: ResortPalette.border),
+                    minimumSize: const Size(0, 48),
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w700,
@@ -906,20 +943,127 @@ class _CarrierCard extends StatelessWidget {
             .toList(growable: false) ??
         const [];
   }
+}
 
-  String _statusSubtitle(QueryStatus status) {
-    switch (status) {
-      case QueryStatus.notConnected:
-        return '尚未连接';
-      case QueryStatus.loading:
-        return '正在同步';
-      case QueryStatus.success:
-        return '号码已连接';
-      case QueryStatus.authExpired:
-        return '需要重新登录';
-      case QueryStatus.error:
-        return '查询遇到问题';
-    }
+class _TrafficCategoryRow extends StatelessWidget {
+  const _TrafficCategoryRow({required this.snapshot, required this.status});
+
+  final CarrierSnapshot? snapshot;
+  final QueryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = <(String, BucketKind, Color, Color)>[
+      ('通用流量', BucketKind.general, ResortPalette.mint, ResortPalette.mintWash),
+      (
+        '定向流量',
+        BucketKind.directed,
+        ResortPalette.lavender,
+        ResortPalette.lavenderWash,
+      ),
+      ('其他流量', BucketKind.unknown, ResortPalette.pink, ResortPalette.pinkWash),
+    ];
+    final scale = MediaQuery.textScalerOf(context).scale(12);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 270 || scale > 16;
+        final itemWidth = compact
+            ? (constraints.maxWidth - 7) / 2
+            : (constraints.maxWidth - 14) / 3;
+        return Wrap(
+          spacing: 7,
+          runSpacing: 7,
+          children: [
+            for (final (label, kind, color, wash) in categories)
+              SizedBox(
+                width: itemWidth,
+                child: _TrafficCategoryChip(
+                  label: label,
+                  kind: kind,
+                  color: color,
+                  wash: wash,
+                  snapshot: snapshot,
+                  status: status,
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _TrafficCategoryChip extends StatelessWidget {
+  const _TrafficCategoryChip({
+    required this.label,
+    required this.kind,
+    required this.color,
+    required this.wash,
+    required this.snapshot,
+    required this.status,
+  });
+
+  final String label;
+  final BucketKind kind;
+  final Color color;
+  final Color wash;
+  final CarrierSnapshot? snapshot;
+  final QueryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final group = snapshot == null
+        ? const TrafficGroupSummary()
+        : summarizeTrafficGroup(snapshot!, kind);
+    final unknownPurpose = kind == BucketKind.unknown;
+    final value = group.isUnlimited
+        ? unknownPurpose
+              ? '不限量 · 用途待确认'
+              : '不限量'
+        : group.isComplete && group.remainingBytes != null
+        ? '${group.isEstimated ? '约 ' : ''}${_formatGb(group.remainingBytes!)} GB${unknownPurpose ? ' · 用途待确认' : ''}'
+        : status == QueryStatus.notConnected
+        ? '待连接'
+        : unknownPurpose
+        ? '用途待确认'
+        : '待确认';
+    return Container(
+      constraints: const BoxConstraints(minHeight: 54),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      decoration: BoxDecoration(
+        color: wash,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: color.withValues(alpha: .28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color.withValues(alpha: .95),
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: ResortPalette.ink,
+              fontSize: 11,
+              height: 1.15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1220,8 +1364,8 @@ class _TrafficBucketListState extends State<_TrafficBucketList> {
               onPressed: () => setState(() => _expanded = !_expanded),
               style: TextButton.styleFrom(
                 foregroundColor: widget.accent,
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                visualDensity: VisualDensity.compact,
+                minimumSize: const Size(48, 48),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
               ),
               icon: Icon(
                 _expanded
@@ -1555,10 +1699,10 @@ class _FooterAction extends StatelessWidget {
     return OutlinedButton.icon(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
-        backgroundColor: const Color(0xFFFFFDF9),
-        foregroundColor: const Color(0xFF667080),
-        side: const BorderSide(color: Color(0xFFF0EAE2)),
-        minimumSize: const Size(0, 47),
+        backgroundColor: ResortPalette.paper,
+        foregroundColor: ResortPalette.mint,
+        side: const BorderSide(color: ResortPalette.border),
+        minimumSize: const Size(0, 48),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
           fontSize: 12,
@@ -1584,178 +1728,6 @@ class _MiniCarrierDot extends StatelessWidget {
       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
-}
-
-class _CloudDropPainter extends CustomPainter {
-  const _CloudDropPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final softCloud = Paint()
-      ..color = const Color(0xFFFFFFFF).withValues(alpha: .34);
-    final lightDrop = Paint()
-      ..color = const Color(0xFFEEA489).withValues(alpha: .34);
-    final dropHighlight = Paint()
-      ..color = const Color(0xFFFFFFFF).withValues(alpha: .48);
-
-    final cloud = Path()
-      ..moveTo(size.width * .21, size.height * .18)
-      ..cubicTo(
-        size.width * .21,
-        size.height * .08,
-        size.width * .38,
-        size.height * .04,
-        size.width * .46,
-        size.height * .13,
-      )
-      ..cubicTo(
-        size.width * .54,
-        size.height * .04,
-        size.width * .71,
-        size.height * .09,
-        size.width * .72,
-        size.height * .20,
-      )
-      ..cubicTo(
-        size.width * .86,
-        size.height * .20,
-        size.width * .89,
-        size.height * .39,
-        size.width * .74,
-        size.height * .42,
-      )
-      ..lineTo(size.width * .25, size.height * .42)
-      ..cubicTo(
-        size.width * .11,
-        size.height * .40,
-        size.width * .10,
-        size.height * .21,
-        size.width * .21,
-        size.height * .18,
-      )
-      ..close();
-    canvas.drawPath(cloud, softCloud);
-
-    final drop = Path()
-      ..moveTo(size.width * .60, size.height * .43)
-      ..cubicTo(
-        size.width * .55,
-        size.height * .54,
-        size.width * .43,
-        size.height * .67,
-        size.width * .43,
-        size.height * .78,
-      )
-      ..cubicTo(
-        size.width * .43,
-        size.height * .93,
-        size.width * .72,
-        size.height * .95,
-        size.width * .72,
-        size.height * .78,
-      )
-      ..cubicTo(
-        size.width * .72,
-        size.height * .66,
-        size.width * .65,
-        size.height * .54,
-        size.width * .60,
-        size.height * .43,
-      )
-      ..close();
-    canvas.drawPath(drop, lightDrop);
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(size.width * .54, size.height * .68),
-        width: size.width * .045,
-        height: size.height * .13,
-      ),
-      dropHighlight,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _CloudDropPainter oldDelegate) => false;
-}
-
-class _CuteDropMarkPainter extends CustomPainter {
-  const _CuteDropMarkPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final dropPaint = Paint()..color = const Color(0xFFE58C79);
-    final facePaint = Paint()..color = const Color(0xFFFFF7F0);
-    final drop = Path()
-      ..moveTo(size.width * .5, size.height * .03)
-      ..cubicTo(
-        size.width * .43,
-        size.height * .18,
-        size.width * .17,
-        size.height * .47,
-        size.width * .17,
-        size.height * .66,
-      )
-      ..cubicTo(
-        size.width * .17,
-        size.height * .89,
-        size.width * .34,
-        size.height * .99,
-        size.width * .5,
-        size.height * .99,
-      )
-      ..cubicTo(
-        size.width * .68,
-        size.height * .99,
-        size.width * .84,
-        size.height * .87,
-        size.width * .84,
-        size.height * .66,
-      )
-      ..cubicTo(
-        size.width * .84,
-        size.height * .45,
-        size.width * .58,
-        size.height * .17,
-        size.width * .5,
-        size.height * .03,
-      )
-      ..close();
-    canvas.drawPath(drop, dropPaint);
-    canvas.drawCircle(
-      Offset(size.width * .4, size.height * .58),
-      1.65,
-      facePaint,
-    );
-    canvas.drawCircle(
-      Offset(size.width * .6, size.height * .58),
-      1.65,
-      facePaint,
-    );
-    final smile = Path()
-      ..moveTo(size.width * .4, size.height * .7)
-      ..quadraticBezierTo(
-        size.width * .5,
-        size.height * .78,
-        size.width * .6,
-        size.height * .7,
-      );
-    canvas.drawPath(
-      smile,
-      Paint()
-        ..color = facePaint.color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.7
-        ..strokeCap = StrokeCap.round,
-    );
-    canvas.drawCircle(
-      Offset(size.width * .34, size.height * .34),
-      1.4,
-      Paint()..color = const Color(0xFFFFDCCB),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _CuteDropMarkPainter oldDelegate) => false;
 }
 
 String _formatGb(int bytes) {

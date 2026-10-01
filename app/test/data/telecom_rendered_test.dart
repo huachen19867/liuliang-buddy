@@ -12,6 +12,39 @@ void main() {
     'source': 'officialRendered',
     'rows': rows,
   };
+  test('currency requires rendered yuan and cannot reuse traffic balance', () {
+    final response = sample([row('0MB', '1GB')]);
+    expect(
+      parseTelecomRendered({...response, 'balanceText': '12.34 元'}).balanceYuan,
+      12.34,
+    );
+    expect(
+      parseTelecomRendered({...response, 'balanceText': '-3.20 元'}).balanceYuan,
+      -3.2,
+    );
+    expect(
+      parseTelecomRendered({...response, 'balanceText': '0 元'}).balanceYuan,
+      0,
+    );
+    for (final text in [
+      '12.34',
+      '12.34 KB',
+      'NaN 元',
+      '1.234 元',
+      '-- 元',
+      '余额 12.34 元',
+      '1e3 元',
+    ]) {
+      expect(
+        parseTelecomRendered({...response, 'balanceText': text}).balanceYuan,
+        isNull,
+      );
+    }
+    expect(
+      parseTelecomRendered({...response, 'balance': 12345}).balanceYuan,
+      isNull,
+    );
+  });
   test(
     'independent MB/GB units are subtracted and always tagged as estimated package balances',
     () {

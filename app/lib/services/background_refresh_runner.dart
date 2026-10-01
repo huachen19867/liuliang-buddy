@@ -128,6 +128,13 @@ Future<Map<String, Object?>?> _runScheduledRefresh() async {
   }
 
   if (!await _isTaskCurrent()) return null;
+  // A local identity edit may happen while the official page is querying.
+  // Publish the current display identity, not the earlier task's copy.
+  await prefs.reload();
+  final displayAccounts = CarrierAccounts.restore(
+    savedJson: prefs.getString(CarrierAccounts.storageKey),
+    selection: selection,
+  );
   final current = <CarrierSnapshot>[
     for (final account in visibleAccounts)
       if (snapshots[account.id] != null) snapshots[account.id]!,
@@ -144,7 +151,7 @@ Future<Map<String, Object?>?> _runScheduledRefresh() async {
       current,
       thresholdGb: (prefs.getDouble('threshold_gb') ?? 5).clamp(1, 20),
       selection: selection,
-      accounts: accounts,
+      accounts: displayAccounts,
       accountSnapshots: snapshots,
     ),
   };
@@ -370,6 +377,15 @@ CarrierSnapshot? _parseCapturedResponse(
     }
   }
   if (decoded == null) return null;
+  if (carrier == Carrier.unicom && stage == 'unicomSession') {
+    return isUnicomSessionExpired(decoded, status)
+        ? const CarrierSnapshot(
+            carrier: Carrier.unicom,
+            status: QueryStatus.authExpired,
+            message: '联通官网登录已失效，请重新连接号码',
+          )
+        : null;
+  }
   final snapshot = switch (carrier) {
     Carrier.mobile => parseMobile(
       decoded,

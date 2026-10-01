@@ -79,8 +79,39 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     'https://iservice.10010.com.evil.test/e3/static/query/userinfoE5query']) await unicom.context.fetch(url);
   await settle();
   assert.equal(unicom.messages.length, 1, 'Unicom only observes its official balance response');
+  const checkUrl = 'https://iservice.10010.com/e3/static/check/checklogin/?_=123';
+  const check = new unicom.XHR();
+  check.open('POST', checkUrl);
+  check.send();
+  const privateBody = JSON.stringify({isLogin: false,
+    userInfo: {usernumber: 'never-forward', token: 'never-forward'}});
+  check.complete(checkUrl, privateBody);
+  assert.equal(unicom.messages.length, 2);
+  assert.equal(unicom.messages.at(-1).payload.stage, 'unicomSession');
+  assert.equal(unicom.messages.at(-1).payload.body, '{"isLogin":false}');
+  assert.equal(unicom.messages.at(-1).payload.url,
+    'https://iservice.10010.com/e3/static/check/checklogin/');
+  assert.equal(check.responseText, privateBody, 'do not change the official session response');
+  for (const body of ['{"isLogin":true}', '{"isLogin":"false"}',
+    '{"isLogin":0}', '{}', 'null', 'not JSON']) {
+    const ignored = new unicom.XHR();
+    ignored.open('POST', checkUrl); ignored.send(); ignored.complete(checkUrl, body);
+  }
+  const failed = new unicom.XHR();
+  failed.open('POST', checkUrl); failed.send();
+  failed.complete(checkUrl, '{"isLogin":false}', 500);
+  assert.equal(unicom.messages.length, 2, 'unknown/login success/server failure cannot claim expiry');
+  const earlySession = setup('https://iservice.10010.com',
+    {pathname:'/e5/query.html', bridgeReady:false});
+  const earlyCheck = new earlySession.XHR();
+  earlyCheck.open('POST', checkUrl); earlyCheck.send(); earlyCheck.complete(checkUrl, privateBody);
+  earlySession.ready();
+  assert.equal(earlySession.messages[0].payload.body, '{"isLogin":false}',
+    'document-start queue holds only the minimized session flag');
   const unicomLogin = setup('https://iservice.10010.com', {pathname:'/login.html'});
   await unicomLogin.context.fetch('/e3/static/query/userinfoE5query');
+  const loginCheck = new unicomLogin.XHR();
+  loginCheck.open('POST', checkUrl); loginCheck.send(); loginCheck.complete(checkUrl, privateBody);
   await settle();
   assert.equal(unicomLogin.messages.length, 0, 'Unicom unrelated pages do not forward personal data');
   const mobile = setup('https://wx.10086.cn');

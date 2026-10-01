@@ -73,3 +73,7 @@ android-system-surfaces-settings-demo.png 为真实Flutter设置组件渲染，D
 ## 1.8.1 启动热修
 
 唯一正式APK18,383,087字节，SHA-256 59fe631319748e3ed998ae134cf3a89c6e781856d0fd4a0f1be4adbe66b53caa，证书沿用33b11555。1.8.1/code12、API24/36、ARM64、非debuggable及v2通过。隔离工作树从2afb682仅含Room无参构造保留修复与版本变化，未混入后续UI改版；荣耀Android16原1.8启动崩溃复现、同签名覆盖后冷启动及持续进程通过，老板确认正常。日志/截图保留.tools/android-crash，不作为公开组件预览。详见docs/RELEASE_1.8.1.md。
+
+## 1.9.0 新界面输出
+
+少女风实际组件演示：ui-preview.png、carrier-selection-four-demo.png、dashboard-two-mobile-unlimited-demo.png、dashboard-unicom-broadnet-demo.png、dashboard-telecom-demo.png、dashboard-voice-sms-demo.png。全部是合成演示数据，不是手机或运营商实测。唯一正式包为 liuliang-buddy-release.apk；版本和摘要见 docs/RELEASE_1.9.0.md。新 Launcher 效果仍待设备验证。

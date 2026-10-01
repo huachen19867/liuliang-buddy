@@ -49,7 +49,18 @@ const telecomRenderedCaptureScript = r'''
         total: match ? match[2] : null});
     }
     if (!rows.length && !allowanceRows.length) { pending = null; return; }
-    const body = JSON.stringify({source: 'officialRendered', rows, allowanceRows});
+    const money = document.querySelector('#balanceModal #mobileBalance');
+    const moneyText = (money?.textContent || '').replace(/\s+/g, '').trim();
+    // The exact official modal labels this value as 余额 and its unit as 元.
+    // Never interpret mobileTimeBalance (current charges) as account balance.
+    const moneyParent = (money?.parentElement?.textContent || '').replace(/\s+/g, '');
+    const following = (money?.parentElement?.nextSibling?.textContent || '').trim();
+    const balanceText = /^-?\d+(?:\.\d{1,2})?$/.test(moneyText) &&
+      moneyParent.startsWith('余额:') && /^元(?:\s|$)/.test(following)
+      ? moneyText + ' 元' : null;
+    const payload = {source: 'officialRendered', rows, allowanceRows};
+    if (balanceText !== null) payload.balanceText = balanceText;
+    const body = JSON.stringify(payload);
     if (body !== previous) { pending = body; flush(); }
   };
   const schedule = () => {

@@ -108,6 +108,7 @@ CarrierSnapshot parseTelecomRendered(
     carrier: Carrier.telecom,
     status: QueryStatus.success,
     queriedAt: queriedAt ?? DateTime.now(),
+    balanceYuan: _renderedYuan(response['balanceText']),
     buckets: buckets,
     allowances: allowances,
     message: buckets.isEmpty
@@ -118,6 +119,18 @@ CarrierSnapshot parseTelecomRendered(
         ? '部分官网明细无法估算，暂不显示合计；请核对官方查询页'
         : '根据官网已用量和总量的显示值估算，存在舍入误差，套餐适用范围以官网为准',
   );
+}
+
+// The archived Account component labels #mobileBalance in yuan. No generic
+// `balance` field is accepted: Broadnet uses that field for traffic in KB.
+num? _renderedYuan(Object? raw) {
+  if (raw is! String || raw.length > 50) return null;
+  final match = RegExp(r'^(-?\d+(?:\.\d{1,2})?)\s*元$').firstMatch(raw.trim());
+  if (match == null) return null;
+  final value = num.tryParse(match.group(1)!);
+  return value != null && value.isFinite && value.abs() <= 1000000000
+      ? value
+      : null;
 }
 
 (num, String)? _telecomAmount(Object? raw, AllowanceKind kind) {

@@ -60,7 +60,8 @@ const responseCaptureScript = r'''
         (location.origin === 'https://iservice.10010.com' &&
         ['/e5/index.html', '/e5/query.html'].includes(location.pathname) &&
         url.origin === 'https://iservice.10010.com' &&
-        url.pathname === '/e3/static/query/userinfoE5query');
+        ['/e3/static/query/userinfoE5query',
+          '/e3/static/check/checklogin/'].includes(url.pathname));
     } catch (_) { return false; }
   };
   const pendingMessages = [];
@@ -82,8 +83,23 @@ const responseCaptureScript = r'''
     try {
       if (!selected(url) || typeof body !== 'string' ||
           body.length > 2097152) return;
-      const payload = {url: new URL(url, location.href).href,
-        body, status, stage, pageUrl: location.href};
+      const responseUrl = new URL(url, location.href);
+      if (location.origin === 'https://iservice.10010.com' &&
+          responseUrl.pathname === '/e3/static/check/checklogin/') {
+        // E5 can stay on its home page while logged out and never request
+        // balances. Forward only a confirmed negative session flag; never
+        // bridge the checklogin profile, identifiers, or query parameters.
+        if (status < 200 || status >= 300) return;
+        const session = JSON.parse(body);
+        if (!session || session.isLogin !== false) return;
+        body = '{"isLogin":false}';
+        stage = 'unicomSession';
+        responseUrl.search = '';
+        responseUrl.hash = '';
+      }
+      const payload = {url: responseUrl.href,
+        body, status, stage, pageUrl: stage === 'unicomSession'
+          ? location.origin + location.pathname : location.href};
       flush();
       if (!deliver(payload)) {
         // Keep a small, bounded queue for document-start responses before the

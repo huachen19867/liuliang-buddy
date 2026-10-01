@@ -50,6 +50,20 @@ const modal = rows => `<div id="balanceModal" style="display:none"><div class="m
   const sample = modal(row('测试套餐', ' 已使用<span class="blue-font">512MB</span> / 2GB') +
     row('语音', '已使用10分钟 / 100分钟', '1') + row('短信', '已使用1次 / 20次', '2'));
   try {
+    for (const [label, value, unit, expected] of [
+      ['余额:', '12.30', '元', '12.30 元'],
+      ['余额:', '-2.50', '元', '-2.50 元'],
+      ['当月费用:', '12.30', '元', undefined],
+      ['余额:', '123', 'KB', undefined],
+      ['余额:', '--', '元', undefined],
+    ]) {
+      const money = `<span>${label}<b id="mobileBalance">${value}</b></span>${unit}`;
+      const f = await fixture(sample.replace('<div class="modal-body">',
+        `<div class="modal-body">${money}`));
+      assert.equal(JSON.parse(f.messages[0].body).balanceText, expected);
+      await f.context.close();
+    }
+    cases.push('exact official balance label, signed yuan, ambiguous money rejected');
     let f = await fixture(sample);
     assert.equal(await f.page.locator('#balanceModal').isVisible(), false);
     assert.equal(f.messages.length, 1, 'hidden v-show modal captured without clicking');

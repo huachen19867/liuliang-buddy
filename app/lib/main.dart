@@ -28,6 +28,8 @@ import 'services/query_state.dart';
 import 'services/widget_bridge.dart';
 import 'services/ios_account_profiles.dart';
 import 'ui/dashboard_screen.dart';
+import 'ui/resort_theme.dart';
+import 'ui/account_identity_dialog.dart';
 
 const demoMode = bool.fromEnvironment('DEMO');
 const _notifications = MethodChannel('cn.liuliang/notifications');
@@ -50,8 +52,22 @@ class FlowBuddyApp extends StatelessWidget {
     title: '流量小伙伴',
     theme: ThemeData(
       useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFFFFFAF2),
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF7EA6DB)),
+      scaffoldBackgroundColor: ResortPalette.canvas,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: ResortPalette.mint,
+        surface: ResortPalette.paper,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: ResortPalette.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: ResortPalette.border),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: ResortPalette.paper,
+        showDragHandle: true,
+      ),
     ),
     home: const FlowHome(),
   );
@@ -755,27 +771,35 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     }
     if (decoded == null) return;
     final status = payload['status'] is int ? payload['status'] as int : null;
-    final snapshot = switch (carrier) {
-      Carrier.mobile => parseMobile(
-        decoded,
-        queriedAt: DateTime.now(),
-        httpStatus: status,
-      ),
-      Carrier.broadnet => parseBroadnetH5(
-        decoded,
-        queriedAt: DateTime.now(),
-        httpStatus: status,
-      ),
-      Carrier.unicom => parseUnicomWeb(
-        decoded,
-        queriedAt: DateTime.now(),
-        httpStatus: status,
-      ),
-      Carrier.telecom => parseTelecomRendered(
-        decoded,
-        queriedAt: DateTime.now(),
-      ),
-    };
+    final unicomSession = carrier == Carrier.unicom && stage == 'unicomSession';
+    if (unicomSession && !isUnicomSessionExpired(decoded, status)) return;
+    final snapshot = unicomSession
+        ? const CarrierSnapshot(
+            carrier: Carrier.unicom,
+            status: QueryStatus.authExpired,
+            message: '联通官网登录已失效，请重新连接号码',
+          )
+        : switch (carrier) {
+            Carrier.mobile => parseMobile(
+              decoded,
+              queriedAt: DateTime.now(),
+              httpStatus: status,
+            ),
+            Carrier.broadnet => parseBroadnetH5(
+              decoded,
+              queriedAt: DateTime.now(),
+              httpStatus: status,
+            ),
+            Carrier.unicom => parseUnicomWeb(
+              decoded,
+              queriedAt: DateTime.now(),
+              httpStatus: status,
+            ),
+            Carrier.telecom => parseTelecomRendered(
+              decoded,
+              queriedAt: DateTime.now(),
+            ),
+          };
     if (carrier == Carrier.broadnet &&
         !shouldApplyBroadnetResponse(
           stage: payload['stage'] is String ? payload['stage'] as String : null,
@@ -1322,6 +1346,39 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _editAccount(String id) async {
+    if (_clearing || _savingSelection) return;
+    final account = _account(id);
+    if (account == null) return;
+    final generation = _generation;
+    final identity = await showDialog<(String, String)>(
+      context: context,
+      builder: (_) => AccountIdentityDialog(account: account),
+    );
+    if (identity == null || !_current(generation)) return;
+    try {
+      await _store(() async {
+        if (!_current(generation) || _account(id) == null) return;
+        final next = _accounts.updateIdentity(
+          id,
+          note: identity.$1,
+          phoneNumber: identity.$2,
+        );
+        if (await _prefs?.setString(
+              CarrierAccounts.storageKey,
+              next.toStorageString(),
+            ) !=
+            true) {
+          throw StateError('Identity save failed');
+        }
+        if (_current(generation)) setState(() => _accounts = next);
+      });
+      if (_current(generation)) await _publishWidget();
+    } catch (_) {
+      if (_current(generation)) _showInfo('备注还没保存', '本机存储暂时无法写入，请稍后重试。');
+    }
+  }
+
   Future<void> _removeSecondAccount(String id) async {
     final account = _account(id);
     if (account == null || account.isPrimary || _clearing) return;
@@ -1701,6 +1758,20 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         }
       }
     }
+    try {
+      final clearedAccounts = _accounts.withoutIdentities();
+      if (await _prefs?.setString(
+            CarrierAccounts.storageKey,
+            clearedAccounts.toStorageString(),
+          ) !=
+          true) {
+        otherDataCleared = false;
+      } else {
+        _accounts = clearedAccounts;
+      }
+    } catch (_) {
+      otherDataCleared = false;
+    }
     final fullyCleared = profilesCleared && otherDataCleared;
     if (fullyCleared) {
       try {
@@ -1809,6 +1880,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               onRefresh: _refresh,
               onConnectAccount: _connectAccount,
               onRefreshAccount: (id) => unawaited(_refreshAccount(id)),
+              onEditAccount: (id) => unawaited(_editAccount(id)),
               onRefreshAll: _refreshAll,
               onSettings: _settings,
               onAddWidget: _addWidget,

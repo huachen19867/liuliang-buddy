@@ -255,3 +255,11 @@ Release切换AOT、R8、资源裁剪、ARM64 ABI，拒绝无发布签名的Relea
 老板反馈荣耀/iQOO13等Android16手机打开闪退，连接荣耀BKQ-AN00真机后原1.8日志明确InitializationProvider->WorkManagerInitializer->Room反射创建WorkDatabase_Impl时报无参构造NoSuchMethodException。原Room consumer只keep类而未保留构造；原生单元测试/debug及静态签名校验未覆盖Release初始化，这是1.8验收漏项。精确keep WorkDatabase_Impl.public <init>()，不关闭R8/后台功能，不删除数据库。先对四个原生SO ELF LOAD及zipalign16KB核验通过，JNI/mapping调查未误判为根因，官方依赖复用证据见RELEASE_STARTUP_REVIEW。
 
 仅proguard及pubspec1.8.1+12提交2afb682；隔离.tools/hotfix-1.8.1工作树构建，避免正在工作的UI/备注代码混入。正式Release18,383,087字节，SHA-256 59fe631319748e3ed998ae134cf3a89c6e781856d0fd4a0f1be4adbe66b53caa，原正式证书33b11555/v2、非debuggable、ARM64/API24/36。用户亲自确认系统安装提示后同签名覆盖成功，ADB冷启动进入首次选择页，PID6565持续存在，启动之后crash buffer无新增本应用异常；老板确认“已安装，没有问题”。原始系统日志/截图仅留忽略.tools目录，不公开个人数据。仅本台荣耀实测，不声称iQOO或所有机型已验证；公开1.8.1唯一APK分发回执随后补充。
+
+## 2026-10-01：1.9 少女风和卡片身份
+
+复用工作区已下载的官方 AppWidget/Flutter/运营商页面参考，未新增重复架构。角色替换为老板提供的棕色盘发绿眼参考，青瓷绿/奶油白主题、微缩温泉页头、简化桌面贴纸和双平台图标落地；数据优先。账号备注/手填号码沿用稳定 accountId，后台重新读取元数据防覆盖；展示号码脱敏。三类流量依赖单位和完整性，未知用途不冒充通用，通话不叠加共享套餐，电信余额仅官网余额元节点。
+
+修复备注对话框关闭动画期间 TextEditingController 提前销毁，以及测试平台覆盖未清理；截图示例补齐单位，不放松生产校验。Flutter 144 项全部通过，Node fetch/XHR 与联通过期探针回归通过；真实 Chrome 电信合成页面 11 类场景通过（新增正负元余额、费用/KB/缺值拒绝）。这是合成验证，不冒充真实账号。用户已拔 USB，继续构建不等设备。1.8.1 已公开唯一 APK，荣耀验证成功；1.9 新小组件尚待 Launcher 真机验证。
+
+最终 analyze 无问题，JUnit21/Flutter144通过。正常 Flutter Release ARM64 构建成功，未采用 --no-pub 或直接 assembleRelease；wrapper restored，DPAPI私钥不入库。APK27,185,049字节/SHA256 43aa24ea8a1f24804dc410f98dcf6294ad4a5e2274870572cbf16e4a609bfddc；v2/非debuggable/code13/API24-36/ARM64/16KB ZIP对齐通过，正式证书33b11555保持。角色四张PNG新增约7.53MB，整体比1.8.1增加8.80MB。准备唯一APK公开发布，不附源码以外多余二进制。

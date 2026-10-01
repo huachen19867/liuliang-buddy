@@ -11,6 +11,7 @@ import 'package:liuliang_app/data/carrier_accounts.dart';
 import 'package:liuliang_app/data/carrier_selection.dart';
 import 'package:liuliang_app/ui/carrier_selection_screen.dart';
 import 'package:liuliang_app/ui/dashboard_screen.dart';
+import 'package:liuliang_app/ui/resort_theme.dart';
 import 'package:liuliang_app/ui/system_surfaces_settings.dart';
 import 'package:liuliang_app/services/system_surfaces.dart';
 
@@ -263,6 +264,106 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('温泉主题卡片显示账号身份、分类余量并支持编辑与角色短句', (tester) async {
+    _configureViewport(tester, const Size(320, 1280));
+    final account = CarrierAccount(
+      id: 'mobile',
+      carrier: Carrier.mobile,
+      label: '中国移动 1',
+      note: '家庭上网卡',
+      phoneNumber: '13812345678',
+    );
+    final snapshot = CarrierSnapshot(
+      carrier: Carrier.mobile,
+      status: QueryStatus.success,
+      queriedAt: DateTime(2026, 10, 1, 10, 20),
+      phoneMasked: '13812345678',
+      balanceYuan: 26.5,
+      buckets: const [
+        TrafficBucket(
+          name: '通用流量',
+          kind: BucketKind.general,
+          remainingBytes: 5 * _gib,
+          totalBytes: 20 * _gib,
+          rawUnit: 'GB',
+        ),
+        TrafficBucket(
+          name: '视频专属流量',
+          kind: BucketKind.directed,
+          remainingBytes: 2 * _gib,
+          rawUnit: 'GB',
+        ),
+        TrafficBucket(
+          name: '活动流量',
+          kind: BucketKind.unknown,
+          remainingBytes: _gib,
+          rawUnit: 'GB',
+        ),
+      ],
+      allowances: [
+        ServiceAllowance(
+          kind: AllowanceKind.voice,
+          label: '国内通话',
+          remaining: 90,
+        ),
+        ServiceAllowance(kind: AllowanceKind.sms, label: '国内短信', remaining: 12),
+      ],
+    );
+    final edited = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: const TextScaler.linear(1.4),
+            disableAnimations: true,
+          ),
+          child: child!,
+        ),
+        home: DashboardScreen(
+          snapshots: [snapshot],
+          selectedCarriers: const {Carrier.mobile},
+          accountEntries: [DashboardAccountEntry(account, snapshot)],
+          thresholdGb: 2,
+          onConnect: (_) {},
+          onRefresh: (_) {},
+          onRefreshAll: () {},
+          onSettings: () {},
+          onAbout: () {},
+          onEditAccount: edited.add,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('account-card-mobile')),
+        matching: find.text('家庭上网卡'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('138****5678'), findsOneWidget);
+    expect(find.text('13812345678'), findsNothing);
+    expect(find.text('¥26.50'), findsOneWidget);
+    expect(find.text('话费余额'), findsOneWidget);
+    expect(find.text('定向流量'), findsOneWidget);
+    expect(find.text('其他流量'), findsOneWidget);
+    expect(find.text('国内通话'), findsOneWidget);
+    expect(find.text('国内短信'), findsOneWidget);
+    expect(
+      tester.getSize(find.byType(ResortMiniScene)).height,
+      lessThanOrEqualTo(120),
+    );
+
+    await tester.tap(find.byTooltip('编辑备注与号码'));
+    await tester.pump();
+    expect(edited, ['mobile']);
+    await tester.tap(find.byType(ResortMascotSticker).first);
+    await tester.pumpAndSettle();
+    expect(find.text('查询一下，今天也安心出发。'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('不支持桌面卡片的平台显示安卓说明并禁用入口', (tester) async {
     _configureViewport(tester, const Size(390, 844));
     await tester.pumpWidget(
@@ -378,8 +479,8 @@ void main() {
     expect(find.text('通用流量总览'), findsNothing);
     expect(find.textContaining('显示上次查询'), findsOneWidget);
     expect(find.textContaining('登录已过期 · 以下为上次查询'), findsOneWidget);
-    expect(find.textContaining('3.0'), findsOneWidget);
-    expect(find.textContaining('7.0'), findsOneWidget);
+    expect(find.text('3.0'), findsOneWidget);
+    expect(find.text('7.0'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -878,6 +979,7 @@ List<CarrierSnapshot> _demoSnapshots() => [
         name: '视频定向流量',
         kind: BucketKind.directed,
         rawRemaining: '2.5',
+        rawUnit: 'GB',
       ),
     ],
   ),
@@ -997,6 +1099,7 @@ CarrierSnapshot _snapshot(
             TrafficBucket(
               name: '通用流量',
               kind: BucketKind.general,
+              rawUnit: 'GB',
               remainingBytes: (remainingGiB * _gib).round(),
               totalBytes: totalGiB == null ? null : (totalGiB * _gib).round(),
             ),

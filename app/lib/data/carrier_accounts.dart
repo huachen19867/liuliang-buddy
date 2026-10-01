@@ -9,11 +9,59 @@ class CarrierAccount {
     required this.id,
     required this.carrier,
     required this.label,
+    this.note,
+    this.phoneNumber,
   });
 
   final String id;
   final Carrier carrier;
   final String label;
+
+  /// Optional user-entered identity, never read from a SIM or login form.
+  final String? note;
+  final String? phoneNumber;
+
+  String get displayName =>
+      note?.trim().isNotEmpty == true ? note!.trim() : label;
+  String? get phoneHint {
+    final phone = phoneNumber?.trim();
+    if (phone == null || phone.isEmpty || validatePhoneNumber(phone) != null) {
+      return null;
+    }
+    final prefixLength = phone.length >= 10 ? 3 : 1;
+    return '${phone.substring(0, prefixLength)}****${phone.substring(phone.length - 4)}';
+  }
+
+  static String? validateNote(String value) => value.trim().runes.length > 20
+      ? '备注最多 20 个字'
+      : RegExp(r'[\x00-\x1f\x7f]').hasMatch(value)
+      ? '备注不能包含换行或控制字符'
+      : null;
+
+  static String? validatePhoneNumber(String value) {
+    final phone = value.trim();
+    if (phone.isEmpty) return null;
+    return RegExp(r'^\+?[0-9]{7,15}$').hasMatch(phone)
+        ? null
+        : '请输入 7–15 位数字，可在开头加 +';
+  }
+
+  CarrierAccount withIdentity({
+    required String note,
+    required String phoneNumber,
+  }) {
+    if (validateNote(note) != null ||
+        validatePhoneNumber(phoneNumber) != null) {
+      throw const FormatException('Invalid account identity');
+    }
+    return CarrierAccount(
+      id: id,
+      carrier: carrier,
+      label: label,
+      note: note.trim().isEmpty ? null : note.trim(),
+      phoneNumber: phoneNumber.trim().isEmpty ? null : phoneNumber.trim(),
+    );
+  }
 
   bool get isPrimary => id == carrier.name;
   String? get profileName => isPrimary ? null : 'liuliang_$id';
@@ -22,10 +70,12 @@ class CarrierAccount {
   String get broadnetSessionKey =>
       isPrimary ? 'broadnet_session' : 'broadnet_session_$id';
 
-  Map<String, String> toJson() => {
+  Map<String, Object?> toJson() => {
     'id': id,
     'carrier': carrier.name,
     'label': label,
+    'note': note,
+    'phoneNumber': phoneNumber,
   };
 
   static CarrierAccount? fromJson(Object? value) {
@@ -42,7 +92,26 @@ class CarrierAccount {
     if (id != found.name && id != '${found.name}_2') return null;
     final label = value['label'] as String;
     if (label.trim().isEmpty || label.length > 40) return null;
-    return CarrierAccount(id: id, carrier: found, label: label);
+    // Invalid optional additions must not discard valid legacy account IDs.
+    final rawNote = value['note'];
+    final rawPhone = value['phoneNumber'];
+    return CarrierAccount(
+      id: id,
+      carrier: found,
+      label: label,
+      note:
+          rawNote is String &&
+              rawNote.trim().isNotEmpty &&
+              validateNote(rawNote) == null
+          ? rawNote.trim()
+          : null,
+      phoneNumber:
+          rawPhone is String &&
+              rawPhone.trim().isNotEmpty &&
+              validatePhoneNumber(rawPhone) == null
+          ? rawPhone.trim()
+          : null,
+    );
   }
 }
 
@@ -162,6 +231,26 @@ class CarrierAccounts {
     }
     return null;
   }
+
+  CarrierAccounts updateIdentity(
+    String id, {
+    required String note,
+    required String phoneNumber,
+  }) {
+    if (find(id) == null) throw StateError('Unknown account');
+    return CarrierAccounts._([
+      for (final account in accounts)
+        if (account.id == id)
+          account.withIdentity(note: note, phoneNumber: phoneNumber)
+        else
+          account,
+    ]);
+  }
+
+  CarrierAccounts withoutIdentities() => CarrierAccounts._([
+    for (final account in accounts)
+      account.withIdentity(note: '', phoneNumber: ''),
+  ]);
 
   String toStorageString() => jsonEncode({
     'schemaVersion': schemaVersion,
