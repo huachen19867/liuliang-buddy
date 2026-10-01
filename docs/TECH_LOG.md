@@ -162,4 +162,6 @@ Flutter完整74项通过，Node加入联通精确端点/登录与敏感接口排
 
 按老板要求增加后台刷新关闭、每小时、每两小时、每天四档。Android 使用 WorkManager 在有网络时尽力调度，通过后台 Flutter 引擎和无界面 WebView 访问已登录官网，沿用响应来源门禁与 Dart 解析；成功查询写回本地快照并更新桌面卡片。移动、联通、广电可尝试后台查询；电信依赖前台官网渲染的账务 DOM，明确跳过。后台不代替用户登录、不读取短信；失效会话停止该运营商的重复尝试，失败沿用旧值及其时间。首次默认关闭，前台五分钟刷新不变。Google WorkManager 官方样例已下载至本地参考目录并登记来源，未把参考源码纳入发布。
 
-版本升至1.4.0+7。`flutter analyze`、Android ARM64 `assembleDebug`、APK v2 签名和 aapt 元数据检查通过；APK 为114,399,238字节，SHA-256 `53a782a6a4c5730f29a53fb8d6df3a6f4da6d2bc1337632498ca4872812b2b4b`。本版未运行测试套件；没有连接安卓设备，WorkManager 实际触发、WebView 会话共享、真实余额和不同 Launcher 更新尚未验证。源码和安装包的公开发布与远端校验随后记录。
+版本升至1.4.0+7。`flutter analyze`、Android ARM64 `assembleDebug`、APK v2 签名和 aapt 元数据检查通过；APK 为114,399,238字节，SHA-256 `53a782a6a4c5730f29a53fb8d6df3a6f4da6d2bc1337632498ca4872812b2b4b`。本版未运行测试套件；没有连接安卓设备，WorkManager 实际触发、WebView 会话共享、真实余额和不同 Launcher 更新尚未验证。
+
+源码提交`7e6d9f4f54a5cf9946325de618a46d72527342fd`已推送到公开仓库`huachen19867/liuliang-buddy`，GitHub main、v1.4.0标签均核对为该提交。Release https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.4.0 已发布，draft=false、prerelease=true；APK asset状态uploaded、114399238字节，GitHub digest `sha256:53a782a6a4c5730f29a53fb8d6df3a6f4da6d2bc1337632498ca4872812b2b4b`与本地一致。真实运营商及桌面卡片刷新仍待安卓设备验证。
