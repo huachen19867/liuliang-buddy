@@ -3,7 +3,12 @@ import 'dart:io';
 import 'package:integration_test/integration_test_driver_extended.dart';
 
 Future<void> main() async {
-  const expectedNames = {'ios-selection', 'ios-dashboard'};
+  const expectedNames = {
+    'ios-selection',
+    'ios-dashboard',
+    'ios-widget-guide',
+    'ios-settings',
+  };
   await integrationDriver(
     writeResponseOnFailure: true,
     onScreenshot: (name, bytes, [args]) async {

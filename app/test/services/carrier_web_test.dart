@@ -137,4 +137,84 @@ void main() {
       );
     },
   );
+
+  test('current official balance page accepts harmless URL changes only', () {
+    final mobile = Uri.parse(carrierQueryUrl(Carrier.mobile));
+    expect(
+      isCarrierResponsePageCurrent(
+        Carrier.mobile,
+        mobile,
+        mobile.replace(query: 'from=refresh'),
+      ),
+      isTrue,
+    );
+    expect(
+      isCarrierResponsePageCurrent(
+        Carrier.mobile,
+        mobile,
+        mobile.replace(fragment: '/login'),
+      ),
+      isFalse,
+    );
+    final broadnet = Uri.parse(carrierQueryUrl(Carrier.broadnet));
+    expect(
+      isCarrierResponsePageCurrent(
+        Carrier.broadnet,
+        broadnet,
+        broadnet.replace(query: 'tab=traffic'),
+      ),
+      isTrue,
+    );
+    expect(
+      isCarrierResponsePageCurrent(
+        Carrier.broadnet,
+        broadnet,
+        Uri.parse(carrierLoginUrl(Carrier.broadnet)),
+      ),
+      isFalse,
+    );
+    final unicom = Uri.parse(carrierQueryUrl(Carrier.unicom));
+    expect(
+      isCarrierResponsePageCurrent(
+        Carrier.unicom,
+        unicom,
+        Uri.parse('https://iservice.10010.com/e5/query.html?tab=flow'),
+      ),
+      isTrue,
+    );
+    for (final bad in [
+      Uri.parse(carrierLoginUrl(Carrier.unicom)),
+      Uri.parse('https://iservice.10010.com.evil.test/e5/query.html'),
+      Uri.parse('https://iservice.10010.com/e5/query.html#/login'),
+      Uri.parse('https://iservice.10010.com/e5/marketing.html'),
+    ]) {
+      expect(
+        isCarrierResponsePageCurrent(Carrier.unicom, unicom, bad),
+        isFalse,
+      );
+    }
+    final telecom = Uri.parse(carrierQueryUrl(Carrier.telecom));
+    expect(
+      isCarrierResponsePageCurrent(Carrier.telecom, telecom, telecom),
+      isTrue,
+    );
+    expect(
+      isCarrierResponsePageCurrent(
+        Carrier.telecom,
+        telecom,
+        telecom.replace(fragment: '/login'),
+      ),
+      isFalse,
+    );
+  });
+
+  test('Mobile login help states the official App does not sync Web login', () {
+    expect(mobileLoginHelpMessage, contains('中国移动官方 App'));
+    expect(mobileLoginHelpMessage, contains('不会自动同步'));
+    expect(mobileLoginHelpMessage, contains('暂不支持自动查询'));
+    expect(
+      mobileLoginHelpMessage,
+      contains('https://www.10086.cn/cmccclient/'),
+    );
+  });
 }

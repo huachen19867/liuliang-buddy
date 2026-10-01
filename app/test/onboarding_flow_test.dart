@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -125,6 +127,77 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(CarrierSelectionScreen), findsOneWidget);
     expect(find.byType(DashboardScreen), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets(
+    'orphaned loading record becomes a retryable failure on startup',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'carrier_selection': CarrierSelection.complete([
+          Carrier.unicom,
+        ]).toStorageString(),
+        'connected_unicom': true,
+        'snapshot_unicom':
+            '{"carrier":"unicom","status":"loading","buckets":[]}',
+      });
+      await tester.pumpWidget(const FlowBuddyApp());
+      await tester.pumpAndSettle();
+      final dashboard = tester.widget<DashboardScreen>(
+        find.byType(DashboardScreen),
+      );
+      expect(
+        dashboard.accountEntries!.single.snapshot!.status,
+        QueryStatus.error,
+      );
+      expect(
+        dashboard.accountEntries!.single.snapshot!.message,
+        contains('上次查询记录'),
+      );
+      await tester.pumpWidget(const SizedBox());
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
+
+  testWidgets('foreground resume keeps a newly saved background success', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'carrier_selection': CarrierSelection.complete([
+        Carrier.unicom,
+      ]).toStorageString(),
+      'connected_unicom': true,
+    });
+    await tester.pumpWidget(const FlowBuddyApp());
+    await tester.pumpAndSettle();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'snapshot_unicom',
+      jsonEncode(
+        CarrierSnapshot(
+          carrier: Carrier.unicom,
+          status: QueryStatus.success,
+          queriedAt: DateTime(2026, 10, 1),
+          buckets: const [
+            TrafficBucket(
+              name: '官网套餐余量',
+              kind: BucketKind.unknown,
+              remainingBytes: 1024 * 1024 * 1024,
+            ),
+          ],
+        ).toJson(),
+      ),
+    );
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    final dashboard = tester.widget<DashboardScreen>(
+      find.byType(DashboardScreen),
+    );
+    expect(
+      dashboard.accountEntries!.single.snapshot!.status,
+      QueryStatus.success,
+    );
     await tester.pumpWidget(const SizedBox());
     debugDefaultTargetPlatformOverride = null;
   });

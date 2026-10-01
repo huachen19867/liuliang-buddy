@@ -38,6 +38,10 @@ liuliang-buddy-debug.apk已更新为1.4.0+7，114,399,238字节（约109.1MiB）
 
 dashboard-two-mobile-unlimited-demo.png 来自实际 Flutter 首页组件的 390×1220 布局，导出为两倍分辨率 PNG。两张中国移动卡分别显示有限 5 GB 样本与官网明确标记“不限量”的样本，顶部有“界面演示 · 非真实流量”；这些数字与规则文字为测试样本，不能证明两个真实号码已登录或余额准确。生成测试见 `app/test/ui/dashboard_screen_test.dart`，隔离实现与待验证边界见 `docs/MULTI_ACCOUNT_REVIEW.md`。
 
-## 1.5.0 当前安装包
+## 1.5.0 历史安装包
 
 liuliang-buddy-debug.apk已更新为1.5.0+8，90,035,780字节（约85.9MiB），API24/36、ARM64、Android Debug签名v2通过，未启用DEMO。SHA-256：8657856bd3f79380568b6ee786ec03059c877e7225a63ba177a669f6e31a65fa。公开下载 https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.5.0 。95项Flutter、13项应用原生JUnit、analyze、Node及Chrome本地合成DOM8场景通过。最终构建日志为android-build.log，原生回归为native-tests.log；这些日志与APK按仓库规则不提交，APK由GitHub Release发布。详见docs/RELEASE_1.5.0.md，真实账号、S25 Ultra、Profile会话与后台长期运行尚待设备验证。
+
+## 1.6.0 当前安装包
+
+liuliang-buddy-debug.apk为1.6.0+9，115,893,050字节，API24/36，libflutter.so仅ARM64；插件自身还含其他ABI库，不代表应用能在其他架构运行。Android Debug证书沿用，v2验签通过，未启用DEMO。SHA-256：cffde603402c2ceb5877c9bc9ce49fec9d7de0e2236e57b594deee954d218ecd。104项Flutter、analyze、Node及Chrome本地合成DOM8场景通过，Android构建45秒成功；新版日志为android-build.log，旧native-tests.log仅代表1.5.0原生回归，不能算本轮新测试。公开发布说明见docs/RELEASE_1.6.0.md，真实联通登录与特殊移动卡仍待手机复测。

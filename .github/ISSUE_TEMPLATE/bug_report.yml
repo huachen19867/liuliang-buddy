@@ -9,7 +9,7 @@ body:
     id: app-version
     attributes:
       label: 应用版本
-      placeholder: "例如 1.5.0+8"
+      placeholder: "例如 1.6.0+9"
     validations:
       required: true
   - type: input
@@ -33,7 +33,7 @@ body:
     id: reproduce
     attributes:
       label: 操作、预期与实际现象
-      description: 桌面问题请注明是否弹出系统确认框；刷新问题请注明后台间隔及最后查询时间。
+      description: 桌面问题请注明是否弹出系统确认框；刷新问题请注明后台间隔、最后查询时间，以及应用内官网是否能看到余量。特殊卡请说明官网是否要求官方 App 人脸验证，不要上传人脸照片。
     validations:
       required: true
   - type: textarea

@@ -45,6 +45,7 @@ void main() {
     await tester.tap(find.text('添加桌面卡片'));
     await tester.pumpAndSettle();
     expect(find.textContaining('请长按 iPhone 主屏幕空白处'), findsOneWidget);
+    expect(await binding.takeScreenshot('ios-widget-guide'), isNotEmpty);
     await tester.tap(find.text('知道了'));
     await tester.pumpAndSettle();
 
@@ -53,5 +54,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('桌面卡片后台刷新'), findsNothing);
     expect(find.textContaining('iOS 暂无定时后台官网查询'), findsOneWidget);
+    expect(await binding.takeScreenshot('ios-settings'), isNotEmpty);
   });
 }

@@ -22,6 +22,7 @@ import 'services/background_refresh.dart';
 import 'services/background_refresh_runner.dart';
 import 'services/telecom_page_probe.dart';
 import 'services/response_policy.dart';
+import 'services/refresh_throttle.dart';
 import 'services/widget_bridge.dart';
 import 'services/ios_account_profiles.dart';
 import 'ui/dashboard_screen.dart';
@@ -72,7 +73,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   final Map<String, InAppWebViewController> _controllers = {};
   final Set<String> _connected = {};
   final Map<String, Timer> _timeouts = {};
-  final Map<String, DateTime> _lastRequests = {};
+  final RefreshThrottle _refreshThrottle = RefreshThrottle();
   final Map<String, bool> _warnedLow = {};
   final Set<String> _inFlight = {};
   final Set<String> _awaitingLoginReturn = {};
@@ -109,6 +110,15 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               carrier: account.carrier,
               status: QueryStatus.notConnected,
             ));
+
+  CarrierSnapshot _restoredSnapshot(
+    CarrierSnapshot snapshot, {
+    bool startup = false,
+  }) =>
+      snapshot.status == QueryStatus.loading ||
+          (startup && snapshot.status == QueryStatus.success)
+      ? snapshot.copyWith(status: QueryStatus.error, message: '上次查询记录，正在确认最新状态')
+      : snapshot;
 
   void _putSnapshot(CarrierAccount account, CarrierSnapshot snapshot) {
     if (snapshot.carrier != account.carrier) return;
@@ -225,7 +235,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   Future<void> _openFromWidget() async {
     if (!mounted || _clearing) return;
     setState(() => _visibleAccountId = null);
-    _lastRequests.clear();
+    _refreshThrottle.clear();
     _refreshAll();
   }
 
@@ -415,15 +425,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
             final snapshot = CarrierSnapshot.fromJson(
               jsonDecode(raw) as Map<String, dynamic>,
             );
-            _putSnapshot(
-              account,
-              snapshot.status == QueryStatus.success
-                  ? snapshot.copyWith(
-                      status: QueryStatus.error,
-                      message: '上次查询记录，正在确认最新状态',
-                    )
-                  : snapshot,
-            );
+            _putSnapshot(account, _restoredSnapshot(snapshot, startup: true));
           } catch (_) {
             /* Retain the explicit unconnected state. */
           }
@@ -492,12 +494,17 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       if (!mounted || _clearing) return;
       setState(() {
         for (final account in _visibleAccounts) {
+          if (_inFlight.contains(account.id)) continue;
           final raw = prefs.getString(account.snapshotKey);
           if (raw == null) continue;
           try {
             _putSnapshot(
               account,
-              CarrierSnapshot.fromJson(jsonDecode(raw) as Map<String, dynamic>),
+              _restoredSnapshot(
+                CarrierSnapshot.fromJson(
+                  jsonDecode(raw) as Map<String, dynamic>,
+                ),
+              ),
             );
           } catch (_) {
             // Keep the in-memory result if a background record is malformed.
@@ -620,11 +627,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       return;
     }
     if (_inFlight.contains(accountId)) return;
-    final last = _lastRequests[accountId];
-    if (last != null &&
-        DateTime.now().difference(last) < const Duration(seconds: 30)) {
-      return;
-    }
+    if (_refreshThrottle.blocks(accountId, DateTime.now())) return;
     final controller = _controllers[accountId];
     if (controller == null) return;
     final generation = _generation;
@@ -636,7 +639,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _inFlight.remove(accountId);
       return;
     }
-    _lastRequests[accountId] = DateTime.now();
+    _refreshThrottle.started(accountId, DateTime.now());
     setState(
       () => _putSnapshot(
         account,
@@ -648,11 +651,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     unawaited(_publishWidget());
     _timeouts[accountId]?.cancel();
     _timeouts[accountId] = Timer(const Duration(seconds: 35), () {
-      if (!_current(generation) ||
-          _snapshot(account).status != QueryStatus.loading) {
-        return;
-      }
-      _inFlight.remove(accountId);
+      if (!_current(generation) || !_inFlight.remove(accountId)) return;
       final failed = _snapshot(
         account,
       ).copyWith(status: QueryStatus.error, message: '未取得可识别的流量结果，请打开官方查询页确认');
@@ -676,6 +675,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     } catch (_) {
       _timeouts[accountId]?.cancel();
       _inFlight.remove(accountId);
+      _refreshThrottle.loginOrLoadFailed(accountId);
       if (_current(generation)) {
         setState(
           () => _putSnapshot(
@@ -718,7 +718,12 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       if (!_current(generation) ||
           !_selection.allows(carrier) ||
           currentUrl == null ||
-          Uri.tryParse(currentUrl.toString()) != page) {
+          page == null ||
+          !isCarrierResponsePageCurrent(
+            carrier,
+            page,
+            Uri.tryParse(currentUrl.toString()) ?? Uri(),
+          )) {
         return;
       }
     } on Exception {
@@ -905,12 +910,23 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      child: Text(
-                        _webMessage ?? '在官网完成验证后点击「查询流量」。关闭此页可回到首页。',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF736F69),
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _webMessage ?? '在官网完成验证后点击「查询流量」。关闭此页可回到首页。',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF736F69),
+                            ),
+                          ),
+                          if (carrier == Carrier.mobile)
+                            TextButton(
+                              onPressed: () =>
+                                  _showInfo('移动网页登录帮助', mobileLoginHelpMessage),
+                              child: const Text('登录遇到问题？'),
+                            ),
+                        ],
                       ),
                     ),
                   ],
@@ -1038,6 +1054,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   if (uri != null && isCarrierLoginPage(uri)) {
                     _timeouts[accountId]?.cancel();
                     _inFlight.remove(accountId);
+                    _refreshThrottle.loginOrLoadFailed(accountId);
                     _awaitingLoginReturn.add(accountId);
                     setState(
                       () => _putSnapshot(
@@ -1070,6 +1087,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                     if (!_current(generation)) return;
                     _timeouts[accountId]?.cancel();
                     _inFlight.remove(accountId);
+                    _refreshThrottle.loginOrLoadFailed(accountId);
                     setState(
                       () => _putSnapshot(
                         account,
@@ -1097,6 +1115,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   }
                   _timeouts[accountId]?.cancel();
                   _inFlight.remove(accountId);
+                  _refreshThrottle.loginOrLoadFailed(accountId);
                   setState(() {
                     _webMessage = '官方页面暂时无法打开，请检查网络后重试';
                     _putSnapshot(
@@ -1191,7 +1210,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       }
       _controllers.clear();
       _visibleAccountId = null;
-      _lastRequests.clear();
+      _refreshThrottle.clear();
       _inFlight.clear();
       _awaitingLoginReturn.clear();
       _warnedLow.clear();
@@ -1301,7 +1320,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _visibleAccountId = null;
       _inFlight.clear();
       _awaitingLoginReturn.clear();
-      _lastRequests.clear();
+      _refreshThrottle.clear();
     });
     for (final timer in _timeouts.values) {
       timer.cancel();
@@ -1669,7 +1688,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _clearing = false;
       _connected.clear();
       _controllers.clear();
-      _lastRequests.clear();
+      _refreshThrottle.clear();
       _warnedLow.clear();
       _broadnetSessions.clear();
       _visibleAccountId = null;

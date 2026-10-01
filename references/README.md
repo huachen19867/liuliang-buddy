@@ -22,6 +22,12 @@ ios-platform-review 保存 2026-10-01 的 Flutter 官方 iOS 开发环境源文�
 
 2026-10-01 的 iOS 实施新增 `ios-home-widget/` 精选参考，来自 [ABausG/home_widget](https://github.com/ABausG/home_widget)，固定 commit `a3e6b641e365c0a5d25f206d543ef9b88bdb8617`。下载包内 BSD-3-Clause LICENSE、WidgetKit 示例、App Group entitlements、Xcode target 配置和原生桥接源码，来源及 blob SHA 保存到目录内 index.json。仅复用 App Group + WidgetKit 的平台方案，未引入该插件或其后台执行代码；现有 payload 直接由本项目桥接展示。官方 Flutter 3.44.8 iOS 模板通过本地 Flutter SDK 生成到 `.tools/ios-scaffold/`，只复制 iOS 子树到应用，保留现有安卓业务。
 
+`ios-platform-review/wkwebsitedatastore-identifier.json` 为 Apple 官方文档 [WKWebsiteDataStore.init(forIdentifier:)](https://developer.apple.com/documentation/webkit/wkwebsitedatastore/init(foridentifier:))的 JSON 原文，确认 iOS/iPadOS 17.0 起可用、UUID 对应持久化 Profile。新建 iOS 工程最低 17.0 的依据记录在 IOS_SESSIONS.md，不用无持久性的临时仓库冒充跨启动独立登录。
+
+`ios-webkit-linker/` 保存 [WebKit 官方问题 293831](https://bugs.webkit.org/show_bug.cgi?id=293831#c2)和插件上游回帖，确认 iOS 18.4/18.5 模拟器的 Swift WebKit overlay 打包问题。云端脚本仅在实际 Cryptex 库存在时采用官方模拟器环境修复，不改产品强链接或最低版本。
+
+`mobile-face-login/` 保存中国移动公开官网的下载链接、官方 App 入口页面和请求来源索引。复用 ChinaMobileMonitor 参考核对网页登录边界，未输入号码或取得人脸授权协议；结论见 `docs/MOBILE_FACE_LOGIN_RESEARCH.md`。
+
 广电失败复核记录位于 broadnet-public/failure-review/，使用新的公开官网加载与本地合成响应核对两套 jQuery 实例、原探针漏数及修复后桥接。可复用的验证脚本收录于 scripts/test-broadnet-browser.cjs；证据范围和复用方法见 docs/PROTOCOL_RESEARCH.md，不含真实账号或凭证。
 
 新增联通/电信精选参考：`ChinaUnicomMonitor/` 来源 https://github.com/dengfhqqq/ChinaUnicomMonitor （未发现LICENSE）；`FlowLite/` 来源 https://github.com/nongchengqi/FlowLite （未发现LICENSE）；`ChinaTelecomMonitor/` 来源 https://github.com/Cp0204/ChinaTelecomMonitor （AGPL-3.0，附LICENSE）。仅协议研究，不复制到应用，这些项目依赖APP认证，不能作为网页登录已接通的依据。

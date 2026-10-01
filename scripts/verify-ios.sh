@@ -115,7 +115,9 @@ except subprocess.TimeoutExpired:
     print('ERROR: Flutter simulator smoke exceeded 300 seconds.', flush=True)
     sys.exit(124)
 PY
-[[ -s build/ios-smoke/ios-selection.png && -s build/ios-smoke/ios-dashboard.png ]]
+for screenshot in ios-selection ios-dashboard ios-widget-guide ios-settings; do
+  [[ -s "build/ios-smoke/$screenshot.png" ]]
+done
 if [[ "$startup_status" != 0 ]]; then
   echo 'Flutter-driven smoke completed, but standalone cold launch failed; see ios-diagnostics.'
   exit "$startup_status"

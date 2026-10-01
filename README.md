@@ -2,11 +2,11 @@
 
 一个可自行选择运营商的流量查询测试应用。首次选择移动、联通、电信、广电，至少一家；同一家有两个号码时可连续点两下加入第二张卡，各自在官网登录。每家最多两个、同时最多展示四个账号；第二账号需要系统 WebView 支持独立 Profile，不支持时明确阻止添加。设置可改选运营商或收起第二张卡，保留历史本地记录。联通读取官网套餐余量，电信按官网已用/总量显示值估算并标「约」，均不混入已确认通用额度或提醒。首页采用奶油背景、圆润卡片与水滴插画，展示每个账号的余量、时间、状态和明细；官网明确标记不限量时结束加载并显示不限量，不生成零或无限 GB。
 
-当前源码版本 1.6.0+9：[GitHub 仓库](https://github.com/huachen19867/liuliang-buddy)。已发布的安卓安装包为 [1.5.0 测试版](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.5.0)，本轮新增 iOS 17 及以上的 Runner、持久化双账号会话和 WidgetKit 工程，尚无签名的 iPhone 安装包。
+当前版本 1.6.0+9：[GitHub 仓库](https://github.com/huachen19867/liuliang-buddy)、[安卓测试包与版本说明](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.6.0)。修复联通登录返回被刷新限制挡住和历史加载状态持续转圈，移动连接页补充官方 App 人脸验证的帮助。本轮新增 iOS 17 及以上的 Runner、持久化双账号会话和 WidgetKit 工程，尚无签名的 iPhone 安装包。
 
 没有 Mac 也可通过 [GitHub Actions](https://github.com/huachen19867/liuliang-buddy/actions/workflows/ios.yml)执行 macOS 编译、模拟器启动与截图。操作和签名说明见 [iOS 构建说明](docs/IOS_BUILD.md)，实现边界见 [会话隔离](docs/IOS_SESSIONS.md)与 [iOS 小组件](docs/IOS_WIDGET.md)。模拟器应用不适用于 iPhone；iOS 初版前台查询，组件展示最近结果，点击打开应用更新，设置不提供安卓后台周期选项。
 
-安装包路径为 artifacts/liuliang-buddy-debug.apk，适用 Android 7.0 及以上 ARM64 手机。构建、测试、签名和哈希结果见 [1.5.0 版本说明](docs/RELEASE_1.5.0.md)。尚无连接真机，官网余额、双账号 Profile 会话、S25 Ultra / One UI 添加弹窗及长期后台调度仍待设备验证，完整边界见 [后台刷新说明](docs/WIDGET_BACKGROUND_REFRESH.md)。
+安装包路径为 artifacts/liuliang-buddy-debug.apk，适用 Android 7.0 及以上 ARM64 手机。构建、测试、签名和哈希结果见 [1.6.0 版本说明](docs/RELEASE_1.6.0.md)。尚无连接真机，官网余额、双账号 Profile 会话、S25 Ultra / One UI 添加弹窗及长期后台调度仍待设备验证，完整边界见 [后台刷新说明](docs/WIDGET_BACKGROUND_REFRESH.md)。
 
 联通依据公开官网 E5 查询页自然发出的 userinfoE5query 响应，套餐余量单位 MB；不限量已用字段不当成剩余。电信当前天翼账号首页返回加密账务结果，应用读取首页已渲染的指定账务明细（含隐藏的官网明细弹窗），不复制其加解密代码、不自动点击或发送登录请求。每项按已用/总量的 MB/GB 显示值换算后估算差值；缺项、无单位、超额或无限哨兵不算合计。它有官网显示值舍入误差，共享/重叠额度以套餐规则为准。
 
@@ -30,6 +30,9 @@
 | app/ios/ | iOS 17 Runner、UIScene、App Group 权限与 WidgetKit 扩展 |
 | app/ios/Shared/TrafficSnapshot.swift | 主应用和 WidgetKit 共用的白名单展示快照 |
 | docs/IOS_BUILD.md | 没有 Mac 时的云端验证、模拟器产物与真机签名说明 |
+| docs/RELEASE_1.6.0.md | iOS 源码预览的实现与交付范围 |
+| app/integration_test/ios_smoke_test.dart | 真实 iOS 模拟器的首次选择、首页与平台指引验收 |
+| app/test_driver/ios_smoke_driver.dart | 导出模拟器页面截图的测试驱动 |
 | docs/IOS_SESSIONS.md | iOS 持久化双账号、前台查询与清理保护 |
 | docs/IOS_WIDGET.md | 小/中/大号组件、通知与手动添加的范围 |
 | docs/IOS_FOUNDATION_PROGRESS.md | Xcode 工程接线与本地静态检查 |
@@ -47,6 +50,7 @@
 | app/lib/services/page_probe.dart | 限定接口的响应观察、移动解码与广电会话脚本 |
 | app/lib/services/response_policy.dart | 广电明文成功结果回退与迟到原始响应门禁 |
 | app/lib/services/carrier_web.dart | 四家登录/查询入口与响应页面门禁 |
+| app/lib/services/refresh_throttle.dart | 按账号限制重复刷新，登录返回和加载失败可立即重试 |
 | app/lib/services/telecom_page_probe.dart | 当前电信官网已渲染套餐明细读取，不采集登录数据 |
 | app/lib/services/widget_bridge.dart | 桌面展示数据与原生通信 |
 | app/lib/ui/widget_preview_card.dart | 添加桌面卡片入口与样式示意 |
@@ -71,6 +75,8 @@
 | docs/MULTI_ACCOUNT_REVIEW.md | 独立 WebView Profile、两张同运营商卡与前台查询门禁 |
 | docs/WIDGET_COMPATIBILITY_REVIEW.md | 系统添加回执、无弹窗手动入口、尺寸与多账号桌面 |
 | docs/USER_FEEDBACK.md | 用户反馈、S25 Ultra 验证条件和 iOS 支持范围 |
+| docs/UNICOM_REFRESH_PROGRESS.md | 联通登录返回、旧查询状态与响应页面门禁修复 |
+| docs/MOBILE_FACE_LOGIN_RESEARCH.md | 移动特殊卡人脸登录的官方入口与支持边界 |
 | .github/ISSUE_TEMPLATE/bug_report.yml | 设备、WebView、运营商与复现信息反馈模板 |
 | docs/RELEASE_1.1.0.md | 版本说明、验证与安装包哈希 |
 | docs/RELEASE_1.1.1.md | 广电查询修复、验证与安装包哈希 |

@@ -29,3 +29,11 @@
 1.6.0 源码新增 iOS 17 Runner、原生通知、持久化 WKWebView 双账号隔离和 WidgetKit 小/中/大号桌面组件。老板没有 Mac，改用公开仓库 GitHub macOS runner 编译、模拟器启动与截图，详细入口见 [IOS_BUILD.md](IOS_BUILD.md)。当前仍没有可安装的签名 iPhone 版本，也未测试真实运营商账号。组件 timeline 只更新最近快照的展示，不查询运营商，iOS 设置不提供安卓后台周期选项。真实 iPhone 分发需要开发者团队签名、App Group provisioning 与设备验证，未交付 TestFlight 或 App Store 版本。
 
 官方环境参考：[Flutter iOS setup](https://docs.flutter.dev/platform-integration/ios/setup)、[WidgetKit keeping a widget up to date](https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date)。精选官方资料保存在 `references/ios-platform-review/`，来源和下载状态记录在其 `index.json`。
+
+## 联通登录后一直转圈
+
+新增截图反馈明确来自联通，但未提供应用版本或官网余量画面。排查发现登录返回被上一轮刷新节流拦截、旧 loading 快照恢复后没有计时器，以及官网合法页面地址变化导致响应拒收的路径；修复与回归证据见 [联通刷新记录](UNICOM_REFRESH_PROGRESS.md)。查询失败应结束加载并说明原因，保留旧余量及原查询时间；这不等于已验证反馈者的实际套餐或官网响应。
+
+## 移动特殊卡需要官方 App 人脸验证
+
+截图中的“哑巴卡”尚不能确定正式卡型或登录规则。移动连接页增加帮助说明和核实过的[中国移动官方 App 入口](https://www.10086.cn/cmccclient/)。需要人脸验证时由用户在官方 App 完成，返回后仍需在本应用官网会话中独立验证；官方 App 的登录不会自动同步。如果该号码只允许官方 App 查询，当前方式暂不支持自动查询。官方资料与限制见 [移动人脸登录研究](MOBILE_FACE_LOGIN_RESEARCH.md)，未验证真实号码。
