@@ -240,3 +240,5 @@ Release切换AOT、R8、资源裁剪、ARM64 ABI，拒绝无发布签名的Relea
 
 最终产品文案移除Release关于弹窗“测试版”标题，开发构建仍明确开发版；pubspec描述同步。完整Flutter130项再次通过、analyze无问题，按串行SDK规则正常flutter build apk --release重建24.5秒成功。最终交付主包18,350,307字节/SHA-256 b8943da4629e17a03c5f74b9e69d9822335c8dea6c9ab99d442d51151f7ee88c，过渡包18,376,558字节/5b9785c4edecfbcb14754e21adbb711650637764ce4b386da71edc0cab205c14；上一段8eae/8d4a仅属未发布中间包。证书、v2、非debuggable、API24/36、code11/1.8.0、仅ARM64及315项应用内容相同再次核对。README更新正式分发与签名迁移，未宣称真实账号或系统面板验收通过。
 发布前说明核对：研究中原推荐的磁贴切换通知方案更新为最终前台查询动作，系统设置入口描述与实际引导一致。本次1.8.0聚焦安卓正式分发，不把1.7.0 iOS截图/归档标成新版；最终源码iOS run36838979981尚在云端构建，未记为通过。
+
+公开1.8.0正式发布完成：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.8.0 ，draft=false/prerelease=false，仓库private=false。标签API核对为1d316503b53f367a44f203bcc99d78f304ad2431，app/、scripts/、workflow与已验收构建源码ecb89035a17e941b76b3724862b19df396852ad5逐树相同。三项资产均uploaded：正式APK18,350,307字节/b8943da4，旧证书Release过渡APK18,376,558字节/5b9785c4，设置DEMO截图78,972字节/8477d70f；GitHub digest逐项与本机一致。只推public，私钥及DPAPI凭证ignored。此次正式分发标记不等同实体手机及各省真实账号已验证，iOS最新云端流程仍独立进行。本回执另作main文档提交，不修改已公开标签或APK。
