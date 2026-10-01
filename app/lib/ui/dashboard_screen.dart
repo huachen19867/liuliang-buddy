@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
+import '../data/carrier_accounts.dart';
 import '../data/traffic_summary.dart';
 import 'widget_preview_card.dart';
 
@@ -15,6 +16,10 @@ class DashboardScreen extends StatelessWidget {
     required this.onSettings,
     required this.onAbout,
     this.selectedCarriers,
+    this.accountEntries,
+    this.cleanupPending = false,
+    this.onConnectAccount,
+    this.onRefreshAccount,
     this.onManageCarriers,
     this.onAddWidget,
     this.widgetSupported = true,
@@ -29,6 +34,10 @@ class DashboardScreen extends StatelessWidget {
   final VoidCallback onSettings;
   final VoidCallback onAbout;
   final Set<Carrier>? selectedCarriers;
+  final List<DashboardAccountEntry>? accountEntries;
+  final bool cleanupPending;
+  final ValueChanged<String>? onConnectAccount;
+  final ValueChanged<String>? onRefreshAccount;
   final VoidCallback? onManageCarriers;
   final VoidCallback? onAddWidget;
   final bool widgetSupported;
@@ -52,14 +61,29 @@ class DashboardScreen extends StatelessWidget {
     final carriers = Carrier.values
         .where(chosen.contains)
         .toList(growable: false);
-    final entries = [
-      for (final carrier in carriers)
-        _DashboardCarrier(
-          carrier: carrier,
-          snapshot: _snapshotFor(carrier),
-          accent: _carrierPalette[carrier.index % _carrierPalette.length],
-        ),
-    ];
+    final entries = accountEntries == null
+        ? [
+            for (final carrier in carriers)
+              _DashboardCarrier(
+                accountId: carrier.name,
+                carrier: carrier,
+                slotLabel: _carrierCardLabel(carrier),
+                snapshot: _snapshotFor(carrier),
+                accent: _carrierPalette[carrier.index % _carrierPalette.length],
+              ),
+          ]
+        : [
+            for (final entry in accountEntries!)
+              _DashboardCarrier(
+                accountId: entry.account.id,
+                carrier: entry.account.carrier,
+                slotLabel: entry.account.label,
+                snapshot: entry.snapshot,
+                accent:
+                    _carrierPalette[entry.account.carrier.index %
+                        _carrierPalette.length],
+              ),
+          ];
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -74,6 +98,23 @@ class DashboardScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildHeader(context, carriers),
+                  if (cleanupPending) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(13),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEBDD),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Text(
+                        '本地登录资料还没清理完。请到提醒设置重试清除，完成前已暂停所有号码查询。',
+                        style: TextStyle(
+                          color: Color(0xFF765B50),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
                   if (demo) ...[
                     const SizedBox(height: 15),
                     const _DemoNotice(),
@@ -88,11 +129,15 @@ class DashboardScreen extends StatelessWidget {
                     SizedBox(height: index == 0 ? 18 : 13),
                     _CarrierCard(
                       carrier: entries[index].carrier,
-                      slotLabel: _carrierCardLabel(entries[index].carrier),
+                      slotLabel: entries[index].slotLabel,
                       snapshot: entries[index].snapshot,
                       accent: entries[index].accent,
-                      onConnect: () => onConnect(entries[index].carrier),
-                      onRefresh: () => onRefresh(entries[index].carrier),
+                      onConnect: () => onConnectAccount == null
+                          ? onConnect(entries[index].carrier)
+                          : onConnectAccount!(entries[index].accountId),
+                      onRefresh: () => onRefreshAccount == null
+                          ? onRefresh(entries[index].carrier)
+                          : onRefreshAccount!(entries[index].accountId),
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -127,7 +172,10 @@ class DashboardScreen extends StatelessWidget {
                   WidgetPreviewCard(
                     widgetSupported: widgetSupported,
                     onAddWidget: onAddWidget,
-                    selectedCarriers: carriers,
+                    selectedCarriers: entries.map((e) => e.carrier).toList(),
+                    selectedAccountLabels: accountEntries
+                        ?.map((e) => e.account.label)
+                        .toList(),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -215,14 +263,25 @@ class DashboardScreen extends StatelessWidget {
 
 class _DashboardCarrier {
   const _DashboardCarrier({
+    required this.accountId,
     required this.carrier,
+    required this.slotLabel,
     required this.snapshot,
     required this.accent,
   });
 
+  final String accountId;
   final Carrier carrier;
+  final String slotLabel;
   final CarrierSnapshot? snapshot;
   final Color accent;
+}
+
+class DashboardAccountEntry {
+  const DashboardAccountEntry(this.account, this.snapshot);
+
+  final CarrierAccount account;
+  final CarrierSnapshot? snapshot;
 }
 
 String _carrierCardLabel(Carrier carrier) {
@@ -314,10 +373,17 @@ class _SummaryCard extends StatelessWidget {
         ? singleSummary!.remainingBytes
         : 0;
     final showAmount = hasGeneralTotal || hasSingleBalance;
+    final hasUnlimited = entries.any(
+      (entry) =>
+          entry.snapshot?.status == QueryStatus.success &&
+          entry.snapshot?.hasUnlimitedAllowance == true,
+    );
     final headline = hasGeneralTotal
         ? '通用流量总览'
         : hasSingleBalance
         ? singleSummary!.label
+        : hasUnlimited
+        ? '含不限量套餐'
         : entries.isEmpty
         ? '尚未选择运营商'
         : entries.length == 1
@@ -329,6 +395,8 @@ class _SummaryCard extends StatelessWidget {
               : '所选运营商的通用流量剩余合计'
         : hasSingleBalance
         ? singleSummary!.detailNotice ?? '已查询套餐余额'
+        : hasUnlimited
+        ? '官网标注不限量，达量后的使用规则请查看下方套餐说明。'
         : singleStatusMessage ??
               (entries.isEmpty
                   ? '选择至少一家运营商后，这里会显示对应流量。'
@@ -457,7 +525,7 @@ class _SummaryCard extends StatelessWidget {
                             _MiniCarrierDot(color: entry.accent),
                             const SizedBox(width: 6),
                             Text(
-                              entry.carrier.label,
+                              entry.slotLabel,
                               style: const TextStyle(fontSize: 12),
                             ),
                           ],
@@ -568,6 +636,9 @@ class _CarrierCard extends StatelessWidget {
         trafficSummary?.label ??
         (canShowUnknownBucket
             ? '套餐余量'
+            : status == QueryStatus.success &&
+                  snapshot?.hasUnlimitedAllowance == true
+            ? '套餐标注'
             : status == QueryStatus.success
             ? '余额待确认'
             : '流量余量');
@@ -579,6 +650,10 @@ class _CarrierCard extends StatelessWidget {
         : null;
     final detailNotice =
         trafficSummary?.detailNotice ??
+        (status == QueryStatus.success &&
+                snapshot?.hasUnlimitedAllowance == true
+            ? snapshot?.message?.trim()
+            : null) ??
         ((partialEstimateNotice?.isNotEmpty ?? false)
             ? partialEstimateNotice
             : null);
@@ -683,6 +758,15 @@ class _CarrierCard extends StatelessWidget {
                             _BigUsageValue(
                               bytes: remainingBytes,
                               isEstimate: trafficSummary?.isEstimate ?? false,
+                            )
+                          else if (snapshot?.status == QueryStatus.success &&
+                              snapshot?.hasUnlimitedAllowance == true)
+                            Text(
+                              '不限量',
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                color: const Color(0xFF424B5A),
+                                fontWeight: FontWeight.w800,
+                              ),
                             )
                           else
                             Text(
@@ -1095,6 +1179,7 @@ String _bucketName(TrafficBucket bucket) {
 
 String _bucketRemainingText(TrafficBucket bucket, {bool estimated = false}) {
   final remaining = bucket.remainingBytes;
+  if (bucket.isUnlimited) return '不限量';
   if (remaining != null) {
     return '${estimated ? '约 ' : ''}${_formatGb(remaining)} GB';
   }
@@ -1108,6 +1193,7 @@ String _bucketRemainingText(TrafficBucket bucket, {bool estimated = false}) {
 }
 
 String _bucketTotalText(TrafficBucket bucket) {
+  if (bucket.isUnlimited) return '不限量套餐（以官网规则为准）';
   final total = bucket.totalBytes;
   if (total == null) return '未提供可确认的套餐总量';
   return '${_formatGb(total)} GB';
@@ -1141,7 +1227,13 @@ void _showBucketDetails(
                 style: TextStyle(color: Color(0xFF777D87), fontSize: 12),
               ),
             ],
-            if (bucket.remainingBytes == null && estimated) ...[
+            if (bucket.isUnlimited) ...[
+              const SizedBox(height: 12),
+              const Text(
+                '官网标注不限量；达量后可能限速，具体规则以官网为准。',
+                style: TextStyle(color: Color(0xFF777D87), fontSize: 12),
+              ),
+            ] else if (bucket.remainingBytes == null && estimated) ...[
               const SizedBox(height: 8),
               const Text(
                 '此项已用量或总量无法确认，因此不展示估算余额。',

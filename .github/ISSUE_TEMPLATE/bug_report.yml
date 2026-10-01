@@ -1,0 +1,43 @@
+name: 安卓问题反馈
+description: 报告查询、自动刷新、重复运营商账号或桌面组件问题
+title: "[反馈] "
+body:
+  - type: markdown
+    attributes:
+      value: "欢迎反馈。请将手机号打码，不要粘贴 Cookie、服务密码、验证码或官网账号原始响应。"
+  - type: input
+    id: app-version
+    attributes:
+      label: 应用版本
+      placeholder: "例如 1.5.0+8"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: 手机、Android 与默认桌面版本
+      placeholder: "例如 S25 Ultra / Android 16 / One UI"
+    validations:
+      required: true
+  - type: input
+    id: webview
+    attributes:
+      label: Android System WebView 版本
+      description: 不清楚可填写未知；重复运营商账号是否可用与此有关。
+  - type: input
+    id: carriers
+    attributes:
+      label: 运营商和套餐类型
+      placeholder: "例如两个移动账号，其中一张为不限量套餐；无需提供手机号"
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 操作、预期与实际现象
+      description: 桌面问题请注明是否弹出系统确认框；刷新问题请注明后台间隔及最后查询时间。
+    validations:
+      required: true
+  - type: textarea
+    id: schedule
+    attributes:
+      label: 后台最近尝试状态或补充说明
+      description: 可提供设置中的状态文字，说明是否开启省电、限制后台或曾强行停止应用。

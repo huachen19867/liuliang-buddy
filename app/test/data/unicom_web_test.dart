@@ -45,18 +45,24 @@ void main() {
     },
   );
   test(
-    'failed flow, absent flow and unlimited usage are never shown as remaining',
+    'failed or absent flow is rejected while official unlimited flags finish successfully',
     () {
       for (final extra in [
         {'successFlow': false},
         {'flowFlag': false},
-        {'hasNolimitedFlow': true, 'usedFlow': 300},
-        {'hasNolimitedFlow': 1, 'usedFlow': 300},
-        {'hasNolimitedFlow': 'false', 'usedFlow': 300},
       ]) {
         final snapshot = parseUnicomWeb(response(500, extra: extra));
         expect(snapshot.status, QueryStatus.error);
         expect(snapshot.buckets, isEmpty);
+        expect(summarizeTraffic(snapshot), isNull);
+      }
+      for (final flag in [true, 1, 'false']) {
+        final snapshot = parseUnicomWeb(
+          response(500, extra: {'hasNolimitedFlow': flag, 'usedFlow': 300}),
+        );
+        expect(snapshot.status, QueryStatus.success);
+        expect(snapshot.hasUnlimitedAllowance, isTrue);
+        expect(snapshot.generalRemainingBytes, isNull);
         expect(summarizeTraffic(snapshot), isNull);
       }
     },

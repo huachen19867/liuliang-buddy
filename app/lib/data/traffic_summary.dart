@@ -89,6 +89,7 @@ int? _completeSum(
 ) {
   var sum = 0;
   for (final bucket in buckets) {
+    if (bucket.isUnlimited) return null;
     final value = select(bucket);
     if (value == null || value < 0) return null;
     sum += value;

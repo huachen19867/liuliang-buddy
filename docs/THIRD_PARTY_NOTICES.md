@@ -6,6 +6,8 @@
 
 后台周期调度依赖 AndroidX WorkManager（Apache-2.0）。调度结构参考 Google android/architecture-components-samples/WorkManagerSample（Apache-2.0）；精选参考项目与许可证保存在本地 references/android-workmanager-sample/，未复制其业务 Worker 到应用。
 
+Android 多账户会话隔离使用 AndroidX WebKit 1.12.0 的 ProfileStore 与 WebViewCompat 多 Profile API（Apache-2.0）。项目 vendored 的 flutter_inappwebview_android 1.1.3 仍保留其原 LICENSE；除 AGP 规则修补外，本地增加了首次导航前设置独立 Profile、功能检测和清理入口，具体见 app/vendor/README.md。未复用第三方账户、Cookie 或绕过登录的实现。
+
 ## ChinaMobileMonitor
 
 MIT License

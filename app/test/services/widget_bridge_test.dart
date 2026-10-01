@@ -1,10 +1,55 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liuliang_app/data/carrier_accounts.dart';
 import 'package:liuliang_app/data/carrier_selection.dart';
 import 'package:liuliang_app/data/models.dart';
 import 'package:liuliang_app/services/widget_bridge.dart';
 
 void main() {
   final time = DateTime.utc(2026, 9, 30, 6, 30);
+  test('secondary-only background result cannot fill the primary account', () {
+    final selection = CarrierSelection.complete([Carrier.mobile]);
+    final accounts = CarrierAccounts.fromSelection(
+      selection,
+    ).addSecond(Carrier.mobile);
+    final secondary = CarrierSnapshot(
+      carrier: Carrier.mobile,
+      status: QueryStatus.success,
+      queriedAt: time,
+      buckets: const [
+        TrafficBucket(
+          name: '通用流量',
+          kind: BucketKind.general,
+          remainingBytes: 200,
+        ),
+      ],
+    );
+    final payload = buildWidgetPayload(
+      [secondary],
+      thresholdGb: 5,
+      selection: selection,
+      accounts: accounts,
+      accountSnapshots: {'mobile_2': secondary},
+    );
+    final instances = payload['instances'] as List;
+    expect((instances[0] as Map)['status'], 'notConnected');
+    expect((instances[0] as Map)['primaryValue'], isNull);
+    expect((instances[1] as Map)['primaryValue'], 200);
+    expect((payload['mobile'] as Map)['remainingBytes'], isNull);
+
+    final mismatched = CarrierSnapshot(
+      carrier: Carrier.unicom,
+      status: QueryStatus.success,
+      queriedAt: time,
+    );
+    final bad = buildWidgetPayload(
+      [secondary],
+      thresholdGb: 5,
+      selection: selection,
+      accounts: accounts,
+      accountSnapshots: {'mobile': mismatched, 'mobile_2': secondary},
+    );
+    expect(((bad['instances'] as List)[0] as Map)['status'], 'notConnected');
+  });
   test(
     'expired widget cache retains the original query time and explicit status',
     () {
@@ -213,4 +258,154 @@ void main() {
       expect(card['queriedAt'], isNull);
     }
   });
+
+  test('schema 2 gives each selected account its own widget slot', () {
+    final selection = CarrierSelection.complete([
+      Carrier.mobile,
+      Carrier.broadnet,
+    ]);
+    final accounts = CarrierAccounts.fromSelection(
+      selection,
+    ).addSecond(Carrier.mobile);
+    final snapshots = {
+      'mobile': CarrierSnapshot(
+        carrier: Carrier.mobile,
+        status: QueryStatus.success,
+        queriedAt: time,
+        phoneMasked: '138****0001',
+        buckets: const [
+          TrafficBucket(
+            name: '通用流量',
+            kind: BucketKind.general,
+            remainingBytes: 100,
+          ),
+        ],
+      ),
+      'mobile_2': CarrierSnapshot(
+        carrier: Carrier.mobile,
+        status: QueryStatus.authExpired,
+        queriedAt: time,
+        phoneMasked: '138****0002',
+        buckets: const [
+          TrafficBucket(
+            name: '通用流量',
+            kind: BucketKind.general,
+            remainingBytes: 200,
+          ),
+        ],
+      ),
+    };
+    final payload = buildWidgetPayload(
+      snapshots.values,
+      thresholdGb: 5,
+      selection: selection,
+      accounts: accounts,
+      accountSnapshots: snapshots,
+    );
+    final instances = payload['instances'] as List<Map<String, Object?>>;
+    expect(payload['schema'], 2);
+    expect(payload['selectedCarriers'], ['mobile', 'broadnet']);
+    expect(instances.map((item) => item['accountId']), [
+      'mobile',
+      'mobile_2',
+      'broadnet',
+    ]);
+    expect(instances.map((item) => item['accountLabel']), [
+      '中国移动 1',
+      '中国移动 2',
+      '中国广电 1',
+    ]);
+    expect(instances[0]['primaryValue'], 100);
+    expect(instances[1]['primaryValue'], 200);
+    expect(instances[1]['status'], 'authExpired');
+    expect(instances.every((item) => !item.containsKey('phoneMasked')), isTrue);
+    expect(payload['mobile'], containsPair('remainingBytes', 100));
+  });
+
+  test(
+    'unlimited headline requires successful timed query and yields no amount',
+    () {
+      final selection = CarrierSelection.complete([Carrier.mobile]);
+      final accounts = CarrierAccounts.fromSelection(selection);
+      final snapshot = CarrierSnapshot(
+        carrier: Carrier.mobile,
+        status: QueryStatus.success,
+        queriedAt: time,
+        buckets: const [
+          TrafficBucket(
+            name: '不限量套餐',
+            kind: BucketKind.general,
+            isUnlimited: true,
+          ),
+        ],
+      );
+      final payload = buildWidgetPayload(
+        [snapshot],
+        thresholdGb: 5,
+        selection: selection,
+        accounts: accounts,
+        accountSnapshots: {'mobile': snapshot},
+      );
+      final instance = (payload['instances'] as List).single as Map;
+      expect(instance['primaryValue'], isNull);
+      expect(instance['primaryLabel'], '含不限量套餐');
+      expect(instance['isUnlimited'], isTrue);
+
+      final failedRefresh = CarrierSnapshot(
+        carrier: Carrier.mobile,
+        status: QueryStatus.error,
+        queriedAt: time,
+        message: 'network error',
+        buckets: const [
+          TrafficBucket(
+            name: '不限量套餐',
+            kind: BucketKind.general,
+            isUnlimited: true,
+          ),
+        ],
+      );
+      final failedPayload = buildWidgetPayload(
+        [failedRefresh],
+        thresholdGb: 5,
+        selection: selection,
+        accounts: accounts,
+        accountSnapshots: {'mobile': failedRefresh},
+      );
+      final failedInstance = (failedPayload['instances'] as List).single as Map;
+      expect(failedInstance['status'], 'error');
+      expect(failedInstance['queriedAt'], time.millisecondsSinceEpoch);
+      expect(failedInstance['isUnlimited'], isTrue);
+    },
+  );
+
+  test(
+    'pin status bridge distinguishes actual installation from pending request',
+    () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(WidgetBridge.channel, (call) async {
+        if (call.method == 'requestPin') {
+          return {'status': 'request_pending_confirmation'};
+        }
+        if (call.method == 'installationStatus') {
+          return {'status': 'already_added'};
+        }
+        return null;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(WidgetBridge.channel, null),
+      );
+
+      const bridge = WidgetBridge();
+      final request = await bridge.requestPinDetailed();
+      expect(request.status, WidgetPinStatus.requestPendingConfirmation);
+      expect(request.isAlreadyAdded, isFalse);
+      expect(await bridge.requestPin(), isTrue);
+      expect(
+        (await bridge.installationStatus()).status,
+        WidgetPinStatus.alreadyAdded,
+      );
+    },
+  );
 }

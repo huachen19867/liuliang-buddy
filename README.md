@@ -1,16 +1,18 @@
 # 流量小伙伴
 
-一个可自行选择运营商的安卓流量查询测试应用。首次使用选择至少一家，现在可选择移动、联通、电信、广电，支持任意单家或多家组合；设置中可随时改选。每家目前只连接一个号码。联通读取官网套餐余量，电信按官网明细已用/总量显示值估算并标「约」，两者不混入已确认通用额度或提醒。首页采用奶油背景、圆润双色卡片与笑脸水滴，展示每张卡的剩余流量、查询时间、连接状态，以及通用和定向额度。号码验证由用户在运营商官方网页完成，成功会话尽量复用。
+一个可自行选择运营商的安卓流量查询测试应用。首次选择移动、联通、电信、广电，至少一家；同一家有两个号码时可连续点两下加入第二张卡，各自在官网登录。每家最多两个、同时最多展示四个账号；第二账号需要系统 WebView 支持独立 Profile，不支持时明确阻止添加。设置可改选运营商或收起第二张卡，保留历史本地记录。联通读取官网套餐余量，电信按官网已用/总量显示值估算并标「约」，均不混入已确认通用额度或提醒。首页采用奶油背景、圆润卡片与水滴插画，展示每个账号的余量、时间、状态和明细；官网明确标记不限量时结束加载并显示不限量，不生成零或无限 GB。
 
-当前版本 1.4.0+7，已公开发布：[GitHub 仓库](https://github.com/huachen19867/liuliang-buddy) · [安装包发布页](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.4.0)。
+当前源码版本 1.5.0+8：[GitHub 仓库](https://github.com/huachen19867/liuliang-buddy) · [安装包发布页](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.5.0)。
 
-当前安装包：artifacts/liuliang-buddy-debug.apk（约 109.1 MiB，Android 7.0 及以上 ARM64 手机）。本次 flutter analyze 无问题，Android 构建和 v2 签名检查通过。后台刷新没有连接真机验证，四家真实账号与电信后台支持边界见 [后台刷新说明](docs/WIDGET_BACKGROUND_REFRESH.md)；75 项 Flutter 测试、9 项原生卡片测试和网页探针验证是 1.3.0 发布时的结果，不代表本次后台刷新已经过运行验证。
+安装包路径为 artifacts/liuliang-buddy-debug.apk，适用 Android 7.0 及以上 ARM64 手机。构建、测试、签名和哈希结果见 [1.5.0 版本说明](docs/RELEASE_1.5.0.md)。尚无连接真机，官网余额、双账号 Profile 会话、S25 Ultra / One UI 添加弹窗及长期后台调度仍待设备验证，完整边界见 [后台刷新说明](docs/WIDGET_BACKGROUND_REFRESH.md)。
 
 联通依据公开官网 E5 查询页自然发出的 userinfoE5query 响应，套餐余量单位 MB；不限量已用字段不当成剩余。电信当前天翼账号首页返回加密账务结果，应用读取首页已渲染的指定账务明细（含隐藏的官网明细弹窗），不复制其加解密代码、不自动点击或发送登录请求。每项按已用/总量的 MB/GB 显示值换算后估算差值；缺项、无单位、超额或无限哨兵不算合计。它有官网显示值舍入误差，共享/重叠额度以套餐规则为准。
 
 当前为待真机验证的测试版：移动响应读取与解密已实现；广电官网的真实查询接口、业务字段和 KB 单位已从公开页面核对，使用官网自身解密后的结果。没有真实账号登录验证，不保证各省份或套餐均可读取。运营商没有在调研中提供可稳定依赖的公开余额 API，官网改版或会话失效会影响自动查询。
 
-自动更新可在设置中关闭，或选择后台每小时、每两小时、每天尝试一次；Android 可能延迟任务。后台目前尝试移动、联通、广电，电信仍需打开 APP 查询。前台原有每五分钟查询不变。低流量提醒仅使用成功查询的通用额度。未知用途或单位不推算成通用 GB，总览不会把定向流量混进去；没有数据时展示未连接，不使用示例余额。后台实现与验证边界见 [后台刷新说明](docs/WIDGET_BACKGROUND_REFRESH.md)。
+后台自动更新可关闭，或选择每小时、每两小时、每天尝试一次；设置还显示最近实际尝试时间和结果，Android 可能延迟任务。后台尝试移动、联通、广电各个已连接账号，电信仍需打开 APP。前台五分钟尝试查询，每个账号最多一轮进行中的请求，超时结束加载。低流量提醒仅使用成功查询的有限通用额度。未知单位不推算成通用 GB，不限量不触发低量提醒；没有数据时展示未连接，不使用示例余额。
+
+点击“添加桌面卡片”后会说明是否已添加、等待系统确认或需要手动添加。没有系统弹窗时，长按桌面空白处，进入“小组件”，找到“流量小伙伴”拖到桌面。桌面支持两个同运营商账号分别占位，并提供点击刷新入口。目前没有 iOS 安装版；S25 Ultra 反馈、iOS 开发条件和各条用户反馈处理范围见 [反馈说明](docs/USER_FEEDBACK.md)，欢迎到 [GitHub Issues](https://github.com/huachen19867/liuliang-buddy/issues)提交设备与复现信息。
 
 广电已同步但套餐用途不明确时，卡片主位显示“套餐明细合计”，只有全部明细的剩余额和单位都可确认才计算。这是各项余量的数学合计，用途以各套餐规则为准，不能代表全都可通用；不进入通用总览或低量提醒。首页和桌面使用同一摘要，明细可展开并点击查看完整名称。移动的“流量总览”可能包含分类，不纳入这个合计。
 
@@ -19,6 +21,7 @@
 | 位置 | 内容 |
 | --- | --- |
 | app/lib/main.dart | 生命周期、官方 WebView、会话、查询与提醒集成 |
+| app/lib/data/carrier_accounts.dart | 稳定账号 ID、旧键迁移、每家两个账号与隐藏历史 |
 | app/lib/services/background_refresh.dart | 周期选择与 WorkManager 设置通道 |
 | app/lib/services/background_refresh_runner.dart | 后台 Flutter 引擎、无界面官网 WebView 与安全响应解析 |
 | app/lib/ui/dashboard_screen.dart | 按所选运营商展示的可爱首页与各种连接状态 |
@@ -51,14 +54,22 @@
 | docs/THIRD_PARTY_NOTICES.md | 上游参考声明 |
 | docs/WIDGET_RESEARCH.md | Android AppWidget 官方参考、支持范围与实施边界 |
 | docs/WIDGET_BACKGROUND_REFRESH.md | 后台自动刷新架构、四家支持边界与真机验证项 |
+| docs/REFRESH_RELIABILITY_REVIEW.md | 任务取消、超时、最近实际状态和多账号后台复核 |
+| docs/MULTI_ACCOUNT_REVIEW.md | 独立 WebView Profile、两张同运营商卡与前台查询门禁 |
+| docs/WIDGET_COMPATIBILITY_REVIEW.md | 系统添加回执、无弹窗手动入口、尺寸与多账号桌面 |
+| docs/USER_FEEDBACK.md | 用户反馈、S25 Ultra 验证条件和 iOS 支持范围 |
+| .github/ISSUE_TEMPLATE/bug_report.yml | 设备、WebView、运营商与复现信息反馈模板 |
 | docs/RELEASE_1.1.0.md | 版本说明、验证与安装包哈希 |
 | docs/RELEASE_1.1.1.md | 广电查询修复、验证与安装包哈希 |
 | docs/RELEASE_1.3.0.md | 四家选择、联通读取、电信估算和公开测试发布 |
+| docs/RELEASE_1.4.0.md | 后台刷新测试发布与安装包信息 |
+| docs/RELEASE_1.5.0.md | 用户反馈修复、多账号测试发布与安装包信息 |
 | scripts/test-telecom-rendered-browser.cjs | Chrome全本地合成官方结构DOM读取验证 |
 | artifacts/carrier-selection-four-demo.png | 四家运营商首次选择DEMO截图 |
 | artifacts/dashboard-unicom-broadnet-demo.png | 联通与广电组合DEMO截图 |
 | artifacts/dashboard-telecom-demo.png | 电信估算余量DEMO截图 |
 | artifacts/carrier-settings-four-demo.png | 四家运营商管理DEMO截图 |
+| artifacts/dashboard-two-mobile-unlimited-demo.png | 两张移动账号分别展示有限余量与不限量的DEMO截图 |
 | docs/RELEASE_1.2.0.md | 首次选择、单卡适配与公开测试发布 |
 | artifacts/carrier-selection-demo.png | 首次运营商选择DEMO截图 |
 | artifacts/dashboard-single-demo.png | 移动单卡首页DEMO截图 |

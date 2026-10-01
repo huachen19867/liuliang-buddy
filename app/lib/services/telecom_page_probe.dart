@@ -35,7 +35,7 @@ const telecomRenderedCaptureScript = r'''
       if (!/^0*3$/.test(type || '')) continue;
       const name = (element.querySelector('.bill-title')?.textContent || '').trim();
       const text = (balance.textContent || '').replace(/\s+/g, ' ').trim();
-      const match = /^已使用\s*(\d+(?:\.\d+)?\s*(?:GB|MB|KB|B))\s*\/\s*(\d+(?:\.\d+)?\s*(?:GB|MB|KB|B))$/i.exec(text);
+      const match = /^已使用\s*(\d+(?:\.\d+)?\s*(?:GB|MB|KB|B))\s*\/\s*(\d+(?:\.\d+)?\s*(?:GB|MB|KB|B)|(?:不限量|无限量|无限|不限|不限制|unlimited|no\s*limit)\s*(?:GB|MB|KB|B)?)$/i.exec(text);
       // A malformed flow row blocks the aggregate rather than silently dropping it.
       rows.push({name: name.slice(0, 200), used: match ? match[1] : null,
         total: match ? match[2] : null});

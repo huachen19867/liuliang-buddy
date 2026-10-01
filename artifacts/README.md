@@ -26,10 +26,18 @@ carrier-selection-four-demo.png 展示移动、广电、联通、电信的首次
 
 telecom-rendered-browser.json：scripts/test-telecom-rendered-browser.cjs生成的真实Chrome/全本地合成网页探针验收结果。passed=true，未验证真实账号；覆盖限定DOM、隐藏模态、混合单位、畸形行、登录路由和桥接时序。
 
-## 1.3.0 当前安装包
+## 1.3.0 历史安装包
 
 liuliang-buddy-debug.apk已更新为1.3.0+6，89,530,031字节（约85.4MiB），API24/36、ARM64、Android Debug签名v2通过，未启用DEMO。SHA-256：f0c550a930cc249047479a6539dded713cfa5c90c82146bc7606d2a91d689781。公开下载 https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.3.0 。75项Flutter、9项应用原生JUnit、analyze、Node和Chrome合成DOM验证通过，尚未实测联通/电信账号或Launcher。
 
-## 1.4.0 当前安装包
+## 1.4.0 历史安装包
 
 liuliang-buddy-debug.apk已更新为1.4.0+7，114,399,238字节（约109.1MiB），API24/36、ARM64、Android Debug签名v2通过，未启用DEMO。SHA-256：53a782a6a4c5730f29a53fb8d6df3a6f4da6d2bc1337632498ca4872812b2b4b。公开下载 https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.4.0 。本次analyze与Android构建通过；未运行测试套件，也没有连接真机，后台实际触发和官网登录会话共享仍待设备验证。
+
+## 同运营商双卡演示截图
+
+dashboard-two-mobile-unlimited-demo.png 来自实际 Flutter 首页组件的 390×1220 布局，导出为两倍分辨率 PNG。两张中国移动卡分别显示有限 5 GB 样本与官网明确标记“不限量”的样本，顶部有“界面演示 · 非真实流量”；这些数字与规则文字为测试样本，不能证明两个真实号码已登录或余额准确。生成测试见 `app/test/ui/dashboard_screen_test.dart`，隔离实现与待验证边界见 `docs/MULTI_ACCOUNT_REVIEW.md`。
+
+## 1.5.0 当前安装包
+
+liuliang-buddy-debug.apk已更新为1.5.0+8，90,035,780字节（约85.9MiB），API24/36、ARM64、Android Debug签名v2通过，未启用DEMO。SHA-256：8657856bd3f79380568b6ee786ec03059c877e7225a63ba177a669f6e31a65fa。公开下载 https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.5.0 。95项Flutter、13项应用原生JUnit、analyze、Node及Chrome本地合成DOM8场景通过。最终构建日志为android-build.log，原生回归为native-tests.log；这些日志与APK按仓库规则不提交，APK由GitHub Release发布。详见docs/RELEASE_1.5.0.md，真实账号、S25 Ultra、Profile会话与后台长期运行尚待设备验证。

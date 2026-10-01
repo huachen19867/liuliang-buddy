@@ -7,6 +7,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:liuliang_app/data/models.dart';
+import 'package:liuliang_app/data/carrier_accounts.dart';
+import 'package:liuliang_app/data/carrier_selection.dart';
 import 'package:liuliang_app/ui/carrier_selection_screen.dart';
 import 'package:liuliang_app/ui/dashboard_screen.dart';
 
@@ -113,6 +115,75 @@ void main() {
     );
     expect(button.onPressed, isNull);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('同运营商两张卡分开展示且明确不限量', (tester) async {
+    _configureViewport(tester, const Size(390, 1220));
+    final accounts = CarrierAccounts.fromSelection(
+      CarrierSelection.complete([Carrier.mobile]),
+    ).addSecond(Carrier.mobile).accounts;
+    final first = CarrierSnapshot(
+      carrier: Carrier.mobile,
+      status: QueryStatus.success,
+      queriedAt: DateTime(2026, 10, 1, 10),
+      buckets: const [
+        TrafficBucket(
+          name: '通用流量',
+          kind: BucketKind.general,
+          remainingBytes: 5 * _gib,
+        ),
+      ],
+    );
+    final second = CarrierSnapshot(
+      carrier: Carrier.mobile,
+      status: QueryStatus.success,
+      queriedAt: DateTime(2026, 10, 1, 10),
+      message: '达量后可能限速，具体以官网规则为准',
+      buckets: const [
+        TrafficBucket(
+          name: '畅享套餐',
+          kind: BucketKind.general,
+          isUnlimited: true,
+        ),
+      ],
+    );
+    final connected = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(fontFamily: 'PreviewChinese'),
+        builder: (context, child) =>
+            RepaintBoundary(key: _previewBoundaryKey, child: child!),
+        home: DashboardScreen(
+          snapshots: [first],
+          selectedCarriers: const {Carrier.mobile},
+          demo: true,
+          accountEntries: [
+            DashboardAccountEntry(accounts[0], first),
+            DashboardAccountEntry(accounts[1], second),
+          ],
+          thresholdGb: 2,
+          onConnect: (_) {},
+          onRefresh: (_) {},
+          onConnectAccount: connected.add,
+          onRefreshAccount: (_) {},
+          onRefreshAll: () {},
+          onSettings: () {},
+          onAbout: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('中国移动 1'), findsWidgets);
+    expect(find.text('中国移动 2'), findsWidgets);
+    expect(find.text('含不限量套餐'), findsOneWidget);
+    expect(find.text('中国移动 2'), findsNWidgets(3));
+    expect(find.text('不限量'), findsWidgets);
+    expect(find.textContaining('达量后可能限速'), findsOneWidget);
+    await _writeScreenshot(tester, 'dashboard-two-mobile-unlimited-demo.png');
+    await tester.ensureVisible(find.text('连接号码').last);
+    await tester.tap(find.text('连接号码').last);
+    expect(connected, ['mobile_2']);
   });
 
   testWidgets('缓存与 error 状态可查看旧值但不会进入汇总', (tester) async {

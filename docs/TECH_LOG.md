@@ -165,3 +165,15 @@ Flutter完整74项通过，Node加入联通精确端点/登录与敏感接口排
 版本升至1.4.0+7。`flutter analyze`、Android ARM64 `assembleDebug`、APK v2 签名和 aapt 元数据检查通过；APK 为114,399,238字节，SHA-256 `53a782a6a4c5730f29a53fb8d6df3a6f4da6d2bc1337632498ca4872812b2b4b`。本版未运行测试套件；没有连接安卓设备，WorkManager 实际触发、WebView 会话共享、真实余额和不同 Launcher 更新尚未验证。
 
 源码提交`7e6d9f4f54a5cf9946325de618a46d72527342fd`已推送到公开仓库`huachen19867/liuliang-buddy`，GitHub main、v1.4.0标签均核对为该提交。Release https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.4.0 已发布，draft=false、prerelease=true；APK asset状态uploaded、114399238字节，GitHub digest `sha256:53a782a6a4c5730f29a53fb8d6df3a6f4da6d2bc1337632498ca4872812b2b4b`与本地一致。真实运营商及桌面卡片刷新仍待安卓设备验证。
+
+## 2026-10-01：集中处理公开用户反馈
+
+老板要求分任务处理自动刷新不好用、两个移动号码、不限量一直查询、桌面添加无弹窗、S25 Ultra体验反馈与iOS支持。按工作区要求复用已有Google WorkManager/AppWidget参考，分配Astra轻度处理后台可靠性、GPT6 SOL高处理多账号与前台状态、GPT6 Luna极高处理原生桌面；根负责不限量解析、iOS范围、验收与公开发布。老板进一步确认桌面点击后没有系统弹窗，未知不限量来自哪家，因此四家均排查。
+
+四家明确不限量标记已作为成功查询保存时间，不生成无限GB、零余额或低流量提醒；数值溢出拒绝而非饱和为大余额。不限量与原解析回归共23项通过。iOS没有Runner/WidgetKit工程，Windows没有Xcode或签名，不能宣称有可安装版；官方Flutter环境文档已从GitHub源下载，Apple WidgetKit说明已归档到忽略的参考目录。反馈任务和平台边界见docs/USER_FEEDBACK.md，新增GitHub安卓反馈模板以收集可复现信息。本轮集成、构建与发布结果继续追加。
+
+集成复核修复登录返回页被inFlight丢弃、第二卡无快照借用主卡、Widget仅有第二卡结果回填主卡、移除第二卡后clear-all遗漏历史键等问题。清理开始先持久化pending，失败或崩溃不恢复查询，完整清理四家主副八组记录才解锁；默认会话单卡在不支持MULTI_PROFILE时仍可清除，使用过独立Profile则保守阻止复用残留会话。后台永久失效修复已在MainActivity接入，增加实际执行状态；移除新FlutterEngine根isolate对仅适用于派生isolate的DartPluginRegistrant.ensureInitialized误调用。
+
+最终Flutter95项及analyze通过，Node探针与Chrome全本地合成账务8场景通过。Flutter多命令并发启动曾报无法确定engine revision，改串行启动后正常；以后共享一个SDK的Flutter命令串行。首轮APK失败于jni CMake/Ninja读取中文用户目录：协作期间pub get重写了插件路径为全局cache，仅给Gradle设置PUB_CACHE不会改旧元数据。构建脚本现从local.properties的Flutter SDK调用pub get，使用同一个工作区ASCII缓存重生依赖元数据后再构建；不更改或删除全局Pub缓存。最终APK与原生回归待构建后记录。
+
+最终1.5.0/code8 ARM64 APK重建成功，90,035,780字节，SHA-256 8657856bd3f79380568b6ee786ec03059c877e7225a63ba177a669f6e31a65fa。apksigner v2通过、Android Debug签名，aapt2确认API24/36，Zip确认libflutter.so仅arm64-v8a；未传DEMO。随后串行执行应用模块:app:testDebugUnitTest，最终JUnit XML为12项WidgetPresentationTest与1项BackgroundRefreshScheduleTest，均0失败/错误。不把依赖插件历史XML计入本次验收。两张移动/不限量与四家选择的组件DEMO截图已目视检查，公开发布说明和输出索引更新为1.5.0。adb devices为空，真实不限量、双账号隔离、S25/One UI弹窗、后台调度仍待设备验证。

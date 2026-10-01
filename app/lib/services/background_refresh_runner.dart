@@ -1,15 +1,17 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
-import 'dart:ui';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_inappwebview_android/flutter_inappwebview_android.dart'
+    as android_webview;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/carrier_selection.dart';
+import '../data/carrier_accounts.dart';
 import '../data/models.dart';
 import '../data/parsers.dart';
 import 'carrier_web.dart';
@@ -23,14 +25,16 @@ const _secureStorage = FlutterSecureStorage();
 @pragma('vm:entry-point')
 Future<void> runBackgroundRefreshEntrypoint() async {
   WidgetsFlutterBinding.ensureInitialized();
-  DartPluginRegistrant.ensureInitialized();
+  // A separate FlutterEngine still starts a root isolate. Its Android engine
+  // registers plugins; DartPluginRegistrant.ensureInitialized is for spawned isolates.
   _backgroundChannel.setMethodCallHandler((call) async {
     if (call.method != 'start') return false;
     try {
-      final payload = await _runScheduledRefresh();
-      await _backgroundChannel.invokeMethod<void>('completed', {
-        'widgetPayload': ?payload,
-      });
+      final report = await _runScheduledRefresh();
+      await _backgroundChannel.invokeMethod<void>(
+        'completed',
+        report ?? {'outcome': 'cancelled'},
+      );
     } catch (_) {
       await _backgroundChannel.invokeMethod<void>('failed');
     }
@@ -43,6 +47,9 @@ Future<Map<String, Object?>?> _runScheduledRefresh() async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.reload();
   if (!await _isTaskCurrent()) return null;
+  if (prefs.getBool('account_profiles_cleanup_pending') == true) {
+    return {'outcome': 'cleanup_required'};
+  }
   final minutes = prefs.getInt('background_refresh_minutes') ?? 0;
   if (minutes == 0) return null;
   final selection = CarrierSelection.restore(
@@ -55,73 +62,92 @@ Future<Map<String, Object?>?> _runScheduledRefresh() async {
   );
   if (!selection.setupCompleted) return null;
 
-  final snapshots = <Carrier, CarrierSnapshot>{};
-  for (final carrier in Carrier.values) {
-    if (!selection.allows(carrier)) continue;
-    final raw = prefs.getString('snapshot_${carrier.name}');
+  final accounts = CarrierAccounts.restore(
+    savedJson: prefs.getString(CarrierAccounts.storageKey),
+    selection: selection,
+  );
+  final visibleAccounts = accounts.visibleAccounts(selection);
+  final snapshots = <String, CarrierSnapshot>{};
+  for (final account in visibleAccounts) {
+    final raw = prefs.getString(account.snapshotKey);
     if (raw == null) continue;
     try {
-      snapshots[carrier] = CarrierSnapshot.fromJson(
+      final snapshot = CarrierSnapshot.fromJson(
         jsonDecode(raw) as Map<String, dynamic>,
       );
+      if (snapshot.carrier == account.carrier) snapshots[account.id] = snapshot;
     } catch (_) {
       // A malformed saved record is not a background refresh authorization.
     }
   }
 
-  final connected = <Carrier>[
-    for (final carrier in Carrier.values)
-      if (selection.allows(carrier) &&
-          (prefs.getBool('connected_${carrier.name}') ?? false))
-        carrier,
+  final connected = <CarrierAccount>[
+    for (final account in visibleAccounts)
+      if (prefs.getBool(account.connectedKey) ?? false) account,
   ];
-  for (final carrier in connected) {
+  var attempted = 0;
+  var succeeded = 0;
+  for (final account in connected) {
+    final carrier = account.carrier;
     // Telecom currently needs account-page sessionStorage and an already
     // rendered billing DOM. Keep its data on the normal foreground path.
     if (carrier == Carrier.telecom ||
-        snapshots[carrier]?.queriedAt == null ||
-        snapshots[carrier]!.buckets.isEmpty ||
-        (prefs.getBool('background_auth_required_${carrier.name}') ?? false)) {
+        snapshots[account.id]?.queriedAt == null ||
+        (prefs.getBool('background_auth_required_${account.id}') ?? false)) {
       continue;
     }
     if (!await _isTaskCurrent()) return null;
 
-    final previous = snapshots[carrier]!;
-    final result = await _queryInHeadlessWebView(carrier);
+    final previous = snapshots[account.id]!;
+    attempted++;
+    final result = await _queryInHeadlessWebView(account);
     await prefs.reload();
     if (!await _isTaskCurrent()) return null;
     if (result.status == QueryStatus.success) {
-      snapshots[carrier] = result.snapshot;
-      await prefs.setBool('background_auth_required_${carrier.name}', false);
+      succeeded++;
+      snapshots[account.id] = result.snapshot;
+      await prefs.setBool('background_auth_required_${account.id}', false);
       if (carrier == Carrier.broadnet) {
-        await _saveBroadnetSession(result.session);
+        await _saveBroadnetSession(account, result.session);
       }
     } else {
-      snapshots[carrier] = previous.copyWith(
+      snapshots[account.id] = previous.copyWith(
         status: result.status,
         message: result.message,
       );
       if (result.status == QueryStatus.authExpired) {
-        await prefs.setBool('background_auth_required_${carrier.name}', true);
+        await prefs.setBool('background_auth_required_${account.id}', true);
       }
     }
+    if (!await _isTaskCurrent()) return null;
     await prefs.setString(
-      'snapshot_${carrier.name}',
-      jsonEncode(snapshots[carrier]!.toJson()),
+      account.snapshotKey,
+      jsonEncode(snapshots[account.id]!.toJson()),
     );
     await prefs.reload();
   }
 
   if (!await _isTaskCurrent()) return null;
   final current = <CarrierSnapshot>[
-    for (final carrier in selection.selectedCarriers)
-      if (snapshots[carrier] != null) snapshots[carrier]!,
+    for (final account in visibleAccounts)
+      if (snapshots[account.id] != null) snapshots[account.id]!,
   ];
-  return buildWidgetPayload(
-    current,
-    thresholdGb: (prefs.getDouble('threshold_gb') ?? 5).clamp(1, 20),
-    selection: selection,
-  );
+  return {
+    'outcome': attempted == 0
+        ? 'no_eligible_accounts'
+        : succeeded == attempted
+        ? 'success'
+        : succeeded > 0
+        ? 'partial'
+        : 'no_result',
+    'widgetPayload': buildWidgetPayload(
+      current,
+      thresholdGb: (prefs.getDouble('threshold_gb') ?? 5).clamp(1, 20),
+      selection: selection,
+      accounts: accounts,
+      accountSnapshots: snapshots,
+    ),
+  };
 }
 
 Future<bool> _isTaskCurrent() async {
@@ -143,23 +169,24 @@ class _HeadlessResult {
   String? get message => snapshot.message;
 }
 
-Future<_HeadlessResult> _queryInHeadlessWebView(Carrier carrier) async {
+Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
+  final carrier = account.carrier;
   final result = Completer<_HeadlessResult>();
   HeadlessInAppWebView? webView;
   Map<String, dynamic>? broadnetSession;
+  var acceptingResponses = true;
 
   void complete(CarrierSnapshot snapshot) {
-    if (!result.isCompleted) {
+    if (acceptingResponses && !result.isCompleted) {
       result.complete(_HeadlessResult(snapshot, session: broadnetSession));
     }
   }
 
   try {
     final savedSession = carrier == Carrier.broadnet
-        ? await _readBroadnetSession()
+        ? await _readBroadnetSession(account)
         : null;
     webView = HeadlessInAppWebView(
-      initialUrlRequest: URLRequest(url: WebUri(carrierQueryUrl(carrier))),
       initialSettings: InAppWebViewSettings(
         javaScriptEnabled: true,
         useShouldOverrideUrlLoading: true,
@@ -179,17 +206,56 @@ Future<_HeadlessResult> _queryInHeadlessWebView(Carrier carrier) async {
             injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
           ),
       ]),
-      onWebViewCreated: (created) {
+      onWebViewCreated: (created) async {
+        if (!acceptingResponses || !await _isTaskCurrent()) return;
         created.addJavaScriptHandler(
           handlerName: 'trafficResponse',
           callback: (args) async {
+            if (!acceptingResponses ||
+                result.isCompleted ||
+                !await _isTaskCurrent()) {
+              return false;
+            }
             if (args.isEmpty || args.first is! Map) return false;
             final payload = Map<String, dynamic>.from(args.first as Map);
+            final currentUrl = await created.getUrl();
+            final currentPage = Uri.tryParse(currentUrl?.toString() ?? '');
+            if (!acceptingResponses ||
+                currentPage == null ||
+                currentPage !=
+                    Uri.tryParse(payload['pageUrl'] as String? ?? '') ||
+                isCarrierLoginPage(currentPage) ||
+                !isCarrierNavigationAllowed(carrier, currentPage)) {
+              return false;
+            }
             final parsed = _parseCapturedResponse(carrier, payload);
             if (parsed != null) complete(parsed);
             return true;
           },
         );
+        try {
+          if (account.profileName != null) {
+            if (!await android_webview
+                .AndroidInAppWebViewController.supportsAccountProfiles()) {
+              throw StateError('WebView account profiles unavailable');
+            }
+            await (created.platform
+                    as android_webview.AndroidInAppWebViewController)
+                .setAccountProfile(account.profileName!);
+          }
+          if (!acceptingResponses || !await _isTaskCurrent()) return;
+          await created.loadUrl(
+            urlRequest: URLRequest(url: WebUri(carrierQueryUrl(carrier))),
+          );
+        } catch (_) {
+          complete(
+            CarrierSnapshot(
+              carrier: carrier,
+              status: QueryStatus.error,
+              message: '后台账号会话暂不可用，请打开 APP 查询',
+            ),
+          );
+        }
       },
       shouldOverrideUrlLoading: (created, action) async {
         final uri = Uri.tryParse(action.request.url?.toString() ?? '');
@@ -211,7 +277,7 @@ Future<_HeadlessResult> _queryInHeadlessWebView(Carrier carrier) async {
         }
       },
       onLoadStop: (created, url) async {
-        if (url == null) return;
+        if (!acceptingResponses || url == null) return;
         final uri = Uri.tryParse(url.toString());
         if (uri == null) return;
         if (isCarrierLoginPage(uri)) {
@@ -251,7 +317,7 @@ Future<_HeadlessResult> _queryInHeadlessWebView(Carrier carrier) async {
         );
       },
     );
-    await webView.run();
+    await webView.run().timeout(const Duration(seconds: 15));
     final completed = await result.future.timeout(
       const Duration(seconds: 40),
       onTimeout: () => _HeadlessResult(
@@ -272,6 +338,7 @@ Future<_HeadlessResult> _queryInHeadlessWebView(Carrier carrier) async {
       ),
     );
   } finally {
+    acceptingResponses = false;
     try {
       await webView?.dispose();
     } catch (_) {
@@ -334,9 +401,11 @@ CarrierSnapshot? _parseCapturedResponse(
   return snapshot;
 }
 
-Future<Map<String, dynamic>?> _readBroadnetSession() async {
+Future<Map<String, dynamic>?> _readBroadnetSession(
+  CarrierAccount account,
+) async {
   try {
-    final raw = await _secureStorage.read(key: 'broadnet_session');
+    final raw = await _secureStorage.read(key: account.broadnetSessionKey);
     if (raw == null) return null;
     final candidate = jsonDecode(raw);
     if (candidate is! Map) return null;
@@ -360,12 +429,15 @@ bool _validBroadnetSession(Map<String, dynamic> session) =>
     (session['phoneInfo'] as String).length <= 20000 &&
     (session['sessionId'] as String).length <= 20000;
 
-Future<void> _saveBroadnetSession(Map<String, dynamic>? session) async {
+Future<void> _saveBroadnetSession(
+  CarrierAccount account,
+  Map<String, dynamic>? session,
+) async {
   if (session == null || !_validBroadnetSession(session)) return;
   try {
     session['savedAt'] = DateTime.now().toIso8601String();
     await _secureStorage.write(
-      key: 'broadnet_session',
+      key: account.broadnetSessionKey,
       value: jsonEncode(session),
     );
   } catch (_) {

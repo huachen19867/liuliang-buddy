@@ -3,6 +3,7 @@ package com.pichillilorenzo.flutter_inappwebview_android;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.webkit.WebViewFeature;
+import androidx.webkit.ProfileStore;
 
 import com.pichillilorenzo.flutter_inappwebview_android.types.ChannelDelegateImpl;
 
@@ -27,6 +28,26 @@ public class WebViewFeatureManager extends ChannelDelegateImpl {
       case "isFeatureSupported":
         String feature = (String) call.argument("feature");
         result.success(WebViewFeature.isFeatureSupported(feature));
+        break;
+      case "deleteAccountProfiles":
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
+          // No secondary stores exist in a primary-only install. If a provider
+          // lost profile support after use, keep cleanup blocked until it returns.
+          result.success(Boolean.FALSE.equals(call.argument("profilesMayExist")));
+          break;
+        }
+        try {
+          ProfileStore store = ProfileStore.getInstance();
+          boolean allDeleted = true;
+          for (String name : store.getAllProfileNames()) {
+            if (name.matches("liuliang_[a-z]+_2")) {
+              allDeleted &= store.deleteProfile(name);
+            }
+          }
+          result.success(allDeleted);
+        } catch (RuntimeException e) {
+          result.error("PROFILE_DELETE_FAILED", e.getMessage(), null);
+        }
         break;
       case "isStartupFeatureSupported":
         if (plugin != null && plugin.activity != null) {

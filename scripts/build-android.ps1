@@ -16,6 +16,18 @@ $taskVersion = [regex]::Match($taskVersionText, '(?m)^version:\s*([0-9.]+)\+(\d+
 if (-not $taskVersion.Success) { throw 'Expected versionName+versionCode in pubspec.yaml' }
 $taskPropertiesPath = Join-Path $taskRoot 'app/android/local.properties'
 $taskProperties = Get-Content -LiteralPath $taskPropertiesPath -Raw
+$taskFlutterSdkMatch = [regex]::Match($taskProperties, '(?m)^flutter\.sdk=(.+)$')
+if (-not $taskFlutterSdkMatch.Success) { throw 'Missing flutter.sdk in app/android/local.properties.' }
+$taskFlutterSdkPath = $taskFlutterSdkMatch.Groups[1].Value.Trim().Replace('\\', '\')
+$taskFlutterCommand = Join-Path $taskFlutterSdkPath 'bin/flutter.bat'
+if (-not (Test-Path -LiteralPath $taskFlutterCommand)) { throw 'Configured Flutter SDK is unavailable.' }
+# Refresh plugin metadata with the same ASCII PUB_CACHE that Gradle will use.
+# A pub get from another shell can otherwise leave JNI/CMake in a Unicode path.
+Push-Location (Join-Path $taskRoot 'app')
+try {
+    & $taskFlutterCommand pub get
+    if ($LASTEXITCODE -ne 0) { throw "Flutter dependency resolution failed with exit code $LASTEXITCODE" }
+} finally { Pop-Location }
 $taskProperties = [regex]::Replace($taskProperties, '(?m)^flutter\.versionName=.*$', "flutter.versionName=$($taskVersion.Groups[1].Value)")
 $taskProperties = [regex]::Replace($taskProperties, '(?m)^flutter\.versionCode=.*$', "flutter.versionCode=$($taskVersion.Groups[2].Value)")
 Set-Content -LiteralPath $taskPropertiesPath -Value $taskProperties -Encoding utf8

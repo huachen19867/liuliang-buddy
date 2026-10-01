@@ -65,6 +65,36 @@ class AndroidInAppWebViewController extends PlatformInAppWebViewController
     with ChannelController {
   static final MethodChannel _staticChannel = IN_APP_WEBVIEW_STATIC_CHANNEL;
 
+  /// Whether the installed Android WebView can isolate an additional account.
+  static Future<bool> supportsAccountProfiles() async =>
+      await const MethodChannel(
+        'com.pichillilorenzo/flutter_inappwebview_webviewfeature',
+      ).invokeMethod<bool>(
+          'isFeatureSupported', {'feature': 'MULTI_PROFILE'}) ??
+      false;
+
+  /// Deletes secondary account browser stores after all their views close.
+  static Future<bool> deleteAccountProfiles({bool profilesMayExist = true}) async =>
+      await const MethodChannel(
+        'com.pichillilorenzo/flutter_inappwebview_webviewfeature',
+      ).invokeMethod<bool>('deleteAccountProfiles', {'profilesMayExist': profilesMayExist}) ??
+      false;
+
+  /// Must be called before the first navigation. Do not pass initialUrlRequest.
+  Future<void> setAccountProfile(String profileName) async {
+    final activeChannel = channel;
+    if (activeChannel == null) {
+      throw StateError('WebView channel is unavailable before profile setup');
+    }
+    final attached =
+        await activeChannel.invokeMethod<bool>('setAccountProfile', {
+      'profileName': profileName,
+    });
+    if (attached != true) {
+      throw StateError('WebView profile setup was not confirmed');
+    }
+  }
+
   // List of properties to be saved and restored for keep alive feature
   Map<String, JavaScriptHandlerCallback> _javaScriptHandlersMap =
       HashMap<String, JavaScriptHandlerCallback>();

@@ -13,6 +13,8 @@ class CarrierSelectionScreen extends StatelessWidget {
     super.key,
     this.availableCarriers = Carrier.values,
     this.querySupportedCarriers = Carrier.values,
+    this.accountCounts = const {},
+    this.onAddSecondAccount,
     required this.selectedCarriers,
     required this.onSelectionChanged,
     required this.onContinue,
@@ -22,6 +24,8 @@ class CarrierSelectionScreen extends StatelessWidget {
 
   final List<Carrier> availableCarriers;
   final List<Carrier> querySupportedCarriers;
+  final Map<Carrier, int> accountCounts;
+  final ValueChanged<Carrier>? onAddSecondAccount;
   final Set<Carrier> selectedCarriers;
   final ValueChanged<Set<Carrier>> onSelectionChanged;
   final ValueChanged<Set<Carrier>> onContinue;
@@ -48,8 +52,8 @@ class CarrierSelectionScreen extends StatelessWidget {
     final canContinue = orderedSelection.isNotEmpty;
     final title = isInitialSetup ? '先选好你的运营商' : '管理运营商';
     final subtitle = isInitialSetup
-        ? '选择正在使用的运营商，可以只选一家，也可以同时选几家。'
-        : '选择要在首页展示和查询的运营商，至少保留一家。';
+        ? '轻点选择一家；同一家有两张卡，连续轻点两下即可加入第二张。'
+        : '轻点选择运营商；连续轻点两下，可加入同一家第二张卡。';
 
     return Scaffold(
       backgroundColor: _canvas,
@@ -146,6 +150,20 @@ class CarrierSelectionScreen extends StatelessWidget {
                           carriers[index],
                         ),
                         selected: selected.contains(carriers[index]),
+                        count:
+                            accountCounts[carriers[index]] ??
+                            (selected.contains(carriers[index]) ? 1 : 0),
+                        onDoubleTap: onAddSecondAccount == null
+                            ? null
+                            : () {
+                                final carrier = carriers[index];
+                                if (!selected.contains(carrier)) {
+                                  onSelectionChanged(
+                                    Set.unmodifiable({...selected, carrier}),
+                                  );
+                                }
+                                onAddSecondAccount!(carrier);
+                              },
                         onTap: () {
                           final next = {...selected};
                           if (!next.add(carriers[index])) {
@@ -287,6 +305,8 @@ class _CarrierOption extends StatelessWidget {
     required this.accent,
     required this.querySupported,
     required this.selected,
+    required this.count,
+    this.onDoubleTap,
     required this.onTap,
   });
 
@@ -294,6 +314,8 @@ class _CarrierOption extends StatelessWidget {
   final Color accent;
   final bool querySupported;
   final bool selected;
+  final int count;
+  final VoidCallback? onDoubleTap;
   final VoidCallback onTap;
 
   @override
@@ -302,11 +324,12 @@ class _CarrierOption extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: '${carrier.label}，${selected ? '已选择' : '未选择'}',
+      label: '${carrier.label}，${selected ? '已选择$count张' : '未选择'}',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
+          onDoubleTap: onDoubleTap,
           borderRadius: BorderRadius.circular(21),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
@@ -363,7 +386,7 @@ class _CarrierOption extends StatelessWidget {
                                   ? '已加入首页 · 余额查询接入中'
                                   : '余额查询接入中'
                             : selected
-                            ? '已加入首页'
+                            ? '已加入 $count 张 · 双击可加第二张'
                             : '点按即可选择',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,

@@ -1,5 +1,7 @@
 # 双卡桌面小组件调研
 
+桌面卡片针对 One UI 添加回执、Launcher 退路、尺寸和多账户 schema 的实现复核见 [`WIDGET_COMPATIBILITY_REVIEW.md`](WIDGET_COMPATIBILITY_REVIEW.md)。下文“建议契约”是最初调研时的 schema 1 草案；实现现兼容 schema 1，并由复核说明 schema 2。
+
 2026-09-30。已定位 `docs/TECH_LOG.md` 并核对现状：Flutter 首页已有两运营商查询状态、通用流量与查询时间；安卓 Kotlin MainActivity 已使用 MethodChannel。当前查询是前台 WebView 行为，APP 关闭后不会持续查询。因此小组件展示最近结果，并明确显示其时间和状态；点击进入 APP 再由既有逻辑查询，不把桌面缓存称为实时数据。
 
 ## 官方参考与支持范围
@@ -39,7 +41,7 @@ Android 标准 AppWidget 与荣耀、华为、小米或其他厂商专属卡片�
 
 `remainingBytes` 只取模型已经确认的通用剩余量，不重新聚合定向或用途未知额度。缺数据用 null，显示“待查询”或“待验证”，不转换为 0 GB。若保留上一成功数值而最新状态失败，必须清楚标注“上次”并使用原成功 queriedAt，不刷新成当前时间。`updatedAtEpochMs` 是缓存写入时间，不能冒充 queriedAt。保留每张卡独立时间，不能把一张成功的时间套到另一张。
 
-`clearSnapshot` 删除这一原生缓存并立即重绘全部实例为空状态。Flutter 清除账号数据时必须纳入同一世代/串行写保护，避免旧异步查询在清除后再次写入小组件。`requestPin` 可返回 `requested` 或 `unsupported`；若返回布尔值，UI 文案仍须明确是“已请求桌面添加”，不是“已添加”。不向原生小组件传手机号原文、cookie、Session、Access 或 WebView 凭证；桌面可见数据仅为额度、运营商品牌和状态时间。
+`clearSnapshot` 删除这一原生缓存并立即重绘全部实例为空状态。Flutter 清除账号数据时必须纳入同一世代/串行写保护，避免旧异步查询在清除后再次写入小组件。添加请求应返回 `already_added`、`request_pending_confirmation` 或 `unsupported` 等明确状态；系统接受请求并不代表用户已添加。实际状态契约、15 分钟等待回执与手动添加说明见兼容性复核。不向原生小组件传手机号原文、cookie、Session、Access 或 WebView 凭证；桌面可见数据仅为额度、账户显示名、运营商品牌和状态时间。
 
 ## 原生生命周期与交互
 

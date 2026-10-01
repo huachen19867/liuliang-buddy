@@ -25,11 +25,17 @@
             android:textStyle="bold"
             android:maxLines="1" />
         <TextView
+            android:id="@+id/widget_refresh_action"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="点我刷新 ›"
             android:textColor="#74819A"
             android:textSize="10sp"
+            android:paddingStart="8dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:contentDescription="打开流量小伙伴并刷新所选运营商"
+            android:clickable="true"
             android:maxLines="1" />
     </LinearLayout>
     <LinearLayout

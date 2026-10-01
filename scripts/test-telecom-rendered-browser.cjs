@@ -94,6 +94,13 @@ const modal = rows => `<div id="balanceModal" style="display:none"><div class="m
     cases.push('incomplete row preserved as null without synthesized aggregate');
     await f.context.close();
 
+    f = await fixture(modal(row('不限量测试套餐', '已使用512MB / 不限量')));
+    data = JSON.parse(f.messages[0].body);
+    assert.deepEqual(data.rows, [{name: '不限量测试套餐', used: '512MB', total: '不限量'}]);
+    assert.equal('remaining' in data, false, 'unlimited marker never becomes a fabricated byte balance');
+    cases.push('explicit unlimited total preserved for terminal Dart parsing');
+    await f.context.close();
+
     f = await fixture(sample, {bridge: false});
     await f.page.evaluate(() => {
       location.hash = '#/login';

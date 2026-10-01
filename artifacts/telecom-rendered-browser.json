@@ -3,7 +3,7 @@
   "syntheticOnly": true,
   "actualAccountVerified": false,
   "networkPolicy": "Every browser request fulfilled or aborted locally",
-  "fulfilled": 6,
+  "fulfilled": 7,
   "aborted": 0,
   "cases": [
     "hidden modal, mixed units/NBSP, voice/SMS excluded",
@@ -12,6 +12,7 @@
     "similar marketing text outside exact container rejected",
     "late bridge ready flushes captured rows once",
     "incomplete row preserved as null without synthesized aggregate",
+    "explicit unlimited total preserved for terminal Dart parsing",
     "login invalidates pending bridge payload"
   ]
 }

@@ -38,6 +38,7 @@ CarrierSnapshot parseTelecomRendered(
     final name = row['name'] is String ? (row['name'] as String).trim() : '';
     final used = displayedBytes(row['used']);
     final total = displayedBytes(row['total']);
+    final unlimited = name.isNotEmpty && _isUnlimitedValue(row['total']);
     final valid =
         name.isNotEmpty &&
         used != null &&
@@ -50,18 +51,29 @@ CarrierSnapshot parseTelecomRendered(
         kind: BucketKind.unknown,
         remainingBytes: valid ? total - used : null,
         totalBytes: valid ? total : null,
-        rawRemaining: valid ? '${total - used}' : '剩余额无法确认',
+        isUnlimited: unlimited,
+        rawRemaining: unlimited
+            ? '不限量'
+            : valid
+            ? '${total - used}'
+            : '剩余额无法确认',
         rawUnit: valid ? 'B' : null,
       ),
     );
   }
-  if (buckets.every((bucket) => bucket.remainingBytes == null)) return fail();
+  if (buckets.every(
+    (bucket) => bucket.remainingBytes == null && !bucket.isUnlimited,
+  )) {
+    return fail();
+  }
   return CarrierSnapshot(
     carrier: Carrier.telecom,
     status: QueryStatus.success,
     queriedAt: queriedAt ?? DateTime.now(),
     buckets: buckets,
-    message: buckets.any((bucket) => bucket.remainingBytes == null)
+    message: buckets.any((bucket) => bucket.isUnlimited)
+        ? '官网标记含不限量套餐，达量限速和适用范围以套餐规则为准'
+        : buckets.any((bucket) => bucket.remainingBytes == null)
         ? '部分官网明细无法估算，暂不显示合计；请核对官方查询页'
         : '根据官网已用量和总量的显示值估算，存在舍入误差，套餐适用范围以官网为准',
   );
@@ -97,7 +109,20 @@ CarrierSnapshot parseUnicomWeb(
       unlimited != false &&
       unlimited != 0 &&
       unlimited != '') {
-    return fail(QueryStatus.error, '官网按不限量套餐展示已用流量，剩余量请在官方页面确认');
+    return CarrierSnapshot(
+      carrier: Carrier.unicom,
+      status: QueryStatus.success,
+      queriedAt: queriedAt ?? DateTime.now(),
+      buckets: const [
+        TrafficBucket(
+          name: '官网不限量套餐',
+          kind: BucketKind.unknown,
+          isUnlimited: true,
+          rawRemaining: '不限量',
+        ),
+      ],
+      message: '官网按不限量套餐展示已用流量，达量限速和适用范围请在官方页面确认',
+    );
   }
   if (resource['flowFlag'] != true &&
       resource['flowFlag'] != 1 &&
@@ -175,16 +200,22 @@ CarrierSnapshot parseMobile(
     if (raw == null) return;
     final remaining = raw['remainNum'];
     final unit = _text(raw['unit']);
+    final unlimited =
+        (unit == null || _toBytes('1', unit) != null) &&
+        (_isUnlimitedValue(remaining) ||
+            (_toBytes(remaining, unit) == null &&
+                _isUnlimitedValue(raw['sumNum'])));
     // 01/02 are voice/SMS. Unknown units must never become GB by default.
-    if (remaining == null || unit == null) return;
+    if (!unlimited && (remaining == null || unit == null)) return;
     buckets.add(
       TrafficBucket(
         name: name,
         kind: kind,
         rawRemaining: _text(remaining),
         rawUnit: unit,
-        remainingBytes: _toBytes(remaining, unit),
-        totalBytes: _toBytes(raw['sumNum'], unit),
+        isUnlimited: unlimited,
+        remainingBytes: unlimited ? null : _toBytes(remaining, unit),
+        totalBytes: unlimited ? null : _toBytes(raw['sumNum'], unit),
       ),
     );
   }
@@ -196,7 +227,9 @@ CarrierSnapshot parseMobile(
   add('totalInfo', '流量总览', BucketKind.unknown);
 
   if (buckets.isEmpty ||
-      buckets.every((bucket) => bucket.remainingBytes == null)) {
+      buckets.every(
+        (bucket) => bucket.remainingBytes == null && !bucket.isUnlimited,
+      )) {
     return failed(QueryStatus.error, '中国移动流量单位或剩余额无法确认');
   }
   return CarrierSnapshot(
@@ -205,6 +238,9 @@ CarrierSnapshot parseMobile(
     queriedAt: queriedAt ?? DateTime.now(),
     phoneMasked: phoneMasked,
     buckets: buckets,
+    message: buckets.any((bucket) => bucket.isUnlimited)
+        ? '官网标记含不限量套餐，达量限速和适用范围以套餐规则为准'
+        : null,
   );
 }
 
@@ -250,14 +286,18 @@ CarrierSnapshot parseBroadnet(
     final rawRemaining = _text(entry['balance']);
     if (name == null || name.isEmpty || rawRemaining == null) continue;
     final unit = _text(entry['unit']);
+    final unlimited =
+        (unit == null || _toBytes('1', unit) != null) &&
+        _isUnlimitedValue(entry['balance']);
     buckets.add(
       TrafficBucket(
         name: name,
         kind: _broadnetKind(name),
         rawRemaining: rawRemaining,
         rawUnit: unit,
-        remainingBytes: _toBytes(entry['balance'], unit),
-        totalBytes: _toBytes(entry['highFee'], unit),
+        isUnlimited: unlimited,
+        remainingBytes: unlimited ? null : _toBytes(entry['balance'], unit),
+        totalBytes: unlimited ? null : _toBytes(entry['highFee'], unit),
       ),
     );
   }
@@ -331,13 +371,19 @@ CarrierSnapshot parseBroadnetH5(
     final name = _text(entry['discntName']);
     final named = name != null && name.isNotEmpty;
     final rawRemaining = _text(entry['balance']);
-    final remainingBytes = named ? _toBytes(entry['balance'], 'KB') : null;
+    final unlimited = named && _isUnlimitedValue(entry['balance']);
+    final remainingBytes = named && !unlimited
+        ? _toBytes(entry['balance'], 'KB')
+        : null;
     buckets.add(
       TrafficBucket(
         name: named ? name : '未命名流量套餐',
         kind: named ? _broadnetKind(name) : BucketKind.unknown,
         remainingBytes: remainingBytes,
-        totalBytes: named ? _toBytes(entry['highFee'], 'KB') : null,
+        isUnlimited: unlimited,
+        totalBytes: named && !unlimited
+            ? _toBytes(entry['highFee'], 'KB')
+            : null,
         rawUnit: 'KB',
         rawRemaining: rawRemaining,
       ),
@@ -345,7 +391,9 @@ CarrierSnapshot parseBroadnetH5(
   }
 
   if (buckets.isEmpty ||
-      buckets.every((bucket) => bucket.remainingBytes == null)) {
+      buckets.every(
+        (bucket) => bucket.remainingBytes == null && !bucket.isUnlimited,
+      )) {
     return failed(QueryStatus.error, '中国广电未返回可确认的流量套餐');
   }
   final incomplete = buckets.any((bucket) => bucket.remainingBytes == null);
@@ -355,7 +403,11 @@ CarrierSnapshot parseBroadnetH5(
     queriedAt: queriedAt ?? DateTime.now(),
     phoneMasked: phoneMasked,
     buckets: buckets,
-    message: incomplete ? '部分流量套餐余额未确认，暂不显示明细合计' : null,
+    message: buckets.any((bucket) => bucket.isUnlimited)
+        ? '官网标记含不限量套餐，达量限速和适用范围以套餐规则为准'
+        : incomplete
+        ? '部分流量套餐余额未确认，暂不显示明细合计'
+        : null,
   );
 }
 
@@ -370,6 +422,13 @@ Map<String, dynamic>? _map(Object? value) =>
     value is Map ? Map<String, dynamic>.from(value) : null;
 
 String? _text(Object? value) => value?.toString().trim();
+
+bool _isUnlimitedValue(Object? value) =>
+    value is String &&
+    RegExp(
+      r'^(不限量|无限量|无限|不限|不限制|unlimited|no\s*limit)\s*(GB|MB|KB|B)?$',
+      caseSensitive: false,
+    ).hasMatch(value.trim());
 
 bool _isAuthFailure(Map<String, dynamic> response) {
   final text = [
@@ -400,14 +459,15 @@ int? _toBytes(Object? rawValue, String? rawUnit) {
     _ => null,
   };
   if (multiplier == null) return null;
-  final match = RegExp(
-    r'^(\d+)(?:\.(\d+))?$',
-  ).firstMatch(rawValue.toString().trim());
+  final rawText = rawValue.toString().trim();
+  if (rawText.length > 80) return null;
+  final match = RegExp(r'^(\d+)(?:\.(\d+))?$').firstMatch(rawText);
   if (match == null) return null;
   final whole = match.group(1)!;
   final fraction = match.group(2) ?? '';
   final denominator = BigInt.from(10).pow(fraction.length);
   final numerator = BigInt.parse('$whole$fraction') * multiplier;
   final bytes = (numerator + denominator ~/ BigInt.two) ~/ denominator;
+  if (bytes > BigInt.parse('9223372036854775807')) return null;
   return bytes.toInt();
 }

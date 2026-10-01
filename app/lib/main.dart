@@ -6,11 +6,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_inappwebview_android/flutter_inappwebview_android.dart'
+    as android_webview;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/models.dart';
 import 'data/carrier_selection.dart';
+import 'data/carrier_accounts.dart';
 import 'ui/carrier_selection_screen.dart';
 import 'data/parsers.dart';
 import 'services/page_probe.dart';
@@ -64,18 +67,25 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         status: QueryStatus.notConnected,
       ),
   };
-  final Map<Carrier, InAppWebViewController> _controllers = {};
-  final Set<Carrier> _connected = {};
-  final Map<Carrier, Timer> _timeouts = {};
-  final Map<Carrier, DateTime> _lastRequests = {};
-  final Map<Carrier, bool> _warnedLow = {};
+  final Map<String, CarrierSnapshot> _accountSnapshots = {};
+  final Map<String, InAppWebViewController> _controllers = {};
+  final Set<String> _connected = {};
+  final Map<String, Timer> _timeouts = {};
+  final Map<String, DateTime> _lastRequests = {};
+  final Map<String, bool> _warnedLow = {};
+  final Set<String> _inFlight = {};
+  final Set<String> _awaitingLoginReturn = {};
   SharedPreferences? _prefs;
   CarrierSelection _selection = CarrierSelection.unconfigured();
+  CarrierAccounts _accounts = CarrierAccounts.fromSelection(
+    CarrierSelection.unconfigured(),
+  );
   Set<Carrier> _draftSelection = {};
+  final Set<Carrier> _draftSecond = {};
   bool _restoring = true;
   bool _savingSelection = false;
-  Map<String, dynamic>? _broadnetSession;
-  Carrier? _visibleCarrier;
+  final Map<String, Map<String, dynamic>> _broadnetSessions = {};
+  String? _visibleAccountId;
   double _thresholdGb = 5;
   BackgroundRefreshInterval _backgroundRefresh = BackgroundRefreshInterval.off;
   bool _reminders = false;
@@ -83,10 +93,82 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   String? _webMessage;
   Timer? _foregroundTimer;
   bool _clearing = false;
+  bool _profileClearPending = false;
+  bool _widgetPinPending = false;
   Future<void> _storageTasks = Future<void>.value();
 
   bool _current(int generation) =>
       mounted && !_clearing && generation == _generation;
+
+  CarrierSnapshot _snapshot(CarrierAccount account) =>
+      _accountSnapshots[account.id] ??
+      (account.isPrimary
+          ? _snapshots[account.carrier]!
+          : CarrierSnapshot(
+              carrier: account.carrier,
+              status: QueryStatus.notConnected,
+            ));
+
+  void _putSnapshot(CarrierAccount account, CarrierSnapshot snapshot) {
+    if (snapshot.carrier != account.carrier) return;
+    _accountSnapshots[account.id] = snapshot;
+    if (account.isPrimary) _snapshots[account.carrier] = snapshot;
+  }
+
+  List<CarrierAccount> get _visibleAccounts =>
+      _accounts.visibleAccounts(_selection);
+
+  CarrierAccount? _account(String id) => _accounts.find(id);
+
+  Future<bool> _canAddSecond(
+    Carrier carrier,
+    Set<Carrier> pending,
+    Set<Carrier> selected,
+  ) async {
+    if (_profileClearPending) {
+      _showInfo('第二张卡暂时锁住了', '上次清除网页登录资料还未完成，请重试清除后再加入。');
+      return false;
+    }
+    if (_accounts.find('${carrier.name}_2') != null ||
+        pending.contains(carrier)) {
+      return false;
+    }
+    final effectiveSelected = {...selected, carrier};
+    final existing = _accounts.accounts
+        .where((a) => effectiveSelected.contains(a.carrier))
+        .length;
+    final newPrimaries = effectiveSelected
+        .where((c) => _accounts.find(c.name) == null)
+        .length;
+    final newSeconds = {...pending, carrier}
+        .where(
+          (c) =>
+              effectiveSelected.contains(c) &&
+              _accounts.find('${c.name}_2') == null,
+        )
+        .length;
+    if (existing + newPrimaries + newSeconds > 4) {
+      _showInfo('最多照顾四张卡', '请先整理已有卡片，再加入新的号码。');
+      return false;
+    }
+    if (demoMode) return true;
+    if (!_android) return false;
+    try {
+      if (await android_webview
+          .AndroidInAppWebViewController.supportsAccountProfiles()) {
+        return mounted;
+      }
+    } on PlatformException {
+      // Installed WebView does not expose isolated profiles.
+    }
+    if (mounted) {
+      _showInfo(
+        '这台手机暂不支持第二张同运营商卡',
+        '当前网页内核无法把两个号码的登录会话分开。为了避免把同一份余额显示两次，暂时只能连接这家运营商的一张卡。',
+      );
+    }
+    return false;
+  }
 
   Future<void> _store(Future<void> Function() operation) {
     final task = _storageTasks.then((_) => operation());
@@ -96,11 +178,14 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   Future<void> _closeOfficialPage() async {
     final generation = _generation;
-    final controller = _controllers[Carrier.broadnet];
-    if (_visibleCarrier == Carrier.broadnet && controller != null) {
-      await _saveSession(controller, generation);
+    final account = _visibleAccountId == null
+        ? null
+        : _account(_visibleAccountId!);
+    final controller = account == null ? null : _controllers[account.id];
+    if (account?.carrier == Carrier.broadnet && controller != null) {
+      await _saveSession(account!, controller, generation);
     }
-    if (_current(generation)) setState(() => _visibleCarrier = null);
+    if (_current(generation)) setState(() => _visibleAccountId = null);
   }
 
   Future<void> _publishWidget() async {
@@ -112,6 +197,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           _snapshots.values,
           _thresholdGb,
           selection: _selection,
+          accounts: _accounts,
+          accountSnapshots: _accountSnapshots,
         );
       }
     });
@@ -119,7 +206,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   Future<void> _openFromWidget() async {
     if (!mounted || _clearing) return;
-    setState(() => _visibleCarrier = null);
+    setState(() => _visibleAccountId = null);
     _lastRequests.clear();
     _refreshAll();
   }
@@ -129,16 +216,25 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     await _publishWidget();
     if (!mounted || _clearing) return;
     try {
-      final requested = await _widgetBridge.requestPin();
-      if (!requested && mounted) {
-        _showInfo(
-          '从桌面添加卡片',
-          '请长按桌面空白处，进入「小组件」或「窗口小工具」，找到「流量小伙伴」并拖到桌面。\n\n卡片显示上次查询的余额与时间，轻点会打开 APP 更新。',
-        );
+      final result = await _widgetBridge.requestPinDetailed();
+      if (!mounted) return;
+      const manual = '也可以长按桌面空白处 →「小组件」或「窗口小工具」→ 找到「流量小伙伴」→ 拖到桌面。';
+      switch (result.status) {
+        case WidgetPinStatus.alreadyAdded:
+          _showInfo('桌面卡片已经在啦', '系统检测到这张卡片已添加到桌面。');
+        case WidgetPinStatus.requestPendingConfirmation:
+          _widgetPinPending = true;
+          _showInfo('请确认桌面弹窗', '已向桌面发出添加请求，请在系统弹窗中确认；这一步还不代表添加成功。\n\n$manual');
+        case WidgetPinStatus.unsupported:
+        case WidgetPinStatus.notAdded:
+          _showInfo('请手动添加桌面卡片', '这次系统没有弹出确认窗口。\n\n$manual');
       }
     } on PlatformException {
       if (mounted) {
-        _showInfo('从桌面添加卡片', '请长按手机桌面，在小组件中找到「流量小伙伴」。不同桌面的入口名称可能略有不同。');
+        _showInfo(
+          '请手动添加桌面卡片',
+          '系统没有弹出确认窗口。请长按桌面空白处，在「小组件」或「窗口小工具」中找到「流量小伙伴」，拖到桌面。',
+        );
       }
     }
   }
@@ -153,6 +249,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     if (_android && !demoMode) _widgetBridge.onOpen(_openFromWidget);
     if (demoMode) {
       _selection = CarrierSelection.complete(Carrier.values);
+      _accounts = CarrierAccounts.fromSelection(_selection);
       _restoring = false;
       for (final carrier in Carrier.values) {
         _snapshots[carrier] = CarrierSnapshot(
@@ -193,13 +290,14 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               ),
           ],
         );
+        _accountSnapshots[carrier.name] = _snapshots[carrier]!;
       }
     } else {
       unawaited(_restore());
     }
     _foregroundTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
-          _visibleCarrier == null) {
+          _visibleAccountId == null) {
         _refreshAll();
       }
     });
@@ -210,65 +308,85 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     if (!_current(generation)) return;
     _prefs = prefs;
-    Map<String, dynamic>? session;
-    try {
-      final raw = await _secure
-          .read(key: 'broadnet_session')
-          .timeout(const Duration(seconds: 3));
-      if (raw != null) {
+    if (prefs.getBool('account_profiles_cleanup_pending') == true) {
+      try {
+        await android_webview
+            .AndroidInAppWebViewController.deleteAccountProfiles();
+      } on PlatformException {
+        // Keep the durable pending flag and disable every account.
+      }
+    }
+    _profileClearPending =
+        prefs.getBool('account_profiles_cleanup_pending') == true;
+    final restoredSelection = CarrierSelection.restore(
+      savedJson: prefs.get('carrier_selection') == null
+          ? null
+          : prefs.get('carrier_selection') is String
+          ? prefs.get('carrier_selection') as String
+          : 'invalid',
+      legacyPreferences: {
+        for (final key in prefs.getKeys()) key: prefs.get(key),
+      },
+    );
+    final restoredAccounts = CarrierAccounts.restore(
+      savedJson: prefs.getString(CarrierAccounts.storageKey),
+      selection: restoredSelection,
+    );
+    for (final account in restoredAccounts.accounts.where(
+      (a) => a.carrier == Carrier.broadnet,
+    )) {
+      try {
+        final raw = await _secure
+            .read(key: account.broadnetSessionKey)
+            .timeout(const Duration(seconds: 3));
+        if (raw == null) continue;
         final candidate = jsonDecode(raw) as Map<String, dynamic>;
         final savedAt = DateTime.tryParse(
           candidate['savedAt'] as String? ?? '',
         );
         final age = savedAt == null ? null : DateTime.now().difference(savedAt);
         if (age != null && !age.isNegative && age < const Duration(days: 7)) {
-          session = candidate;
+          _broadnetSessions[account.id] = candidate;
         } else {
-          await _secure.delete(key: 'broadnet_session');
+          await _secure.delete(key: account.broadnetSessionKey);
         }
+      } catch (_) {
+        // A corrupt session requires official login again.
       }
-    } catch (_) {
-      /* A corrupt session requires official login again. */
     }
     if (!_current(generation)) return;
     setState(() {
       _prefs = prefs;
-      _selection = CarrierSelection.restore(
-        savedJson: prefs.get('carrier_selection') == null
-            ? null
-            : prefs.get('carrier_selection') is String
-            ? prefs.get('carrier_selection') as String
-            : 'invalid',
-        legacyPreferences: {
-          for (final key in prefs.getKeys()) key: prefs.get(key),
-        },
-      );
+      _selection = restoredSelection;
+      _accounts = restoredAccounts;
       _restoring = false;
-      _broadnetSession = session;
       _thresholdGb = (prefs.getDouble('threshold_gb') ?? 5).clamp(1, 20);
       _backgroundRefresh = BackgroundRefreshInterval.fromMinutes(
         prefs.getInt('background_refresh_minutes'),
       );
       _reminders = prefs.getBool('reminders') ?? false;
-      for (final carrier in Carrier.values) {
-        final raw = prefs.getString('snapshot_${carrier.name}');
+      for (final account in restoredAccounts.accounts) {
+        final raw = prefs.getString(account.snapshotKey);
         if (raw != null) {
           try {
             final snapshot = CarrierSnapshot.fromJson(
               jsonDecode(raw) as Map<String, dynamic>,
             );
-            _snapshots[carrier] = snapshot.status == QueryStatus.success
-                ? snapshot.copyWith(
-                    status: QueryStatus.error,
-                    message: '上次查询记录，正在确认最新状态',
-                  )
-                : snapshot;
+            _putSnapshot(
+              account,
+              snapshot.status == QueryStatus.success
+                  ? snapshot.copyWith(
+                      status: QueryStatus.error,
+                      message: '上次查询记录，正在确认最新状态',
+                    )
+                  : snapshot,
+            );
           } catch (_) {
             /* Retain the explicit unconnected state. */
           }
         }
-        if (prefs.getBool('connected_${carrier.name}') ?? false) {
-          _connected.add(carrier);
+        if (prefs.getBool(account.connectedKey) ?? false) {
+          _connected.add(account.id);
         }
       }
     });
@@ -277,6 +395,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         await prefs.setString(
           'carrier_selection',
           _selection.toStorageString(),
+        );
+        await prefs.setString(
+          CarrierAccounts.storageKey,
+          _accounts.toStorageString(),
         );
       }
     });
@@ -289,8 +411,34 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _visibleCarrier == null) {
-      unawaited(_reloadBackgroundSnapshotsAndRefresh());
+    if (state == AppLifecycleState.resumed) {
+      if (_widgetPinPending) unawaited(_checkWidgetInstallation());
+      if (_visibleAccountId == null) {
+        unawaited(_reloadBackgroundSnapshotsAndRefresh());
+      }
+    }
+  }
+
+  Future<void> _checkWidgetInstallation() async {
+    try {
+      final result = await _widgetBridge.installationStatus();
+      if (!mounted) return;
+      if (!result.isAlreadyAdded) {
+        if (result.status == WidgetPinStatus.notAdded ||
+            result.status == WidgetPinStatus.unsupported) {
+          _widgetPinPending = false;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('还没检测到桌面卡片，可长按桌面从小组件里手动添加')),
+          );
+        }
+        return;
+      }
+      _widgetPinPending = false;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('桌面卡片已经添加好啦')));
+    } on PlatformException {
+      // Launcher state can be checked on the next foreground entry.
     }
   }
 
@@ -300,12 +448,13 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       await prefs.reload();
       if (!mounted || _clearing) return;
       setState(() {
-        for (final carrier in _selection.selectedCarriers) {
-          final raw = prefs.getString('snapshot_${carrier.name}');
+        for (final account in _visibleAccounts) {
+          final raw = prefs.getString(account.snapshotKey);
           if (raw == null) continue;
           try {
-            _snapshots[carrier] = CarrierSnapshot.fromJson(
-              jsonDecode(raw) as Map<String, dynamic>,
+            _putSnapshot(
+              account,
+              CarrierSnapshot.fromJson(jsonDecode(raw) as Map<String, dynamic>),
             );
           } catch (_) {
             // Keep the in-memory result if a background record is malformed.
@@ -318,12 +467,11 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   Future<bool> _syncBackgroundSchedule() async {
     if (!_android || demoMode) return true;
-    final hasBackgroundCarrier = Carrier.values.any(
-      (carrier) =>
-          carrier != Carrier.telecom &&
-          _selection.allows(carrier) &&
-          _connected.contains(carrier) &&
-          _snapshots[carrier]?.queriedAt != null,
+    final hasBackgroundCarrier = _visibleAccounts.any(
+      (account) =>
+          account.carrier != Carrier.telecom &&
+          _connected.contains(account.id) &&
+          _snapshot(account).queriedAt != null,
     );
     final interval = hasBackgroundCarrier
         ? _backgroundRefresh
@@ -347,28 +495,38 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     return uri != null && isCarrierNavigationAllowed(carrier, uri);
   }
 
-  void _connect(Carrier carrier) {
+  void _connect(Carrier carrier) => _connectAccount(carrier.name);
+
+  void _connectAccount(String accountId) {
+    final account = _account(accountId);
+    if (account == null) return;
+    if (_profileClearPending) {
+      _showInfo('查询暂时锁住了', '上次清除网页登录资料还未完成，请在设置里重试清除。');
+      return;
+    }
+    if (_visibleAccountId == accountId) return;
+    final carrier = account.carrier;
     if (_clearing || !_selection.allows(carrier)) return;
     if (demoMode || !_android) {
       _showInfo('这是界面预览', '请安装安卓测试包后连接号码。演示流量不是您的实际余额。');
       return;
     }
     setState(() {
-      _visibleCarrier = carrier;
+      _visibleAccountId = accountId;
       _webMessage = null;
-      _connected.add(carrier);
+      _connected.add(accountId);
     });
     final prefs = _prefs;
     if (prefs != null) {
       final generation = _generation;
       final saved = _store(() async {
         if (_current(generation)) {
-          await prefs.setBool('connected_${carrier.name}', true);
+          await prefs.setBool(account.connectedKey, true);
         }
       });
       unawaited(saved.then((_) => _syncBackgroundSchedule()));
     }
-    final controller = _controllers[carrier];
+    final controller = _controllers[accountId];
     if (controller != null) {
       unawaited(
         controller.loadUrl(
@@ -380,60 +538,112 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   void _refreshAll() {
     if (demoMode || _clearing) return;
-    for (final carrier in _selection.queryableCarriers(_connected)) {
-      _refresh(carrier, automatic: true);
+    for (final account in _visibleAccounts.where(
+      (a) => _connected.contains(a.id),
+    )) {
+      _refreshAccount(account.id, automatic: true);
     }
   }
 
-  Future<void> _refresh(Carrier carrier, {bool automatic = false}) async {
-    if (_clearing || !_selection.allows(carrier)) return;
-    if (!_connected.contains(carrier)) {
-      if (!automatic) _connect(carrier);
+  Future<void> _refresh(Carrier carrier, {bool automatic = false}) =>
+      _refreshAccount(carrier.name, automatic: automatic);
+
+  Future<void> _refreshAccount(
+    String accountId, {
+    bool automatic = false,
+  }) async {
+    final account = _account(accountId);
+    if (account == null) return;
+    if (_profileClearPending) {
+      if (!automatic) {
+        _showInfo('查询暂时锁住了', '上次清除网页登录资料还未完成，请在设置里重试清除。');
+      }
       return;
     }
-    final last = _lastRequests[carrier];
+    final carrier = account.carrier;
+    if (_clearing || !_selection.allows(carrier)) return;
+    if (!_connected.contains(accountId)) {
+      if (!automatic) _connectAccount(accountId);
+      return;
+    }
+    if (_inFlight.contains(accountId)) return;
+    final last = _lastRequests[accountId];
     if (last != null &&
         DateTime.now().difference(last) < const Duration(seconds: 30)) {
       return;
     }
-    final controller = _controllers[carrier];
+    final controller = _controllers[accountId];
     if (controller == null) return;
     final generation = _generation;
-    if (carrier == Carrier.broadnet) await _saveSession(controller, generation);
-    if (!_current(generation)) return;
-    _lastRequests[carrier] = DateTime.now();
+    _inFlight.add(accountId);
+    if (carrier == Carrier.broadnet) {
+      await _saveSession(account, controller, generation);
+    }
+    if (!_current(generation)) {
+      _inFlight.remove(accountId);
+      return;
+    }
+    _lastRequests[accountId] = DateTime.now();
     setState(
-      () => _snapshots[carrier] = _snapshots[carrier]!.copyWith(
-        status: QueryStatus.loading,
-        message: '正在向运营商查询',
+      () => _putSnapshot(
+        account,
+        _snapshot(
+          account,
+        ).copyWith(status: QueryStatus.loading, message: '正在向运营商查询'),
       ),
     );
     unawaited(_publishWidget());
-    _timeouts[carrier]?.cancel();
-    _timeouts[carrier] = Timer(const Duration(seconds: 35), () {
-      if (!mounted || _snapshots[carrier]!.status != QueryStatus.loading) {
+    _timeouts[accountId]?.cancel();
+    _timeouts[accountId] = Timer(const Duration(seconds: 35), () {
+      if (!_current(generation) ||
+          _snapshot(account).status != QueryStatus.loading) {
         return;
       }
-      setState(
-        () => _snapshots[carrier] = _snapshots[carrier]!.copyWith(
-          status: QueryStatus.error,
-          message: '未取得可识别的流量结果，请打开官方查询页确认',
-        ),
+      _inFlight.remove(accountId);
+      final failed = _snapshot(
+        account,
+      ).copyWith(status: QueryStatus.error, message: '未取得可识别的流量结果，请打开官方查询页确认');
+      setState(() => _putSnapshot(account, failed));
+      unawaited(
+        _store(() async {
+          if (_current(generation)) {
+            await _prefs?.setString(
+              account.snapshotKey,
+              jsonEncode(failed.toJson()),
+            );
+          }
+        }),
       );
       unawaited(_publishWidget());
     });
-    unawaited(
-      controller.loadUrl(
+    try {
+      await controller.loadUrl(
         urlRequest: URLRequest(url: WebUri(_queryUrl(carrier))),
-      ),
-    );
+      );
+    } catch (_) {
+      _timeouts[accountId]?.cancel();
+      _inFlight.remove(accountId);
+      if (_current(generation)) {
+        setState(
+          () => _putSnapshot(
+            account,
+            _snapshot(
+              account,
+            ).copyWith(status: QueryStatus.error, message: '官方查询页暂时无法打开'),
+          ),
+        );
+        unawaited(_publishWidget());
+      }
+    }
   }
 
   Future<void> _receive(
-    Carrier carrier,
+    CarrierAccount account,
     List<dynamic> args,
     int generation,
   ) async {
+    final carrier = account.carrier;
+    final accountId = account.id;
     if (!_current(generation) || !_selection.allows(carrier)) return;
     if (args.isEmpty || args.first is! Map) return;
     final payload = Map<String, dynamic>.from(args.first as Map);
@@ -443,21 +653,20 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         ? payload['stage'] as String
         : null;
     if (!isCarrierResponseAllowed(carrier, url, page, stage)) return;
-    if (carrier == Carrier.unicom || carrier == Carrier.telecom) {
-      // A queued event from a Home page must not revive a logged-out SPA.
-      final controller = _controllers[carrier];
-      if (controller == null) return;
-      try {
-        final currentUrl = await controller.getUrl();
-        if (!_current(generation) ||
-            !_selection.allows(carrier) ||
-            currentUrl == null ||
-            Uri.tryParse(currentUrl.toString()) != page) {
-          return;
-        }
-      } on Exception {
+    if (!_inFlight.contains(accountId)) return;
+    // A delayed response must not revive a page that already returned to login.
+    final controller = _controllers[accountId];
+    if (controller == null) return;
+    try {
+      final currentUrl = await controller.getUrl();
+      if (!_current(generation) ||
+          !_selection.allows(carrier) ||
+          currentUrl == null ||
+          Uri.tryParse(currentUrl.toString()) != page) {
         return;
       }
+    } on Exception {
+      return;
     }
     final raw = payload['body'];
     if (raw is! String || raw.length > 2000000) return;
@@ -499,39 +708,36 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         !shouldApplyBroadnetResponse(
           stage: payload['stage'] is String ? payload['stage'] as String : null,
           parsedStatus: snapshot.status,
-          currentStatus: _snapshots[carrier]!.status,
+          currentStatus: _snapshot(account).status,
           httpStatus: status,
         )) {
       // Prefer the site's decoded event, but accept an independently verified
       // plaintext raw success if that event was not observed.
       return;
     }
-    if (!mounted) return;
-    final hadPreviousQuery = _snapshots[carrier]?.queriedAt != null;
-    _timeouts[carrier]?.cancel();
+    if (!_current(generation) || !_inFlight.contains(accountId)) return;
+    final hadPreviousQuery = _snapshot(account).queriedAt != null;
+    _timeouts[accountId]?.cancel();
+    _inFlight.remove(accountId);
     final displayed = snapshot.status == QueryStatus.success
         ? snapshot
-        : _snapshots[carrier]!.copyWith(
-            status: snapshot.status,
-            message: snapshot.message,
-          );
-    setState(() => _snapshots[carrier] = displayed);
+        : _snapshot(
+            account,
+          ).copyWith(status: snapshot.status, message: snapshot.message);
+    setState(() => _putSnapshot(account, displayed));
     await _publishWidget();
     if (!_current(generation)) return;
     await _store(() async {
       if (_current(generation)) {
         await _prefs?.setString(
-          'snapshot_${carrier.name}',
+          account.snapshotKey,
           jsonEncode(displayed.toJson()),
         );
         if (snapshot.status == QueryStatus.authExpired) {
-          await _prefs?.setBool(
-            'background_auth_required_${carrier.name}',
-            true,
-          );
+          await _prefs?.setBool('background_auth_required_${account.id}', true);
         } else if (snapshot.status == QueryStatus.success) {
           await _prefs?.setBool(
-            'background_auth_required_${carrier.name}',
+            'background_auth_required_${account.id}',
             false,
           );
         }
@@ -543,11 +749,11 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       if (!_current(generation)) return;
       final remaining = snapshot.generalRemainingBytes;
       final low = remaining != null && remaining / 1073741824 <= _thresholdGb;
-      if (low && !(_warnedLow[carrier] ?? false) && _reminders && _android) {
+      if (low && !(_warnedLow[accountId] ?? false) && _reminders && _android) {
         try {
           await _notifications.invokeMethod('notify', {
-            'id': carrier.index + 1,
-            'title': '${carrier.label}流量快见底了',
+            'id': carrier.index * 2 + (account.isPrimary ? 1 : 2),
+            'title': '${account.label}流量快见底了',
             'body':
                 '通用流量剩余 ${(remaining / 1073741824).toStringAsFixed(2)} GB，数据以运营商查询为准。',
           });
@@ -555,11 +761,12 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           /* Dashboard retains the actual result. */
         }
       }
-      _warnedLow[carrier] = low;
+      _warnedLow[accountId] = low;
     }
   }
 
   Future<void> _saveSession(
+    CarrierAccount account,
     InAppWebViewController controller,
     int generation,
   ) async {
@@ -576,28 +783,32 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           (session['sessionId'] as String).isEmpty) {
         return;
       }
-      if (_broadnetSession?['sessionId'] == session['sessionId']) return;
+      if (_broadnetSessions[account.id]?['sessionId'] == session['sessionId']) {
+        return;
+      }
       session['savedAt'] = DateTime.now().toIso8601String();
       await _store(() async {
         if (_current(generation)) {
           await _secure.write(
-            key: 'broadnet_session',
+            key: account.broadnetSessionKey,
             value: jsonEncode(session),
           );
         }
       });
-      if (_current(generation)) _broadnetSession = session;
+      if (_current(generation)) _broadnetSessions[account.id] = session;
     } catch (_) {
       /* Official login remains usable for this WebView session. */
     }
   }
 
-  Widget _webView(Carrier carrier) {
+  Widget _webView(CarrierAccount account) {
+    final carrier = account.carrier;
+    final accountId = account.id;
     final generation = _generation;
     return Positioned.fill(
-      key: ValueKey('view_${carrier.name}_$generation'),
+      key: ValueKey('view_${account.id}_$generation'),
       child: Offstage(
-        offstage: _visibleCarrier != carrier,
+        offstage: _visibleAccountId != accountId,
         child: Column(
           children: [
             Material(
@@ -614,16 +825,16 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                         ),
                         Expanded(
                           child: Text(
-                            '${carrier.label}官方页面',
+                            '${account.label}官方页面',
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                         TextButton(
-                          onPressed: () => _refresh(carrier),
+                          onPressed: () => _refreshAccount(accountId),
                           child: const Text('查询流量'),
                         ),
                         IconButton(
-                          onPressed: () => _controllers[carrier]?.reload(),
+                          onPressed: () => _controllers[accountId]?.reload(),
                           icon: const Icon(Icons.refresh),
                         ),
                       ],
@@ -644,14 +855,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
             ),
             Expanded(
               child: InAppWebView(
-                key: ValueKey('${carrier.name}_$_generation'),
-                initialUrlRequest: URLRequest(
-                  url: WebUri(
-                    _snapshots[carrier]!.status == QueryStatus.notConnected
-                        ? _loginUrl(carrier)
-                        : _queryUrl(carrier),
-                  ),
-                ),
+                key: ValueKey('${account.id}_$_generation'),
+                // Every account is loaded only after its WebView profile is set.
                 initialSettings: InAppWebViewSettings(
                   javaScriptEnabled: true,
                   useShouldOverrideUrlLoading: true,
@@ -672,24 +877,60 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   if (carrier == Carrier.broadnet)
                     UserScript(
                       groupName: 'broadnetRestore',
-                      source: broadnetSessionRestoreScript(_broadnetSession),
+                      source: broadnetSessionRestoreScript(
+                        _broadnetSessions[accountId],
+                      ),
                       injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
                     ),
                 ]),
-                onWebViewCreated: (controller) {
+                onWebViewCreated: (controller) async {
                   if (!_current(generation)) return;
-                  _controllers[carrier] = controller;
+                  if (account.profileName != null) {
+                    try {
+                      await _store(() async {
+                        if (!_current(generation)) return;
+                        if (await _prefs?.setBool(
+                              'account_profiles_may_exist',
+                              true,
+                            ) !=
+                            true) {
+                          throw StateError(
+                            'Profile ownership could not be saved',
+                          );
+                        }
+                      });
+                      if (!_current(generation)) return;
+                      await (controller.platform
+                              as android_webview.AndroidInAppWebViewController)
+                          .setAccountProfile(account.profileName!);
+                    } catch (_) {
+                      if (_current(generation)) {
+                        setState(
+                          () => _putSnapshot(
+                            account,
+                            _snapshot(account).copyWith(
+                              status: QueryStatus.error,
+                              message: '此手机的网页内核暂不支持第二张同运营商卡',
+                            ),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+                  }
+                  if (!_current(generation)) return;
+                  _controllers[accountId] = controller;
                   controller.addJavaScriptHandler(
                     handlerName: 'trafficResponse',
-                    callback: (args) => _receive(carrier, args, generation),
+                    callback: (args) => _receive(account, args, generation),
                   );
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (_current(generation) &&
-                        _snapshots[carrier]!.status !=
-                            QueryStatus.notConnected) {
-                      _refresh(carrier);
-                    }
-                  });
+                  if (_snapshot(account).status == QueryStatus.notConnected) {
+                    await controller.loadUrl(
+                      urlRequest: URLRequest(url: WebUri(_loginUrl(carrier))),
+                    );
+                  } else {
+                    await _refreshAccount(accountId);
+                  }
                 },
                 shouldOverrideUrlLoading: (controller, action) async =>
                     _allowedUrl(carrier, action.request.url)
@@ -699,11 +940,16 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   if (!_current(generation) || url == null) return;
                   final uri = Uri.tryParse(url.toString());
                   if (uri != null && isCarrierLoginPage(uri)) {
-                    _timeouts[carrier]?.cancel();
+                    _timeouts[accountId]?.cancel();
+                    _inFlight.remove(accountId);
+                    _awaitingLoginReturn.add(accountId);
                     setState(
-                      () => _snapshots[carrier] = _snapshots[carrier]!.copyWith(
-                        status: QueryStatus.authExpired,
-                        message: '请在官方页面验证号码，完成后查询流量',
+                      () => _putSnapshot(
+                        account,
+                        _snapshot(account).copyWith(
+                          status: QueryStatus.authExpired,
+                          message: '请在官方页面验证号码，完成后查询流量',
+                        ),
                       ),
                     );
                     unawaited(_publishWidget());
@@ -713,41 +959,56 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   if (!_current(generation)) return;
                   if (url != null &&
                       isCarrierLoginPage(Uri.parse(url.toString()))) {
+                    _awaitingLoginReturn.add(accountId);
                     if (carrier == Carrier.broadnet) {
-                      _broadnetSession = null;
+                      _broadnetSessions.remove(accountId);
                       await controller.removeUserScriptsByGroupName(
                         groupName: 'broadnetRestore',
                       );
                       await _store(() async {
                         if (_current(generation)) {
-                          await _secure.delete(key: 'broadnet_session');
+                          await _secure.delete(key: account.broadnetSessionKey);
                         }
                       });
                     }
                     if (!_current(generation)) return;
-                    _timeouts[carrier]?.cancel();
+                    _timeouts[accountId]?.cancel();
+                    _inFlight.remove(accountId);
                     setState(
-                      () => _snapshots[carrier] = _snapshots[carrier]!.copyWith(
-                        status: QueryStatus.authExpired,
-                        message: '请在官方页面验证号码，完成后查询流量',
+                      () => _putSnapshot(
+                        account,
+                        _snapshot(account).copyWith(
+                          status: QueryStatus.authExpired,
+                          message: '请在官方页面验证号码，完成后查询流量',
+                        ),
                       ),
                     );
                     unawaited(_publishWidget());
                   } else if (carrier == Carrier.broadnet &&
                       url?.host == 'www.10099.com.cn') {
-                    await _saveSession(controller, generation);
+                    await _saveSession(account, controller, generation);
+                  }
+                  if (_current(generation) &&
+                      url != null &&
+                      !isCarrierLoginPage(Uri.parse(url.toString())) &&
+                      _awaitingLoginReturn.remove(accountId)) {
+                    unawaited(_refreshAccount(accountId));
                   }
                 },
                 onReceivedError: (controller, request, error) {
                   if (request.isForMainFrame != true || !_current(generation)) {
                     return;
                   }
-                  _timeouts[carrier]?.cancel();
+                  _timeouts[accountId]?.cancel();
+                  _inFlight.remove(accountId);
                   setState(() {
                     _webMessage = '官方页面暂时无法打开，请检查网络后重试';
-                    _snapshots[carrier] = _snapshots[carrier]!.copyWith(
-                      status: QueryStatus.error,
-                      message: _webMessage,
+                    _putSnapshot(
+                      account,
+                      _snapshot(account).copyWith(
+                        status: QueryStatus.error,
+                        message: _webMessage,
+                      ),
                     );
                   });
                   unawaited(_publishWidget());
@@ -760,18 +1021,83 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _applySelection(Set<Carrier> carriers) async {
+  Future<void> _applySelection(
+    Set<Carrier> carriers, {
+    Set<Carrier> secondAccounts = const {},
+  }) async {
     if (_savingSelection || carriers.isEmpty || _clearing) return;
     final previousSelection = _selection;
+    final previousAccounts = _accounts;
     final selection = CarrierSelection.complete(carriers);
+    var nextAccounts = _accounts.ensureSelection(selection);
+    final pendingCount = secondAccounts
+        .where(
+          (carrier) =>
+              carriers.contains(carrier) &&
+              nextAccounts.find('${carrier.name}_2') == null,
+        )
+        .length;
+    if (nextAccounts.visibleCount(selection) + pendingCount > 4) {
+      _showInfo('最多照顾四张卡', '当前保存的号码加上新选择会超过四张，请先取消第二张卡后再保存。');
+      return;
+    }
+    for (final carrier in secondAccounts.where(carriers.contains)) {
+      nextAccounts = nextAccounts.addSecond(carrier);
+    }
+    final restoredNew = <String, CarrierSnapshot>{};
+    final restoredSessions = <String, Map<String, dynamic>>{};
+    final connectedNew = <String>{};
+    for (final account in nextAccounts.accounts) {
+      if (previousAccounts.find(account.id) != null) continue;
+      if (_prefs?.getBool(account.connectedKey) == true) {
+        connectedNew.add(account.id);
+      }
+      final raw = _prefs?.getString(account.snapshotKey);
+      if (raw != null) {
+        try {
+          restoredNew[account.id] = CarrierSnapshot.fromJson(
+            jsonDecode(raw) as Map<String, dynamic>,
+          );
+        } catch (_) {
+          // Keep this card unconnected if an old snapshot is corrupt.
+        }
+      }
+      if (account.carrier == Carrier.broadnet) {
+        try {
+          final secureRaw = await _secure.read(key: account.broadnetSessionKey);
+          if (secureRaw == null) continue;
+          final session = jsonDecode(secureRaw) as Map<String, dynamic>;
+          final savedAt = DateTime.tryParse(
+            session['savedAt'] as String? ?? '',
+          );
+          final age = savedAt == null
+              ? null
+              : DateTime.now().difference(savedAt);
+          if (age != null && !age.isNegative && age < const Duration(days: 7)) {
+            restoredSessions[account.id] = session;
+          }
+        } catch (_) {
+          // A corrupt backup requires official login again.
+        }
+      }
+    }
     final oldControllers = _controllers.values.toList();
     setState(() {
       _savingSelection = true;
       _generation++;
       _selection = selection;
+      _accounts = nextAccounts;
+      _connected.addAll(connectedNew);
+      _broadnetSessions.addAll(restoredSessions);
+      for (final account in nextAccounts.accounts) {
+        final restored = restoredNew[account.id];
+        if (restored != null) _putSnapshot(account, restored);
+      }
       _controllers.clear();
-      _visibleCarrier = null;
+      _visibleAccountId = null;
       _lastRequests.clear();
+      _inFlight.clear();
+      _awaitingLoginReturn.clear();
       _warnedLow.clear();
     });
     final generation = _generation;
@@ -796,6 +1122,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
             selection.toStorageString(),
           );
           if (saved == false) throw StateError('Selection save failed');
+          await _prefs?.setString(
+            CarrierAccounts.storageKey,
+            _accounts.toStorageString(),
+          );
           if (_android && !demoMode) {
             try {
               await _notifications.invokeMethod('cancelAll');
@@ -814,6 +1144,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       if (_current(generation)) {
         setState(() {
           _selection = previousSelection;
+          _accounts = previousAccounts;
           _savingSelection = false;
         });
         await _syncBackgroundSchedule();
@@ -825,26 +1156,91 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   Future<void> _manageCarriers() async {
     var draft = _selection.selectedCarriers.toSet();
-    final result = await Navigator.of(context).push<Set<Carrier>>(
-      MaterialPageRoute(
-        builder: (context) => StatefulBuilder(
-          builder: (context, update) => CarrierSelectionScreen(
-            selectedCarriers: draft,
-            onSelectionChanged: (value) => update(() => draft = value),
-            onContinue: (value) => Navigator.pop(context, value),
-            isInitialSetup: false,
-            demo: demoMode,
+    final draftSecond = <Carrier>{};
+    final result = await Navigator.of(context)
+        .push<(Set<Carrier>, Set<Carrier>)>(
+          MaterialPageRoute(
+            builder: (context) => StatefulBuilder(
+              builder: (context, update) => CarrierSelectionScreen(
+                selectedCarriers: draft,
+                accountCounts: {
+                  for (final carrier in Carrier.values)
+                    carrier:
+                        _accounts.accounts
+                            .where((a) => a.carrier == carrier)
+                            .length +
+                        (draftSecond.contains(carrier) ? 1 : 0),
+                },
+                onSelectionChanged: (value) => update(() => draft = value),
+                onAddSecondAccount: (carrier) async {
+                  if (await _canAddSecond(carrier, draftSecond, draft)) {
+                    update(() {
+                      draft.add(carrier);
+                      draftSecond.add(carrier);
+                    });
+                  }
+                },
+                onContinue: (value) =>
+                    Navigator.pop(context, (value, draftSecond)),
+                isInitialSetup: false,
+                demo: demoMode,
+              ),
+            ),
           ),
-        ),
-      ),
-    );
-    if (result != null && mounted) await _applySelection(result);
+        );
+    if (result != null && mounted) {
+      await _applySelection(result.$1, secondAccounts: result.$2);
+    }
+  }
+
+  Future<void> _removeSecondAccount(String id) async {
+    final account = _account(id);
+    if (account == null || account.isPrimary || _clearing) return;
+    final previous = _accounts;
+    final oldControllers = _controllers.values.toList();
+    setState(() {
+      _generation++;
+      _accounts = _accounts.removeSecond(id);
+      _controllers.clear();
+      _visibleAccountId = null;
+      _inFlight.clear();
+      _awaitingLoginReturn.clear();
+      _lastRequests.clear();
+    });
+    for (final timer in _timeouts.values) {
+      timer.cancel();
+    }
+    for (final controller in oldControllers) {
+      try {
+        await controller.stopLoading();
+      } on Exception {
+        // The view may already be disposed.
+      }
+    }
+    try {
+      await _prefs?.setString(
+        CarrierAccounts.storageKey,
+        _accounts.toStorageString(),
+      );
+      await _syncBackgroundSchedule();
+      await _publishWidget();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _accounts = previous);
+        _showInfo('卡片暂未保存', '请稍后再试。');
+      }
+    }
   }
 
   Future<void> _settings() async {
     double threshold = _thresholdGb;
     bool reminders = _reminders;
     var backgroundRefresh = _backgroundRefresh;
+    final statusFuture = _android
+        ? BackgroundRefreshScheduler.status().catchError(
+            (Object _) => const BackgroundRefreshStatus(outcome: 'never'),
+          )
+        : Future.value(const BackgroundRefreshStatus(outcome: 'never'));
     final save = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -873,6 +1269,19 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                     unawaited(_manageCarriers());
                   },
                 ),
+                for (final account in _visibleAccounts.where(
+                  (a) => !a.isPrimary,
+                ))
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('收起 ${account.label}'),
+                    subtitle: const Text('保留本机查询记录和登录资料，之后可重新加入'),
+                    trailing: const Icon(Icons.remove_circle_outline_rounded),
+                    onTap: () {
+                      Navigator.pop(context);
+                      unawaited(_removeSecondAccount(account.id));
+                    },
+                  ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('桌面卡片后台刷新'),
@@ -897,6 +1306,28 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                       ),
                     ),
                   ),
+                ),
+                FutureBuilder<BackgroundRefreshStatus>(
+                  future: statusFuture,
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const SizedBox.shrink();
+                    final status = snapshot.data!;
+                    final at = status.finishedAt ?? status.startedAt;
+                    final local = at?.toLocal();
+                    final time = local == null
+                        ? ''
+                        : ' · ${local.month}/${local.day} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        '${status.label}$time',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF777D87),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 Text('通用流量低于 ${threshold.toStringAsFixed(0)} GB 时提醒'),
                 Slider(
@@ -991,14 +1422,31 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     );
     if (confirm != true) return;
     if (!mounted) return;
+    try {
+      final prefs = _prefs;
+      if (prefs == null) throw StateError('Preferences unavailable');
+      await _store(() async {
+        final saved = await prefs.setBool(
+          'account_profiles_cleanup_pending',
+          true,
+        );
+        if (!saved) throw StateError('Pending profile cleanup was not saved');
+      });
+    } catch (_) {
+      _showInfo('暂时无法清除', '无法保存网页会话清理状态，请稍后重试。');
+      return;
+    }
+    _profileClearPending = true;
     final oldControllers = _controllers.values.toList();
     setState(() {
       _clearing = true;
       _generation++;
       _connected.clear();
       _controllers.clear();
-      _visibleCarrier = null;
-      _broadnetSession = null;
+      _visibleAccountId = null;
+      _broadnetSessions.clear();
+      _inFlight.clear();
+      _awaitingLoginReturn.clear();
     });
     if (_android && !demoMode) {
       try {
@@ -1025,21 +1473,81 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     );
     await WidgetsBinding.instance.endOfFrame;
     await _storageTasks;
+    var profilesCleared = !_android || demoMode;
+    var otherDataCleared = true;
     if (_android) {
-      await CookieManager.instance().deleteAllCookies();
-      await WebStorageManager.instance().deleteAllData();
-      await _widgetBridge.clear();
+      try {
+        await CookieManager.instance().deleteAllCookies();
+        await WebStorageManager.instance().deleteAllData();
+      } catch (_) {
+        otherDataCleared = false;
+      }
+      try {
+        profilesCleared =
+            await android_webview
+                .AndroidInAppWebViewController.deleteAccountProfiles(
+              profilesMayExist:
+                  (_prefs?.getBool('account_profiles_may_exist') ?? false) ||
+                  _accounts.accounts.any((account) => !account.isPrimary) ||
+                  Carrier.values.any(
+                    (carrier) =>
+                        (_prefs?.containsKey('connected_${carrier.name}_2') ??
+                            false) ||
+                        (_prefs?.containsKey('snapshot_${carrier.name}_2') ??
+                            false),
+                  ),
+            );
+      } catch (_) {
+        profilesCleared = false;
+      }
+      try {
+        await _widgetBridge.clear();
+      } catch (_) {
+        otherDataCleared = false;
+      }
       try {
         await _notifications.invokeMethod('cancelAll');
       } on PlatformException {
         /* No active notifications. */
       }
     }
-    await _secure.delete(key: 'broadnet_session');
     for (final carrier in Carrier.values) {
-      await _prefs?.remove('snapshot_${carrier.name}');
-      await _prefs?.remove('connected_${carrier.name}');
-      await _prefs?.remove('background_auth_required_${carrier.name}');
+      for (final id in [carrier.name, '${carrier.name}_2']) {
+        try {
+          if (carrier == Carrier.broadnet) {
+            await _secure.delete(
+              key: id == carrier.name
+                  ? 'broadnet_session'
+                  : 'broadnet_session_$id',
+            );
+          }
+          for (final key in [
+            'snapshot_$id',
+            'connected_$id',
+            'background_auth_required_$id',
+          ]) {
+            if (await _prefs?.remove(key) != true) otherDataCleared = false;
+          }
+        } catch (_) {
+          otherDataCleared = false;
+        }
+      }
+    }
+    final fullyCleared = profilesCleared && otherDataCleared;
+    if (fullyCleared) {
+      try {
+        if (await _prefs?.setBool('account_profiles_may_exist', false) !=
+            true) {
+          throw StateError('Profile cleanup could not be saved');
+        }
+        final saved = await _prefs?.setBool(
+          'account_profiles_cleanup_pending',
+          false,
+        );
+        _profileClearPending = saved != true;
+      } catch (_) {
+        _profileClearPending = true;
+      }
     }
     if (!mounted) return;
     setState(() {
@@ -1048,8 +1556,9 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _controllers.clear();
       _lastRequests.clear();
       _warnedLow.clear();
-      _broadnetSession = null;
-      _visibleCarrier = null;
+      _broadnetSessions.clear();
+      _visibleAccountId = null;
+      _accountSnapshots.clear();
       for (final carrier in Carrier.values) {
         _snapshots[carrier] = CarrierSnapshot(
           carrier: carrier,
@@ -1058,6 +1567,9 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       }
     });
     await _publishWidget();
+    if (_profileClearPending && mounted) {
+      _showInfo('部分网页登录资料还没清除', '本机仍可能留有旧登录资料。请稍后在设置中再次清除；完成前所有号码查询已暂停。');
+    }
   }
 
   void _showInfo(String title, String content) => showDialog<void>(
@@ -1076,7 +1588,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) => PopScope(
-    canPop: _visibleCarrier == null,
+    canPop: _visibleAccountId == null,
     onPopInvokedWithResult: (didPop, result) {
       if (!didPop) unawaited(_closeOfficialPage());
     },
@@ -1088,19 +1600,47 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           else if (!_selection.setupCompleted)
             CarrierSelectionScreen(
               selectedCarriers: _draftSelection,
+              accountCounts: {
+                for (final carrier in Carrier.values)
+                  carrier:
+                      (_draftSelection.contains(carrier) ? 1 : 0) +
+                      (_draftSecond.contains(carrier) ? 1 : 0),
+              },
               onSelectionChanged: (value) =>
                   setState(() => _draftSelection = value),
-              onContinue: (value) => unawaited(_applySelection(value)),
+              onAddSecondAccount: (carrier) async {
+                if (await _canAddSecond(
+                      carrier,
+                      _draftSecond,
+                      _draftSelection,
+                    ) &&
+                    mounted) {
+                  setState(() {
+                    _draftSelection.add(carrier);
+                    _draftSecond.add(carrier);
+                  });
+                }
+              },
+              onContinue: (value) => unawaited(
+                _applySelection(value, secondAccounts: _draftSecond),
+              ),
               demo: demoMode,
             )
           else
             DashboardScreen(
               snapshots: _selection.visibleSnapshots(_snapshots.values),
+              cleanupPending: _profileClearPending,
+              accountEntries: [
+                for (final account in _visibleAccounts)
+                  DashboardAccountEntry(account, _snapshot(account)),
+              ],
               selectedCarriers: _selection.selectedCarriers,
               onManageCarriers: _manageCarriers,
               thresholdGb: _thresholdGb,
               onConnect: _connect,
               onRefresh: _refresh,
+              onConnectAccount: _connectAccount,
+              onRefreshAccount: (id) => unawaited(_refreshAccount(id)),
               onRefreshAll: _refreshAll,
               onSettings: _settings,
               onAddWidget: _addWidget,
@@ -1113,8 +1653,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
             ),
           if (_android && !demoMode)
             if (!_restoring && !_savingSelection)
-              for (final carrier in _selection.queryableCarriers(_connected))
-                _webView(carrier),
+              for (final account in _visibleAccounts.where(
+                (a) => _connected.contains(a.id) && !_profileClearPending,
+              ))
+                _webView(account),
         ],
       ),
     ),

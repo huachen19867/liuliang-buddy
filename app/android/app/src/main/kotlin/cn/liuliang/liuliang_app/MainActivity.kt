@@ -4,8 +4,6 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -20,6 +18,7 @@ class MainActivity : FlutterActivity() {
     override fun onStart() {
         super.onStart()
         isAppVisible = true
+        BackgroundRefreshSchedule.invalidateRunningTask()
     }
 
     override fun onStop() {
@@ -45,6 +44,7 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                     }
+                    "status" -> result.success(BackgroundRefreshSchedule.status(this))
                     else -> result.notImplemented()
                 }
             }
@@ -66,11 +66,10 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "requestPin" -> {
-                        val manager = AppWidgetManager.getInstance(this)
-                        val supported = Build.VERSION.SDK_INT >= 26 && manager.isRequestPinAppWidgetSupported
-                        val requested = supported && manager.requestPinAppWidget(
-                            ComponentName(this, TrafficWidgetProvider::class.java), null, null)
-                        result.success(mapOf("supported" to supported, "requested" to requested))
+                        result.success(TrafficWidgetProvider.requestPin(this))
+                    }
+                    "installationStatus" -> {
+                        result.success(TrafficWidgetProvider.installationStatus(this))
                     }
                     "consumeLaunchRefresh" -> {
                         val refresh = intent?.getBooleanExtra("widget_refresh", false) == true

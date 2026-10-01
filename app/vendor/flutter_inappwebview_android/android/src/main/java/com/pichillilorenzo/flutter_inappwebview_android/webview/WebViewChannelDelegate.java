@@ -75,6 +75,28 @@ public class WebViewChannelDelegate extends ChannelDelegateImpl {
 
   @Override
   public void onMethodCall(@NonNull MethodCall call, @NonNull final MethodChannel.Result result) {
+    if (call.method.equals("setAccountProfile")) {
+      if (webView == null || !WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
+        result.error("PROFILE_UNAVAILABLE", "This Android WebView does not support isolated profiles", null);
+        return;
+      }
+      String profileName = call.argument("profileName");
+      if (profileName == null || !profileName.matches("liuliang_[a-z]+_2")) {
+        result.error("INVALID_PROFILE", "Invalid account profile name", null);
+        return;
+      }
+      if (webView.getUrl() != null || webView.getOriginalUrl() != null) {
+        result.error("PROFILE_ALREADY_LOADED", "Profile must be set before first navigation", null);
+        return;
+      }
+      try {
+        WebViewCompat.setProfile(webView, profileName);
+        result.success(true);
+      } catch (RuntimeException e) {
+        result.error("PROFILE_FAILED", e.getMessage(), null);
+      }
+      return;
+    }
     WebViewChannelDelegateMethods method = null;
     try {
       method = WebViewChannelDelegateMethods.valueOf(call.method);

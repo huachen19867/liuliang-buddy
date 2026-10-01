@@ -143,7 +143,7 @@ packages:
     source: hosted
     version: "6.1.5"
   flutter_inappwebview_android:
-    dependency: "direct overridden"
+    dependency: "direct main"
     description:
       path: "vendor/flutter_inappwebview_android"
       relative: true

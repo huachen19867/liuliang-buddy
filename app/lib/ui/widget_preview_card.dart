@@ -11,11 +11,13 @@ class WidgetPreviewCard extends StatelessWidget {
     super.key,
     required this.widgetSupported,
     this.selectedCarriers = Carrier.values,
+    this.selectedAccountLabels,
     this.onAddWidget,
   });
 
   final bool widgetSupported;
   final List<Carrier> selectedCarriers;
+  final List<String>? selectedAccountLabels;
   final VoidCallback? onAddWidget;
 
   bool get _canAdd => widgetSupported && onAddWidget != null;
@@ -23,7 +25,7 @@ class WidgetPreviewCard extends StatelessWidget {
   String get _hint {
     if (!widgetSupported) return '请在安卓手机添加';
     if (onAddWidget == null) return '桌面卡片入口暂不可用';
-    return '亮屏就能看上次查询，点卡片更新';
+    return '点卡片刷新；若系统没弹窗，长按桌面空白处→小组件→流量小伙伴';
   }
 
   @override
@@ -79,7 +81,10 @@ class WidgetPreviewCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 13),
-          _WidgetCardIllustration(selectedCarriers: selectedCarriers),
+          _WidgetCardIllustration(
+            selectedCarriers: selectedCarriers,
+            accountLabels: selectedAccountLabels,
+          ),
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: _canAdd ? onAddWidget : null,
@@ -117,9 +122,13 @@ class WidgetPreviewCard extends StatelessWidget {
 }
 
 class _WidgetCardIllustration extends StatelessWidget {
-  const _WidgetCardIllustration({required this.selectedCarriers});
+  const _WidgetCardIllustration({
+    required this.selectedCarriers,
+    this.accountLabels,
+  });
 
   final List<Carrier> selectedCarriers;
+  final List<String>? accountLabels;
 
   @override
   Widget build(BuildContext context) {
@@ -225,7 +234,11 @@ class _WidgetCardIllustration extends StatelessWidget {
                           ) ...[
                             if (index > 0) const SizedBox(height: 8),
                             _WidgetColorBar(
-                              label: selectedCarriers[index].label,
+                              label:
+                                  accountLabels != null &&
+                                      index < accountLabels!.length
+                                  ? accountLabels![index]
+                                  : selectedCarriers[index].label,
                               color: _carrierColor(selectedCarriers[index]),
                               fraction: .28 - (index % 4) * .035,
                             ),

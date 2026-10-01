@@ -31,6 +31,7 @@ class TrafficBucket {
     this.totalBytes,
     this.rawUnit,
     this.rawRemaining,
+    this.isUnlimited = false,
   });
 
   final String name;
@@ -40,6 +41,9 @@ class TrafficBucket {
   final String? rawUnit;
   final String? rawRemaining;
 
+  /// An explicit official unlimited marker, never inferred from a large number.
+  final bool isUnlimited;
+
   Map<String, dynamic> toJson() => {
     'name': name,
     'kind': kind.name,
@@ -47,6 +51,7 @@ class TrafficBucket {
     'totalBytes': totalBytes,
     'rawUnit': rawUnit,
     'rawRemaining': rawRemaining,
+    'isUnlimited': isUnlimited,
   };
 
   factory TrafficBucket.fromJson(Map<String, dynamic> json) => TrafficBucket(
@@ -63,6 +68,7 @@ class TrafficBucket {
     rawRemaining: json['rawRemaining'] is String
         ? json['rawRemaining'] as String
         : null,
+    isUnlimited: json['isUnlimited'] == true,
   );
 }
 
@@ -85,6 +91,8 @@ class CarrierSnapshot {
   final List<TrafficBucket> buckets;
   final String? message;
 
+  bool get hasUnlimitedAllowance => buckets.any((bucket) => bucket.isUnlimited);
+
   // null means there is no verified general balance, while zero is a real zero.
   int? get generalRemainingBytes =>
       _sumGeneral((bucket) => bucket.remainingBytes);
@@ -96,6 +104,7 @@ class CarrierSnapshot {
     if (values.isEmpty) return null;
     var sum = 0;
     for (final bucket in values) {
+      if (bucket.isUnlimited) return null;
       final value = select(bucket);
       if (value == null) return null;
       sum += value;

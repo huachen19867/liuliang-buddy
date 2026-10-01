@@ -18,6 +18,8 @@ android-widget 的文件与许可证已下载至本地，详细来源在该目�
 
 android-workmanager-sample 使用 sparse checkout 下载，仅保留 WorkManagerSample、根 README 与 LICENSE。实现结论及周期任务限制见 docs/WIDGET_BACKGROUND_REFRESH.md；参考源码不进入公开应用仓库。
 
+ios-platform-review 保存 2026-10-01 的 Flutter 官方 iOS 开发环境源文档和 Apple WidgetKit 刷新说明。Flutter 文档站 HTTPS 请求在本机 TLS 失败后，改从 flutter/website 的官方 GitHub 内容 API 获取 `sites/docs/src/content/platform-integration/ios/setup.md`；来源、blob SHA 和下载状态记于目录内 index.json。仅用于平台可行性研究，不表示已有 iOS 构建或签名。
+
 广电失败复核记录位于 broadnet-public/failure-review/，使用新的公开官网加载与本地合成响应核对两套 jQuery 实例、原探针漏数及修复后桥接。可复用的验证脚本收录于 scripts/test-broadnet-browser.cjs；证据范围和复用方法见 docs/PROTOCOL_RESEARCH.md，不含真实账号或凭证。
 
 新增联通/电信精选参考：`ChinaUnicomMonitor/` 来源 https://github.com/dengfhqqq/ChinaUnicomMonitor （未发现LICENSE）；`FlowLite/` 来源 https://github.com/nongchengqi/FlowLite （未发现LICENSE）；`ChinaTelecomMonitor/` 来源 https://github.com/Cp0204/ChinaTelecomMonitor （AGPL-3.0，附LICENSE）。仅协议研究，不复制到应用，这些项目依赖APP认证，不能作为网页登录已接通的依据。

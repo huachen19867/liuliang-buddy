@@ -134,4 +134,102 @@ class WidgetPresentationTest {
             assertEquals(carriers.filter { it in selected }, displayed)
         }
     }
+
+    @Test fun acceptedPinRequestRemainsPendingUntilConfirmedOrInstalled() {
+        assertEquals(
+            WidgetPinStatus.RequestPendingConfirmation,
+            WidgetPinState.installationStatus(
+                installedCount = 0,
+                pinSupported = true,
+                pendingSince = now - 1_000L,
+                nowMillis = now,
+            ),
+        )
+        assertEquals(
+            WidgetPinStatus.AlreadyAdded,
+            WidgetPinState.installationStatus(
+                installedCount = 1,
+                pinSupported = true,
+                pendingSince = now,
+                nowMillis = now,
+            ),
+        )
+        assertEquals(
+            WidgetPinStatus.Unsupported,
+            WidgetPinState.installationStatus(
+                installedCount = 0,
+                pinSupported = false,
+                pendingSince = null,
+                nowMillis = now,
+            ),
+        )
+        assertEquals(
+            WidgetPinStatus.NotAdded,
+            WidgetPinState.installationStatus(
+                installedCount = 0,
+                pinSupported = true,
+                pendingSince = now - WidgetPinState.PENDING_TIMEOUT_MS - 1,
+                nowMillis = now,
+            ),
+        )
+    }
+
+    @Test fun unlimitedIsShownOnlyAsAConfirmedSuccessfulTimedState() {
+        val current = WidgetPresentation.present(
+            WidgetCardData("success", label = "含不限量套餐", queriedAt = now, unlimited = true),
+            5.0, now,
+        )
+        assertEquals("不限量", current.amount)
+        assertEquals("上次记录", current.state)
+        assertTrue(current.unlimited)
+        assertFalse(current.low)
+
+        val untimed = WidgetPresentation.present(
+            WidgetCardData("success", label = "含不限量套餐", unlimited = true),
+            5.0, now,
+        )
+        assertEquals("—", untimed.amount)
+        assertEquals("待确认", untimed.state)
+        assertFalse(untimed.unlimited)
+
+        val failed = WidgetPresentation.present(
+            WidgetCardData("error", label = "含不限量套餐", queriedAt = now, unlimited = true),
+            5.0, now,
+        )
+        assertEquals("不限量", failed.amount)
+        assertEquals("查询失败", failed.state)
+        assertTrue(failed.unlimited)
+    }
+
+    @Test fun accountInstancesKeepTwoSameCarrierEntriesSeparateAndCapAtFour() {
+        val raw = listOf(
+            mapOf(
+                "accountId" to "mobile",
+                "carrier" to "mobile",
+                "accountLabel" to "中国移动 1",
+                "status" to "success",
+                "primaryValue" to 100L,
+                "primaryLabel" to "通用剩余",
+                "queriedAt" to now,
+            ),
+            mapOf(
+                "accountId" to "mobile_2",
+                "carrier" to "mobile",
+                "accountLabel" to "中国移动 2",
+                "status" to "authExpired",
+                "primaryValue" to 200L,
+                "primaryLabel" to "通用剩余",
+                "queriedAt" to now,
+            ),
+            mapOf("accountId" to "broadnet", "carrier" to "broadnet", "status" to "notConnected"),
+            mapOf("accountId" to "unicom", "carrier" to "unicom", "status" to "notConnected"),
+            mapOf("accountId" to "telecom", "carrier" to "telecom", "status" to "notConnected"),
+        )
+        val parsed = WidgetInstances.fromPayload(raw, setOf("mobile", "broadnet", "unicom", "telecom"))
+        assertEquals(4, parsed.size)
+        assertEquals(listOf("mobile", "mobile_2", "broadnet", "unicom"), parsed.map { it.accountId })
+        assertEquals(listOf("中国移动 1", "中国移动 2"), parsed.take(2).map { it.accountLabel })
+        assertEquals(listOf(100L, 200L), parsed.take(2).map { it.remainingBytes })
+        assertEquals("authExpired", parsed[1].status)
+    }
 }

@@ -14,7 +14,7 @@ void main() {
 
     expect(find.text('先选好你的运营商'), findsOneWidget);
     expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
-    expect(find.textContaining('可以只选一家，也可以同时选几家'), findsOneWidget);
+    expect(find.textContaining('连续轻点两下即可加入第二张'), findsOneWidget);
     expect(find.textContaining('不读取 SIM 卡槽'), findsOneWidget);
     expect(find.text('中国移动'), findsOneWidget);
     expect(find.text('中国广电'), findsOneWidget);
@@ -49,6 +49,30 @@ void main() {
     expect(submitted, hasLength(1));
     expect(submitted.single, {Carrier.mobile, Carrier.broadnet});
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('双击同运营商只请求一次第二账户，不切掉已选第一账户', (tester) async {
+    var secondRequests = 0;
+    final changes = <Set<Carrier>>[];
+    await tester.pumpWidget(
+      _host(
+        selected: {Carrier.mobile},
+        accountCounts: const {Carrier.mobile: 1},
+        onChanged: changes.add,
+        onAddSecond: (_) => secondRequests++,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final option = find.byKey(const ValueKey('carrier-option-mobile'));
+    await tester.tap(option);
+    await tester.pump(const Duration(milliseconds: 80));
+    await tester.tap(option);
+    await tester.pumpAndSettle();
+
+    expect(secondRequests, 1);
+    expect(changes, isEmpty);
+    expect(find.textContaining('已加入 1 张'), findsOneWidget);
   });
 
   testWidgets('至少选一家；单运营商配置可独立继续并支持管理文案', (tester) async {
@@ -112,6 +136,8 @@ Widget _host({
   required Set<Carrier> selected,
   ValueChanged<Set<Carrier>>? onChanged,
   ValueChanged<Set<Carrier>>? onContinue,
+  Map<Carrier, int> accountCounts = const {},
+  ValueChanged<Carrier>? onAddSecond,
   bool isInitialSetup = true,
   bool demo = false,
   double textScale = 1,
@@ -124,6 +150,8 @@ Widget _host({
         child: CarrierSelectionScreen(
           availableCarriers: available,
           selectedCarriers: selectedState,
+          accountCounts: accountCounts,
+          onAddSecondAccount: onAddSecond,
           onSelectionChanged: (next) {
             setState(() => selectedState = next);
             onChanged?.call(next);
