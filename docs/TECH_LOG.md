@@ -301,3 +301,5 @@ Flutter ResortCarrierMark与安卓badge ImageView统一128px资源，添加无�
 最终Flutter148项通过/analyze无问题，既有Nodefetch/XHR回归通过。没有连接USB，不伪称新包真机通过。老板尚未补联通具体失败阶段，保持候选修复边界。
 
 正式Release1.9.3/code16构建成功，27,314,188字节/SHA256 adcfe6a21c0d0298799f6ca62399debb608d4724e17982b7b6d6aecc4f956bf4；v2/正式证书33b11555/非debuggable/ARM64/API24-36/16KB ZIP对齐通过。wrapper恢复官方配置，源码只push public。版本不能标联通/移动短信已完全修复，已在README关联发布说明和进展边界。
+
+1.9.3正式公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.9.3 ，draft=false/prerelease=false，仓库isPrivate=false，target1125b2bb91f2c3e4d1257cefb5974cb8141367a6。Assets唯一uploaded APK27,314,188字节，远端完整digest adcfe6a21c0d0298799f6ca62399debb608d4724e17982b7b6d6aecc4f956bf4与本机一致。初次gh create HEAD EOF，回读不存在后重试成功。公开发布不意味着移动验证码或联通登录后余额已完成真机验收；相关限制保留在发布正文。源码只push public，回执另文档提交。
