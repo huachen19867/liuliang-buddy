@@ -57,3 +57,5 @@ ios-selection-simulator.png、ios-dashboard-simulator.png、ios-widget-guide-sim
 dashboard-voice-sms-demo.png 来自实际Flutter首页组件，显示通话分钟、真实零短信样本、未知短彩信共享包与超额短信样本，各套餐分开展示，顶部标界面演示。数值都是合成样本，不代表真实运营商账户。UI定向21项已通过，截图目视无截断或溢出；其他历史DEMO由同一测试同步更新为新布局。桌面示意仍只显示流量。
 
 1.7.0/code10当前安卓包91,439,548字节，SHA-256：9b191abbab3c41abed7c9c188361440289581abcb4dc916bfe33504953a78549，API24/36、ARM64 Flutter、原Android Debug证书、v2验签通过，未启用DEMO。完整123项Flutter和analyze通过。iOS新产物待云端验收回执，历史模拟器截图仍属于1.6.0。
+
+1.7.0的ios-selection/dashboard/widget-guide/settings-simulator.png已更新为run36826003180真实模拟器截图，未连接账号、通话短信等待连接，无真实套餐数据。Release提供未签名模拟器归档56,902,762字节，SHA-256 8304ec122473e14aa5815fb6b921d26bcac13c3dc0dab960cfd024db448a64e6；由云端发布助手run36828372883上传且GitHubdigest核对一致，本机Actions下载超时后使用Release成功取回四张截图。

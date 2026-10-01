@@ -39,3 +39,7 @@ iOS 小组件需要用户从系统主屏幕编辑界面手动添加，系统没�
 `Runner/AppDelegate.swift` 和 `Runner/SceneDelegate.swift` 注册平台桥接并处理冷热启动 URL；`Runner/LiuliangPlatformBridge.swift` 提供小组件、通知和后台能力响应；`Shared/TrafficSnapshot.swift` 由 Runner 与扩展共同编译；`TrafficWidget` 是实际 Xcode 扩展 target；`Tests/TrafficSnapshotTests.swift` 是不依赖 Flutter 的共享模型回归。工程依赖、Embed App Extensions 与 App Group 权限已经写入 `Runner.xcodeproj/project.pbxproj` 和 entitlements。
 
 基础工程来自 [Flutter 官方仓库](https://github.com/flutter/flutter/tree/3.44.8/packages/flutter_tools/templates/app/ios.tmpl)。小组件接入参考已下载至忽略目录 `references/ios-home-widget`，来源为 [home_widget](https://github.com/ABausG/home_widget) 的官方 example，固定提交及许可见参考索引。参考目录不进入公开源码。
+
+## 已验收产物发布
+
+如果本机Actions归档下载受网络限制，可手动运行publish-ios-artifact.yml，填写成功的main分支iOS simulator run_id和现有Release tag。它校验来源工作流、成功状态与tag格式，在GitHub runner取回已验收归档，上传未签名模拟器和四张截图；不自动公开草稿、不重建应用、不生成iPhone签名。权限为临时仓库token的actions读取与contents写入。1.7.0实际发布助手run36828372883已通过。

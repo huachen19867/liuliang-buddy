@@ -45,6 +45,7 @@
 | scripts/verify-ios.sh | macOS Flutter/Swift 验证、编译、模拟器安装与截图 |
 | scripts/generate-ios-icons.cjs | 从已有安卓矢量图标生成不透明 iOS 图标 |
 | .github/workflows/ios.yml | GitHub macOS 构建、日志与模拟器产物 |
+| .github/workflows/publish-ios-artifact.yml | 手动取回已成功验收的主分支产物并上传现有发布草稿 |
 | .github/ISSUE_TEMPLATE/ios_bug_report.yml | iOS 编译、查询和组件反馈模板 |
 | app/lib/ui/dashboard_screen.dart | 按所选运营商展示的可爱首页与各种连接状态 |
 | app/lib/ui/carrier_selection_screen.dart | 首次运营商选择与后续改选页面 |

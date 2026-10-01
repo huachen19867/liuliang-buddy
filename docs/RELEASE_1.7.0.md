@@ -12,3 +12,5 @@ iOS 沿用公开源码和云端模拟器验证，不提供签名 iPhone IPA；�
 安卓1.7.0/code10为91,439,548字节，SHA-256为9b191abbab3c41abed7c9c188361440289581abcb4dc916bfe33504953a78549。沿用Android Debug证书，apksigner v2通过，API24/36，Flutter引擎仅ARM64；无短信/通话读取权限，未启用DEMO。真实手机、套餐余额和原生桌面行为待复测，未重复宣称历史原生JUnit为本轮新验收。
 
 [iOS云端验收](https://github.com/huachen19867/liuliang-buddy/actions/runs/36826003180)已通过：123项Flutter、analyze、Swift模型检查、未签名Runner/WidgetKit编译、独立冷启动及选择/首页/小组件指引/设置流程。验证源码e697ecb0dc7f9c0c2780e9d223f993b096c482af，其后只补文档；没有真实账号、系统Widget或签名iPhone安装验收。
+
+发布附带四张新iOS模拟器截图（未连接账号）和正常启动入口的未签名模拟器归档，56,902,762字节，SHA-256 8304ec122473e14aa5815fb6b921d26bcac13c3dc0dab960cfd024db448a64e6。它不适用于iPhone安装。云端发布助手run36828372883完成上传，GitHub摘要与已验收产物相同。

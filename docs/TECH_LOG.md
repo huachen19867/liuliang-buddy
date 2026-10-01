@@ -221,3 +221,5 @@ run36815488725确认官方fallback生效（ordinaryExists=false/cryptexExists=tr
 iOS run36826003180已success：Xcode编译、完整123项Flutter、analyze、Swift模型检查、独立冷启动及选择/首页/桌面指引/设置smoke通过。日志存artifacts/ios-cloud-1.7.0.log（忽略，不含真实账号）；新截图与归档下载中。Release target需使用完整40位SHA，短SHA曾被API422拒绝，改完整后草稿成功；APK上传摘要与本地一致。
 
 本机取回Actions归档两次受代理超时（gh等待及HttpClient90秒），直连60秒亦失败，不记为产物通过或空文件成功。改用GitHub runner取已验收归档并上传现有Release；新增手动publish-ios-artifact workflow，严格校验成功main分支iOS工作流与tag格式，只发布模拟器和四张截图，使用仓库临时token，不在本机保存凭证。构建结果不受下载路径故障影响。
+
+iOS归档改由云端发布助手run36828372883取得run36826003180已验收artifact并上传Release草稿，success；模拟器包56,902,762字节、SHA-256 8304ec122473e14aa5815fb6b921d26bcac13c3dc0dab960cfd024db448a64e6。GitHub digest与云端sha256sum一致；四张原始1206×2622截图改从Release正常下载到本机，逐张目视核对且hash与云端/GitHub一致，复制artifacts索引。首页包含未连接的通话短信面板，设置5GB是阈值，无真实账号或编造余额。截图不是实际系统Widget验收，不交付iPhone签名包。
