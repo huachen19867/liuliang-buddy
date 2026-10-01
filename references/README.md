@@ -10,10 +10,13 @@
 | BroadnetFlowKeeper | https://github.com/FIONN191/China-Broadnet-Flow-Keeper | 未提供许可证 | 仅检查官网地址和会话字段，不复制实现 |
 | broadnet-public | https://www.10099.com.cn/personal-center-number-order.html | 运营商公开页面 | 浏览器正常打开后的公开 HTML/JS，核对 H5 请求、字段与单位；未登录 |
 | android-widget | https://github.com/android/user-interface-samples/tree/main/AppWidget | Apache-2.0 | Google 官方 AppWidget 精选源码、RemoteViews 与固定入口；固定上游 commit 2c0b04e9092410a14381b86c168034a52243b85b |
+| android-workmanager-sample | https://github.com/android/architecture-components-samples/tree/main/WorkManagerSample | Apache-2.0 | Google 官方 WorkManager 周期任务与 Worker 生命周期参考；固定上游 commit e849ce3004ccd1132a121cf513bbcb7996d95c30 |
 
 Git 直连在本机失败，前三个项目和广电扩展通过 GitHub codeload 下载并解压，源码保留上游目录名。zip 归档一并保留便于追溯。broadnet-query-page.html 为初次普通 HTTP 请求获得的 WAF 页面；可用业务页面与资源位于 broadnet-public/。
 
 android-widget 的文件与许可证已下载至本地，详细来源在该目录 README.md，实施结论在 docs/WIDGET_RESEARCH.md。GitHub 仓库保留本索引，参考源码不重复上传。
+
+android-workmanager-sample 使用 sparse checkout 下载，仅保留 WorkManagerSample、根 README 与 LICENSE。实现结论及周期任务限制见 docs/WIDGET_BACKGROUND_REFRESH.md；参考源码不进入公开应用仓库。
 
 广电失败复核记录位于 broadnet-public/failure-review/，使用新的公开官网加载与本地合成响应核对两套 jQuery 实例、原探针漏数及修复后桥接。可复用的验证脚本收录于 scripts/test-broadnet-browser.cjs；证据范围和复用方法见 docs/PROTOCOL_RESEARCH.md，不含真实账号或凭证。
 

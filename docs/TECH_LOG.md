@@ -157,3 +157,9 @@ Flutter完整74项通过，Node加入联通精确端点/登录与敏感接口排
 最终完整Flutter75项通过、analyze无问题、Node探针通过；电信明细列表与详情弹窗也标约/估算，即使一条未知导致无合计，有效条目仍保留估算语义。新运营商接收时额外核对当前WebView URL，避免Home旧队列回调在SPA已回登录页后恢复成功态。最终1.3.0/code6 APK构建成功，89,530,031字节，SHA-256 f0c550a930cc249047479a6539dded713cfa5c90c82146bc7606d2a91d689781。v2签名与aapt2版本/API24/36检查通过。GitHub与Web DEMO完成后另记。
 
 公开1.3.0发布完成：源码4a0e0e4677fcba05bef847bd989e36de4aae345e已推送到huachen19867/liuliang-buddy，GitHub main及v1.3.0标签API均与本地一致。Release https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.3.0 draft=false/prerelease=true；APK state=uploaded、size=89530031、GitHub digest sha256:f0c550a930cc249047479a6539dded713cfa5c90c82146bc7606d2a91d689781与本地完全一致。Web DEMO已构建成功，四家选择/联通广电/电信估算/运营商管理截图均上传。旧版本与私有仓库保留，未访问真实账号、未发送验证码；真实登录、金额与Launcher仍待设备核对。
+
+## 2026-10-01：1.4.0 后台自动刷新
+
+按老板要求增加后台刷新关闭、每小时、每两小时、每天四档。Android 使用 WorkManager 在有网络时尽力调度，通过后台 Flutter 引擎和无界面 WebView 访问已登录官网，沿用响应来源门禁与 Dart 解析；成功查询写回本地快照并更新桌面卡片。移动、联通、广电可尝试后台查询；电信依赖前台官网渲染的账务 DOM，明确跳过。后台不代替用户登录、不读取短信；失效会话停止该运营商的重复尝试，失败沿用旧值及其时间。首次默认关闭，前台五分钟刷新不变。Google WorkManager 官方样例已下载至本地参考目录并登记来源，未把参考源码纳入发布。
+
+版本升至1.4.0+7。`flutter analyze`、Android ARM64 `assembleDebug`、APK v2 签名和 aapt 元数据检查通过；APK 为114,399,238字节，SHA-256 `53a782a6a4c5730f29a53fb8d6df3a6f4da6d2bc1337632498ca4872812b2b4b`。本版未运行测试套件；没有连接安卓设备，WorkManager 实际触发、WebView 会话共享、真实余额和不同 Launcher 更新尚未验证。源码和安装包的公开发布与远端校验随后记录。

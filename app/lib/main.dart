@@ -15,6 +15,8 @@ import 'ui/carrier_selection_screen.dart';
 import 'data/parsers.dart';
 import 'services/page_probe.dart';
 import 'services/carrier_web.dart';
+import 'services/background_refresh.dart';
+import 'services/background_refresh_runner.dart';
 import 'services/telecom_page_probe.dart';
 import 'services/response_policy.dart';
 import 'services/widget_bridge.dart';
@@ -24,6 +26,9 @@ const demoMode = bool.fromEnvironment('DEMO');
 const _notifications = MethodChannel('cn.liuliang/notifications');
 const _secure = FlutterSecureStorage();
 const _widgetBridge = WidgetBridge();
+
+@pragma('vm:entry-point')
+Future<void> backgroundRefreshEntrypoint() => runBackgroundRefreshEntrypoint();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,6 +77,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   Map<String, dynamic>? _broadnetSession;
   Carrier? _visibleCarrier;
   double _thresholdGb = 5;
+  BackgroundRefreshInterval _backgroundRefresh = BackgroundRefreshInterval.off;
   bool _reminders = false;
   int _generation = 0;
   String? _webMessage;
@@ -240,6 +246,9 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _restoring = false;
       _broadnetSession = session;
       _thresholdGb = (prefs.getDouble('threshold_gb') ?? 5).clamp(1, 20);
+      _backgroundRefresh = BackgroundRefreshInterval.fromMinutes(
+        prefs.getInt('background_refresh_minutes'),
+      );
       _reminders = prefs.getBool('reminders') ?? false;
       for (final carrier in Carrier.values) {
         final raw = prefs.getString('snapshot_${carrier.name}');
@@ -248,10 +257,12 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
             final snapshot = CarrierSnapshot.fromJson(
               jsonDecode(raw) as Map<String, dynamic>,
             );
-            _snapshots[carrier] = snapshot.copyWith(
-              status: QueryStatus.error,
-              message: '上次查询记录，正在确认最新状态',
-            );
+            _snapshots[carrier] = snapshot.status == QueryStatus.success
+                ? snapshot.copyWith(
+                    status: QueryStatus.error,
+                    message: '上次查询记录，正在确认最新状态',
+                  )
+                : snapshot;
           } catch (_) {
             /* Retain the explicit unconnected state. */
           }
@@ -269,6 +280,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         );
       }
     });
+    await _syncBackgroundSchedule();
     await _publishWidget();
     if (_android && !demoMode && _current(generation)) {
       if (await _widgetBridge.consumeLaunchRefresh()) await _openFromWidget();
@@ -278,7 +290,51 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _visibleCarrier == null) {
-      _refreshAll();
+      unawaited(_reloadBackgroundSnapshotsAndRefresh());
+    }
+  }
+
+  Future<void> _reloadBackgroundSnapshotsAndRefresh() async {
+    final prefs = _prefs;
+    if (prefs != null) {
+      await prefs.reload();
+      if (!mounted || _clearing) return;
+      setState(() {
+        for (final carrier in _selection.selectedCarriers) {
+          final raw = prefs.getString('snapshot_${carrier.name}');
+          if (raw == null) continue;
+          try {
+            _snapshots[carrier] = CarrierSnapshot.fromJson(
+              jsonDecode(raw) as Map<String, dynamic>,
+            );
+          } catch (_) {
+            // Keep the in-memory result if a background record is malformed.
+          }
+        }
+      });
+    }
+    _refreshAll();
+  }
+
+  Future<bool> _syncBackgroundSchedule() async {
+    if (!_android || demoMode) return true;
+    final hasBackgroundCarrier = Carrier.values.any(
+      (carrier) =>
+          carrier != Carrier.telecom &&
+          _selection.allows(carrier) &&
+          _connected.contains(carrier) &&
+          _snapshots[carrier]?.queriedAt != null,
+    );
+    final interval = hasBackgroundCarrier
+        ? _backgroundRefresh
+        : BackgroundRefreshInterval.off;
+    try {
+      await BackgroundRefreshScheduler.configure(interval);
+      return true;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
     }
   }
 
@@ -305,13 +361,12 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     final prefs = _prefs;
     if (prefs != null) {
       final generation = _generation;
-      unawaited(
-        _store(() async {
-          if (_current(generation)) {
-            await prefs.setBool('connected_${carrier.name}', true);
-          }
-        }),
-      );
+      final saved = _store(() async {
+        if (_current(generation)) {
+          await prefs.setBool('connected_${carrier.name}', true);
+        }
+      });
+      unawaited(saved.then((_) => _syncBackgroundSchedule()));
     }
     final controller = _controllers[carrier];
     if (controller != null) {
@@ -452,26 +507,39 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       return;
     }
     if (!mounted) return;
+    final hadPreviousQuery = _snapshots[carrier]?.queriedAt != null;
     _timeouts[carrier]?.cancel();
-    setState(
-      () => _snapshots[carrier] = snapshot.status == QueryStatus.success
-          ? snapshot
-          : _snapshots[carrier]!.copyWith(
-              status: snapshot.status,
-              message: snapshot.message,
-            ),
-    );
+    final displayed = snapshot.status == QueryStatus.success
+        ? snapshot
+        : _snapshots[carrier]!.copyWith(
+            status: snapshot.status,
+            message: snapshot.message,
+          );
+    setState(() => _snapshots[carrier] = displayed);
     await _publishWidget();
     if (!_current(generation)) return;
-    if (snapshot.status == QueryStatus.success) {
-      await _store(() async {
-        if (_current(generation)) {
-          await _prefs?.setString(
-            'snapshot_${carrier.name}',
-            jsonEncode(snapshot.toJson()),
+    await _store(() async {
+      if (_current(generation)) {
+        await _prefs?.setString(
+          'snapshot_${carrier.name}',
+          jsonEncode(displayed.toJson()),
+        );
+        if (snapshot.status == QueryStatus.authExpired) {
+          await _prefs?.setBool(
+            'background_auth_required_${carrier.name}',
+            true,
+          );
+        } else if (snapshot.status == QueryStatus.success) {
+          await _prefs?.setBool(
+            'background_auth_required_${carrier.name}',
+            false,
           );
         }
-      });
+      }
+    });
+    if (!_current(generation)) return;
+    if (snapshot.status == QueryStatus.success) {
+      if (!hadPreviousQuery) await _syncBackgroundSchedule();
       if (!_current(generation)) return;
       final remaining = snapshot.generalRemainingBytes;
       final low = remaining != null && remaining / 1073741824 <= _thresholdGb;
@@ -739,6 +807,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       });
       if (_current(generation)) {
         setState(() => _savingSelection = false);
+        await _syncBackgroundSchedule();
         await _publishWidget();
       }
     } catch (_) {
@@ -747,6 +816,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           _selection = previousSelection;
           _savingSelection = false;
         });
+        await _syncBackgroundSchedule();
         await _publishWidget();
         _showInfo('设置暂未完整保存', '请重新选择运营商并保存。');
       }
@@ -774,6 +844,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   Future<void> _settings() async {
     double threshold = _thresholdGb;
     bool reminders = _reminders;
+    var backgroundRefresh = _backgroundRefresh;
     final save = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -802,6 +873,31 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                     unawaited(_manageCarriers());
                   },
                 ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('桌面卡片后台刷新'),
+                  subtitle: Text(backgroundRefresh.label),
+                  trailing: PopupMenuButton<BackgroundRefreshInterval>(
+                    tooltip: '选择后台刷新间隔',
+                    onSelected: (value) =>
+                        update(() => backgroundRefresh = value),
+                    itemBuilder: (context) => [
+                      for (final value in BackgroundRefreshInterval.values)
+                        PopupMenuItem(value: value, child: Text(value.label)),
+                    ],
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('更改'),
+                          SizedBox(width: 4),
+                          Icon(Icons.expand_more_rounded),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
                 Text('通用流量低于 ${threshold.toStringAsFixed(0)} GB 时提醒'),
                 Slider(
                   value: threshold,
@@ -817,7 +913,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   onChanged: (value) => update(() => reminders = value),
                 ),
                 const Text(
-                  '打开 APP 和回到前台时查询；在前台每 5 分钟尝试更新。关闭 APP 后不持续查询。运营商账单可能延迟。',
+                  '后台刷新由 Android 尽力调度，省电模式、网络和运营商响应可能让任务延后。移动、联通、广电可尝试后台网页查询；电信需要打开 APP 查看。前台仍会在打开或返回时查询，并每 5 分钟尝试更新。',
                   style: TextStyle(fontSize: 13, color: Color(0xFF736F69)),
                 ),
                 const SizedBox(height: 16),
@@ -853,10 +949,25 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     setState(() {
       _thresholdGb = threshold;
       _reminders = permitted;
+      _backgroundRefresh = backgroundRefresh;
       _warnedLow.clear();
     });
     await _prefs?.setDouble('threshold_gb', threshold);
     await _prefs?.setBool('reminders', permitted);
+    await _prefs?.setInt(
+      'background_refresh_minutes',
+      backgroundRefresh.minutes,
+    );
+    final scheduled = await _syncBackgroundSchedule();
+    if (!scheduled &&
+        _android &&
+        backgroundRefresh != BackgroundRefreshInterval.off) {
+      setState(() => _backgroundRefresh = BackgroundRefreshInterval.off);
+      await _prefs?.setInt('background_refresh_minutes', 0);
+      if (mounted) {
+        _showInfo('后台刷新暂未启用', '系统没有接受后台任务设置。打开 APP 后仍会按原方式查询。');
+      }
+    }
     await _publishWidget();
   }
 
@@ -889,6 +1000,17 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _visibleCarrier = null;
       _broadnetSession = null;
     });
+    if (_android && !demoMode) {
+      try {
+        await BackgroundRefreshScheduler.configure(
+          BackgroundRefreshInterval.off,
+        );
+      } on PlatformException {
+        // Continue clearing local credentials even if WorkManager is unavailable.
+      } on MissingPluginException {
+        // Older installs may not expose the scheduler channel.
+      }
+    }
     for (final timer in _timeouts.values) {
       timer.cancel();
     }
@@ -917,6 +1039,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     for (final carrier in Carrier.values) {
       await _prefs?.remove('snapshot_${carrier.name}');
       await _prefs?.remove('connected_${carrier.name}');
+      await _prefs?.remove('background_auth_required_${carrier.name}');
     }
     if (!mounted) return;
     setState(() {
@@ -984,7 +1107,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               widgetSupported: _android && !demoMode,
               onAbout: () => _showInfo(
                 '流量小伙伴 · 测试版',
-                '可选择移动、联通、电信、广电，至少一家。数据来自您登录官方网页后的查询结果，通用、定向和用途未知的流量分开展示。\n\n联通展示官网套餐余量；电信按官网已用量和总量的舍入显示值估算，主位标「约」，均不当作已确认通用额度或触发提醒。真实号码登录和余额准确性仍需手机验证，无法识别时请在官方查询页查看。\n\n会话保存在手机本地，广电会话备份使用系统安全存储；不上传第三方服务器，不读取短信或服务密码。桌面卡片显示上次查询的余额和时间，点击打开 APP 更新；APP 关闭后不会持续查询。',
+                '可选择移动、联通、电信、广电，至少一家。数据来自您登录官方网页后的查询结果，通用、定向和用途未知的流量分开展示。\n\n联通展示官网套餐余量；电信按官网已用量和总量的舍入显示值估算，主位标「约」，均不当作已确认通用额度或触发提醒。真实号码登录和余额准确性仍需手机验证，无法识别时请在官方查询页查看。\n\n会话保存在手机本地，广电会话备份使用系统安全存储；不上传第三方服务器，不读取短信或服务密码。桌面卡片可在提醒设置中选择后台刷新间隔；Android 可能延迟任务，电信需要打开 APP 查询。',
               ),
               demo: demoMode,
             ),

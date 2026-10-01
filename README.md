@@ -2,15 +2,15 @@
 
 一个可自行选择运营商的安卓流量查询测试应用。首次使用选择至少一家，现在可选择移动、联通、电信、广电，支持任意单家或多家组合；设置中可随时改选。每家目前只连接一个号码。联通读取官网套餐余量，电信按官网明细已用/总量显示值估算并标「约」，两者不混入已确认通用额度或提醒。首页采用奶油背景、圆润双色卡片与笑脸水滴，展示每张卡的剩余流量、查询时间、连接状态，以及通用和定向额度。号码验证由用户在运营商官方网页完成，成功会话尽量复用。
 
-当前版本 1.3.0+6，已公开发布：[GitHub 仓库](https://github.com/huachen19867/liuliang-buddy) · [安装包发布页](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.3.0)。原有私有仓库和历史发布保留。
+当前版本 1.4.0+7，已公开发布：[GitHub 仓库](https://github.com/huachen19867/liuliang-buddy) · [安装包发布页](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.4.0)。
 
-已生成的安装包：artifacts/liuliang-buddy-debug.apk（约 85.4 MiB，Android 7.0 及以上 ARM64 手机）。APK 构建和 v2 签名检查通过，flutter analyze 无问题，75 项 Flutter 测试、9 项应用原生卡片测试及网页探针 Node 验证通过。广电监听修复还通过真实公开官网配合本地合成响应的 Chrome 验证；已收到用户真机双卡同步截图，官方余额对照与新版显示仍需实际手机核对。
+当前安装包：artifacts/liuliang-buddy-debug.apk（约 109.1 MiB，Android 7.0 及以上 ARM64 手机）。本次 flutter analyze 无问题，Android 构建和 v2 签名检查通过。后台刷新没有连接真机验证，四家真实账号与电信后台支持边界见 [后台刷新说明](docs/WIDGET_BACKGROUND_REFRESH.md)；75 项 Flutter 测试、9 项原生卡片测试和网页探针验证是 1.3.0 发布时的结果，不代表本次后台刷新已经过运行验证。
 
 联通依据公开官网 E5 查询页自然发出的 userinfoE5query 响应，套餐余量单位 MB；不限量已用字段不当成剩余。电信当前天翼账号首页返回加密账务结果，应用读取首页已渲染的指定账务明细（含隐藏的官网明细弹窗），不复制其加解密代码、不自动点击或发送登录请求。每项按已用/总量的 MB/GB 显示值换算后估算差值；缺项、无单位、超额或无限哨兵不算合计。它有官网显示值舍入误差，共享/重叠额度以套餐规则为准。
 
 当前为待真机验证的测试版：移动响应读取与解密已实现；广电官网的真实查询接口、业务字段和 KB 单位已从公开页面核对，使用官网自身解密后的结果。没有真实账号登录验证，不保证各省份或套餐均可读取。运营商没有在调研中提供可稳定依赖的公开余额 API，官网改版或会话失效会影响自动查询。
 
-自动更新发生在打开 APP、回到前台和 APP 前台运行每五分钟；关闭 APP 后不会持续监测。低流量提醒仅使用成功查询的通用额度。未知用途或单位不推算成通用 GB，总览不会把定向流量混进去；没有数据时展示未连接，不使用示例余额。
+自动更新可在设置中关闭，或选择后台每小时、每两小时、每天尝试一次；Android 可能延迟任务。后台目前尝试移动、联通、广电，电信仍需打开 APP 查询。前台原有每五分钟查询不变。低流量提醒仅使用成功查询的通用额度。未知用途或单位不推算成通用 GB，总览不会把定向流量混进去；没有数据时展示未连接，不使用示例余额。后台实现与验证边界见 [后台刷新说明](docs/WIDGET_BACKGROUND_REFRESH.md)。
 
 广电已同步但套餐用途不明确时，卡片主位显示“套餐明细合计”，只有全部明细的剩余额和单位都可确认才计算。这是各项余量的数学合计，用途以各套餐规则为准，不能代表全都可通用；不进入通用总览或低量提醒。首页和桌面使用同一摘要，明细可展开并点击查看完整名称。移动的“流量总览”可能包含分类，不纳入这个合计。
 
@@ -19,6 +19,8 @@
 | 位置 | 内容 |
 | --- | --- |
 | app/lib/main.dart | 生命周期、官方 WebView、会话、查询与提醒集成 |
+| app/lib/services/background_refresh.dart | 周期选择与 WorkManager 设置通道 |
+| app/lib/services/background_refresh_runner.dart | 后台 Flutter 引擎、无界面官网 WebView 与安全响应解析 |
 | app/lib/ui/dashboard_screen.dart | 按所选运营商展示的可爱首页与各种连接状态 |
 | app/lib/ui/carrier_selection_screen.dart | 首次运营商选择与后续改选页面 |
 | app/lib/data/carrier_selection.dart | 选择保存、旧版迁移及查询门禁 |
@@ -33,6 +35,7 @@
 | app/lib/services/widget_bridge.dart | 桌面展示数据与原生通信 |
 | app/lib/ui/widget_preview_card.dart | 添加桌面卡片入口与样式示意 |
 | app/android/ | 安卓入口、权限、通知、自绘启动图标与原生桌面卡片 |
+| app/android/app/src/main/kotlin/cn/liuliang/liuliang_app/BackgroundRefreshWorker.kt | WorkManager 周期任务与后台小组件缓存更新 |
 | app/test/ | 数据、探针及 UI 验证 |
 | app/vendor/README.md | WebView 安卓依赖的 AGP 9 兼容补丁 |
 | artifacts/ui-preview.png | 可视预览，使用显著标注的演示样本 |
@@ -47,6 +50,7 @@
 | docs/PRIVACY.md | 本地存储、登录与清除数据行为 |
 | docs/THIRD_PARTY_NOTICES.md | 上游参考声明 |
 | docs/WIDGET_RESEARCH.md | Android AppWidget 官方参考、支持范围与实施边界 |
+| docs/WIDGET_BACKGROUND_REFRESH.md | 后台自动刷新架构、四家支持边界与真机验证项 |
 | docs/RELEASE_1.1.0.md | 版本说明、验证与安装包哈希 |
 | docs/RELEASE_1.1.1.md | 广电查询修复、验证与安装包哈希 |
 | docs/RELEASE_1.3.0.md | 四家选择、联通读取、电信估算和公开测试发布 |

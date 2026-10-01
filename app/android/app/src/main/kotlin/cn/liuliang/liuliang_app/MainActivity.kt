@@ -16,8 +16,38 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var permissionResult: MethodChannel.Result? = null
     private var widgetChannel: MethodChannel? = null
+
+    override fun onStart() {
+        super.onStart()
+        isAppVisible = true
+    }
+
+    override fun onStop() {
+        isAppVisible = false
+        super.onStop()
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "cn.liuliang/background_refresh_schedule")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "configure" -> {
+                        val minutes = call.arguments as? Int
+                        if (minutes == null || minutes !in setOf(0, 60, 120, 1440)) {
+                            result.error("invalid_interval", "Unsupported refresh interval", null)
+                        } else {
+                            try {
+                                BackgroundRefreshSchedule.configure(this, minutes)
+                                result.success(true)
+                            } catch (error: IllegalArgumentException) {
+                                result.error("invalid_interval", error.message, null)
+                            }
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         widgetChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "cn.liuliang/widgets").also { channel ->
             channel.setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -104,5 +134,11 @@ class MainActivity : FlutterActivity() {
             intent.removeExtra("widget_refresh")
             widgetChannel?.invokeMethod("openFromWidget", null)
         }
+    }
+
+    companion object {
+        @Volatile
+        var isAppVisible: Boolean = false
+            private set
     }
 }

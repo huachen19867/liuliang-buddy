@@ -29,3 +29,7 @@ telecom-rendered-browser.json：scripts/test-telecom-rendered-browser.cjs生成�
 ## 1.3.0 当前安装包
 
 liuliang-buddy-debug.apk已更新为1.3.0+6，89,530,031字节（约85.4MiB），API24/36、ARM64、Android Debug签名v2通过，未启用DEMO。SHA-256：f0c550a930cc249047479a6539dded713cfa5c90c82146bc7606d2a91d689781。公开下载 https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.3.0 。75项Flutter、9项应用原生JUnit、analyze、Node和Chrome合成DOM验证通过，尚未实测联通/电信账号或Launcher。
+
+## 1.4.0 当前安装包
+
+liuliang-buddy-debug.apk已更新为1.4.0+7，114,399,238字节（约109.1MiB），API24/36、ARM64、Android Debug签名v2通过，未启用DEMO。SHA-256：53a782a6a4c5730f29a53fb8d6df3a6f4da6d2bc1337632498ca4872812b2b4b。公开下载 https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.4.0 。本次analyze与Android构建通过；未运行测试套件，也没有连接真机，后台实际触发和官网登录会话共享仍待设备验证。
