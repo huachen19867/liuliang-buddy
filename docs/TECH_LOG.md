@@ -217,3 +217,7 @@ run36815488725确认官方fallback生效（ordinaryExists=false/cryptexExists=tr
 集成完整Flutter123项通过，analyze首轮指出电信分支3处多余非空断言，去除后无问题；不是修改解析逻辑。Node原页面探针通过，Chrome电信10场景通过，UI21项及新DEMO截图目视完成。APK与iOS云端验证进行中，未宣称真机值已确认。
 
 安卓1.7.0/code10构建成功，91,439,548字节，SHA-256 9b191abbab3c41abed7c9c188361440289581abcb4dc916bfe33504953a78549。apksigner v2通过，沿用Android Debug证书fdf71a4c15215bf6ffc0a1f62e53a3abdfc21ed9fc0457697e33082e8a320fa8，API24/36，Flutter引擎仅arm64-v8a；aapt2无短信/通话权限，未用DEMO编译参数。实际组件截图已公开，源码e697ecb0dc7f9c0c2780e9d223f993b096c482af只推送public/main。iOS run36826003180进行中，尚未记为通过；真实账号、实体手机和系统组件没有新增实测。
+
+iOS run36826003180已success：Xcode编译、完整123项Flutter、analyze、Swift模型检查、独立冷启动及选择/首页/桌面指引/设置smoke通过。日志存artifacts/ios-cloud-1.7.0.log（忽略，不含真实账号）；新截图与归档下载中。Release target需使用完整40位SHA，短SHA曾被API422拒绝，改完整后草稿成功；APK上传摘要与本地一致。
+
+本机取回Actions归档两次受代理超时（gh等待及HttpClient90秒），直连60秒亦失败，不记为产物通过或空文件成功。改用GitHub runner取已验收归档并上传现有Release；新增手动publish-ios-artifact workflow，严格校验成功main分支iOS工作流与tag格式，只发布模拟器和四张截图，使用仓库临时token，不在本机保存凭证。构建结果不受下载路径故障影响。

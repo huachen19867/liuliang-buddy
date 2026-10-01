@@ -34,7 +34,7 @@ H5 渲染没有语音/短信不限量的数字哨兵处理；不将 -1、大整�
 
 来源为 `https://static.e.189.cn/portal/web/assets/Home-CbXUZRRH.js`，原文 `references/dlife-public/Home-CbXUZRRH.js` 的 Account 组件。`getPackageDetail` 返回 `result === 10000` 后保存套餐资源，模板遍历 `items[].items[]`，资源名 `ratableResourcename`，`usageAmount` 是已用，`ratableAmount` 是总量。单位函数明确 `unitTypeId == 1` 为“分钟”、`== 2` 为“次”、`== 3` 为流量。实际 DOM 为 `#balanceModal .bill-list .list`，内部 `.bill-title` 是名称，`.bill-balance[data-id]` 保存 unitTypeId，文字为“已使用 X单位 / Y单位”。
 
-沿用现有 `e.dlife.cn/portal/web/index.html#/Home` 精确来源和 SPA 登录失效门禁，仅读已渲染的 Account 套餐组件，不访问加密接口、不扫描营销文本或登录短信验证码。语音可识别 data-id1 且分钟，并保留名称；数据为已用/总量而非直接剩余，所以 `总量 - 已用` 应标“套餐估算余量”，不能宣称官网直出的剩余。若已用大于总量，显示超出/未知，不能负数或钳制成假的零余量。
+沿用现有 `e.dlife.cn/portal/web/index.html#/` 精确来源和 SPA 登录失效门禁，仅读已渲染的 Account 套餐组件，不访问加密接口、不扫描营销文本或登录短信验证码。语音可识别 data-id1 且分钟，并保留名称；数据为已用/总量而非直接剩余，所以 `总量 - 已用` 应标“套餐估算余量”，不能宣称官网直出的剩余。若已用大于总量，显示超出/未知，不能负数或钳制成假的零余量。
 
 短信可识别 data-id2 且套餐名称明确是短信或短彩信，显示单位沿用官网“次”。其他次数资源（权益、服务调用等）不得混入短信；仅出现“短信登录”一类页面文本更不能使用。没有明确短信资源时显示未返回，不制造零。当前模板没有确认不限量标记；页面显示的未知、无限、缺总量或缺已用只保留相应状态，不作差。有效期可留在明细帮助解释套餐范围，不跨期相加。
 

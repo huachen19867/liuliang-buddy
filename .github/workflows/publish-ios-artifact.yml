@@ -1,0 +1,53 @@
+name: Publish verified iOS simulator artifact
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful main-branch iOS simulator run
+        required: true
+        type: string
+      tag:
+        description: Existing release tag, for example v1.7.0
+        required: true
+        type: string
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_RUN: ${{ inputs.run_id }}
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - name: Validate successful source and existing release
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          gh api "repos/$GH_REPO/actions/runs/$SOURCE_RUN" > source-run.json
+          jq -e --arg repo "$GH_REPO" '.conclusion == "success" and .status == "completed" and .name == "iOS simulator" and .head_branch == "main" and .head_repository.full_name == $repo' source-run.json
+          gh release view "$RELEASE_TAG" --json tagName > /dev/null
+          printf 'artifact=ios-simulator-%s\n' "$(jq -r .head_sha source-run.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.source.outputs.artifact }}
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          path: payload
+      - name: Upload verified simulator and screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir delivery
+          cp payload/ios-simulator.tar.gz delivery/ios-simulator.tar.gz
+          for name in selection dashboard widget-guide settings; do
+            cp "payload/ios-smoke/ios-$name.png" "delivery/ios-$name-simulator.png"
+          done
+          sha256sum delivery/*
+          gh release upload "$RELEASE_TAG" delivery/*
