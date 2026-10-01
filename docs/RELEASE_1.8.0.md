@@ -8,4 +8,4 @@
 
 实际界面组件截图标注演示，不代表系统原生通知或磁贴实拍。真实各省套餐、实体手机通知授权/渠道、下拉面板和 Release 长期后台行为仍需复测；iOS没有签名iPhone安装包。
 
-完整Flutter130项、analyze、应用原生JUnit16项（系统入口3、Widget12、调度1）通过。正式包18,350,307字节，约18.35MB，比旧91.44MB减少79.93%；SHA-256 b8943da4629e17a03c5f74b9e69d9822335c8dea6c9ab99d442d51151f7ee88c，证书33b115558027fdfa667a3f14a9351fbdb29901948c085daf739e16a9055a497e。过渡包18,376,558字节，SHA-256 5b9785c4edecfbcb14754e21adbb711650637764ce4b386da71edc0cab205c14，沿用历史证书fdf71a4c。两包非签名区315项内容逐一相同，非debuggable、v2验签通过，API24/36，只有arm64-v8a，未启用DEMO。iOS共用界面的本轮云端回执稍后补充。
+完整Flutter130项、analyze、应用原生JUnit16项（系统入口3、Widget12、调度1）通过。正式包18,350,307字节，约18.35MB，比旧91.44MB减少79.93%；SHA-256 b8943da4629e17a03c5f74b9e69d9822335c8dea6c9ab99d442d51151f7ee88c，证书33b115558027fdfa667a3f14a9351fbdb29901948c085daf739e16a9055a497e。过渡包18,376,558字节，SHA-256 5b9785c4edecfbcb14754e21adbb711650637764ce4b386da71edc0cab205c14，沿用历史证书fdf71a4c。两包非签名区315项内容逐一相同，非debuggable、v2验签通过，API24/36，只有arm64-v8a，未启用DEMO。iOS共用界面的最终源码云端验证[run36838979981](https://github.com/huachen19867/liuliang-buddy/actions/runs/36838979981)进行中，本次1.8.0仅分发安卓包与设置组件截图，不沿用旧版模拟器产物。
