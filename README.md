@@ -51,6 +51,7 @@
 | app/lib/services/response_policy.dart | 广电明文成功结果回退与迟到原始响应门禁 |
 | app/lib/services/carrier_web.dart | 四家登录/查询入口与响应页面门禁 |
 | app/lib/services/refresh_throttle.dart | 按账号限制重复刷新，登录返回和加载失败可立即重试 |
+| app/lib/services/query_state.dart | 配置切换取消查询后结束旧加载状态，保留原余额和时间 |
 | app/lib/services/telecom_page_probe.dart | 当前电信官网已渲染套餐明细读取，不采集登录数据 |
 | app/lib/services/widget_bridge.dart | 桌面展示数据与原生通信 |
 | app/lib/ui/widget_preview_card.dart | 添加桌面卡片入口与样式示意 |

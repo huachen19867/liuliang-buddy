@@ -199,3 +199,5 @@ iOS17 Runner/UIScene、真实WidgetKit扩展target与Embed接线、App Group快�
 反馈修复集成后完整Flutter104项通过，analyze无问题，Node探针与Chrome全本地合成电信DOM8场景通过。安卓1.6.0/code9构建45秒成功，115,893,050字节；SHA-256 cffde603402c2ceb5877c9bc9ce49fec9d7de0e2236e57b594deee954d218ecd。APK v2通过且证书沿用，aapt2确认API24/36；插件包含其他ABI，Zip单独确认Flutter引擎仅arm64-v8a，实际支持仍为ARM64。本轮没有原生安卓代码变化，未重复跑旧JUnit；保留native-tests.log历史边界。新增iOS桌面指引和设置页截图点，最终CI尚待回执。
 
 run36815488725确认官方fallback生效（ordinaryExists=false/cryptexExists=true），不再dyld退出，Flutter驱动连接成功并取得真正首次选择页截图。但选择保存后的即时首页断言失败；原生通道回调不一定继续调度帧，pumpAndSettle不能代替等待业务结果。integration smoke改为等待目标页面最多30秒，失败时截图及dump树，不做原生mock或跳过断言。冷启动15秒截图仍是白屏，日志显示其后仍在首次Metal shader编译，云端冷启动观察窗口延至60秒；只是CI观察窗口，不改产品渲染器或启动逻辑。修改后analyze再次通过，准备最终源码云端复核。
+
+进一步复核发现选择卡的InkWell带onDoubleTap，单击需等待双击识别窗口；集成测试先等“1家已选择”再点击继续，避免仍禁用时误点。配置切换/收起第二账号取消所有查询时，把遗留loading归一化成可重试错误；隐藏账号重新加入亦处理旧loading，保留余额时间、不改成功态。新增定向12项和analyze通过，完整回归及APK因产品有新修改需重新生成。

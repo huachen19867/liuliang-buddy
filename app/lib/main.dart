@@ -23,6 +23,7 @@ import 'services/background_refresh_runner.dart';
 import 'services/telecom_page_probe.dart';
 import 'services/response_policy.dart';
 import 'services/refresh_throttle.dart';
+import 'services/query_state.dart';
 import 'services/widget_bridge.dart';
 import 'services/ios_account_profiles.dart';
 import 'ui/dashboard_screen.dart';
@@ -124,6 +125,15 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     if (snapshot.carrier != account.carrier) return;
     _accountSnapshots[account.id] = snapshot;
     if (account.isPrimary) _snapshots[account.carrier] = snapshot;
+  }
+
+  void _settleInterruptedQueries() {
+    for (final carrier in Carrier.values) {
+      _snapshots[carrier] = settleInterruptedQuery(_snapshots[carrier]!);
+    }
+    _accountSnapshots.updateAll(
+      (accountId, snapshot) => settleInterruptedQuery(snapshot),
+    );
   }
 
   List<CarrierAccount> get _visibleAccounts =>
@@ -1200,13 +1210,16 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     setState(() {
       _savingSelection = true;
       _generation++;
+      _settleInterruptedQueries();
       _selection = selection;
       _accounts = nextAccounts;
       _connected.addAll(connectedNew);
       _broadnetSessions.addAll(restoredSessions);
       for (final account in nextAccounts.accounts) {
         final restored = restoredNew[account.id];
-        if (restored != null) _putSnapshot(account, restored);
+        if (restored != null) {
+          _putSnapshot(account, _restoredSnapshot(restored));
+        }
       }
       _controllers.clear();
       _visibleAccountId = null;
@@ -1315,6 +1328,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     final oldControllers = _controllers.values.toList();
     setState(() {
       _generation++;
+      _settleInterruptedQueries();
       _accounts = _accounts.removeSecond(id);
       _controllers.clear();
       _visibleAccountId = null;

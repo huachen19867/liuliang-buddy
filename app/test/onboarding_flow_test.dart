@@ -202,6 +202,58 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  testWidgets('reselected carrier cannot restore an untimed loading record', (
+    tester,
+  ) async {
+    final at = DateTime(2026, 10, 1, 12);
+    SharedPreferences.setMockInitialValues({
+      'carrier_selection': CarrierSelection.complete([
+        Carrier.mobile,
+      ]).toStorageString(),
+      'connected_unicom': true,
+      'snapshot_unicom': jsonEncode(
+        CarrierSnapshot(
+          carrier: Carrier.unicom,
+          status: QueryStatus.loading,
+          queriedAt: at,
+          buckets: const [
+            TrafficBucket(
+              name: '官网套餐余量',
+              kind: BucketKind.unknown,
+              remainingBytes: 1024 * 1024 * 1024,
+            ),
+          ],
+        ).toJson(),
+      ),
+    });
+    await tester.pumpWidget(const FlowBuddyApp());
+    await tester.pumpAndSettle();
+    tester
+        .widget<DashboardScreen>(find.byType(DashboardScreen))
+        .onManageCarriers!();
+    await tester.pumpAndSettle();
+    var manage = tester.widget<CarrierSelectionScreen>(
+      find.byType(CarrierSelectionScreen),
+    );
+    manage.onSelectionChanged({Carrier.mobile, Carrier.unicom});
+    await tester.pump();
+    manage = tester.widget<CarrierSelectionScreen>(
+      find.byType(CarrierSelectionScreen),
+    );
+    manage.onContinue(manage.selectedCarriers);
+    await tester.pumpAndSettle();
+    final dashboard = tester.widget<DashboardScreen>(
+      find.byType(DashboardScreen),
+    );
+    final unicom = dashboard.accountEntries!.singleWhere(
+      (entry) => entry.account.carrier == Carrier.unicom,
+    );
+    expect(unicom.snapshot!.status, QueryStatus.error);
+    expect(unicom.snapshot!.queriedAt, at);
+    await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   for (final supportsProfiles in [true, false]) {
     testWidgets(
       supportsProfiles

@@ -37,7 +37,8 @@ void main() {
     expect(await binding.takeScreenshot('ios-selection'), isNotEmpty);
 
     await tester.tap(find.byKey(const ValueKey('carrier-option-mobile')));
-    await tester.pumpAndSettle();
+    // InkWell waits for its double-tap window before confirming a single tap.
+    await waitFor(tester, find.text('1 家已选择'));
     await tester.ensureVisible(
       find.byKey(const ValueKey('carrier-selection-continue')),
     );
