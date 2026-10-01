@@ -18,6 +18,8 @@ bash scripts/verify-ios.sh
 
 不自备 Mac 时，可以打开仓库 Actions → iOS simulator → Run workflow；完成后在该次运行的 Artifacts 下载模拟器产物、截图和日志。压缩包只是云端验证产物，不能在 Windows 直接运行或装到 iPhone；公开源码和安卓 APK 可分别从仓库与 Release 获取。
 
+2026-10-01 的 [run36817117891](https://github.com/huachen19867/liuliang-buddy/actions/runs/36817117891)已完成并成功，使用 Xcode16.4 / iOS18.5 ARM64 模拟器验证源码387c8a3。Flutter107项、analyze、Swift模型、Runner/Widget编译、独立冷启动和选择→首页→手动添加指引→设置流程通过；四张截图在仓库artifacts目录，模拟器归档在1.6.0 Release。真实官网登录、账号隔离与系统Widget布局仍需真机验证。
+
 iOS 18.4/18.5 模拟器有 [WebKit 官方确认的 Swift 库打包问题](https://bugs.webkit.org/show_bug.cgi?id=293831#c2)，表现为启动前缺少 `libswiftWebKit.dylib`。验证脚本检查所选 runtime 的库是否实际存在于 Cryptex，满足条件才给模拟器子进程设置官方 fallback 路径，记录在 `build/ios-diagnostics/webkit-runtime.json`。这个设置只服务模拟器，不降低应用 iOS 17 下限、不改产品链接方式。冷启动、崩溃和 Flutter 驱动的失败均保留；驱动等待超过 300 秒终止并报告失败。
 
 依赖统一采用 CocoaPods；脚本关闭 Flutter 的 Swift Package Manager 自动迁移。手动构建时先在 `app` 运行 `flutter config --no-enable-swift-package-manager` 和 `flutter pub get`，再用 `flutter build ios --simulator --debug --no-codesign`。原生编辑应打开 `app/ios/Runner.xcworkspace`，不要单独打开 `.xcodeproj`。

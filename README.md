@@ -6,6 +6,8 @@
 
 没有 Mac 也可通过 [GitHub Actions](https://github.com/huachen19867/liuliang-buddy/actions/workflows/ios.yml)执行 macOS 编译、模拟器启动与截图。操作和签名说明见 [iOS 构建说明](docs/IOS_BUILD.md)，实现边界见 [会话隔离](docs/IOS_SESSIONS.md)与 [iOS 小组件](docs/IOS_WIDGET.md)。模拟器应用不适用于 iPhone；iOS 初版前台查询，组件展示最近结果，点击打开应用更新，设置不提供安卓后台周期选项。
 
+[iOS 云端验收](https://github.com/huachen19867/liuliang-buddy/actions/runs/36817117891)已通过 Flutter/Swift 检查、应用与组件编译、独立冷启动和界面流程。四张真实模拟器空账号截图见输出索引，不代表真实运营商余额或真机小组件验收。
+
 安装包路径为 artifacts/liuliang-buddy-debug.apk，适用 Android 7.0 及以上 ARM64 手机。构建、测试、签名和哈希结果见 [1.6.0 版本说明](docs/RELEASE_1.6.0.md)。尚无连接真机，官网余额、双账号 Profile 会话、S25 Ultra / One UI 添加弹窗及长期后台调度仍待设备验证，完整边界见 [后台刷新说明](docs/WIDGET_BACKGROUND_REFRESH.md)。
 
 联通依据公开官网 E5 查询页自然发出的 userinfoE5query 响应，套餐余量单位 MB；不限量已用字段不当成剩余。电信当前天翼账号首页返回加密账务结果，应用读取首页已渲染的指定账务明细（含隐藏的官网明细弹窗），不复制其加解密代码、不自动点击或发送登录请求。每项按已用/总量的 MB/GB 显示值换算后估算差值；缺项、无单位、超额或无限哨兵不算合计。它有官网显示值舍入误差，共享/重叠额度以套餐规则为准。
@@ -33,6 +35,10 @@
 | docs/RELEASE_1.6.0.md | iOS 源码预览的实现与交付范围 |
 | app/integration_test/ios_smoke_test.dart | 真实 iOS 模拟器的首次选择、首页与平台指引验收 |
 | app/test_driver/ios_smoke_driver.dart | 导出模拟器页面截图的测试驱动 |
+| artifacts/ios-selection-simulator.png | iOS 云端实际首次选择页，无真实账号 |
+| artifacts/ios-dashboard-simulator.png | iOS 云端实际未连接首页，无流量样本 |
+| artifacts/ios-widget-guide-simulator.png | iOS 手动添加桌面小组件的指引 |
+| artifacts/ios-settings-simulator.png | iOS 设置及后台能力说明 |
 | docs/IOS_SESSIONS.md | iOS 持久化双账号、前台查询与清理保护 |
 | docs/IOS_WIDGET.md | 小/中/大号组件、通知与手动添加的范围 |
 | docs/IOS_FOUNDATION_PROGRESS.md | Xcode 工程接线与本地静态检查 |

@@ -45,3 +45,9 @@ liuliang-buddy-debug.apk已更新为1.5.0+8，90,035,780字节（约85.9MiB）�
 ## 1.6.0 当前安装包
 
 liuliang-buddy-debug.apk为1.6.0+9，115,893,713字节，API24/36，libflutter.so仅ARM64；插件自身还含其他ABI库，不代表应用能在其他架构运行。Android Debug证书沿用，v2验签通过，未启用DEMO。SHA-256：a251e90ac55ffcdd36057f8a057bdee102897d08bc12f5adceeb5d278e45647d。107项Flutter、analyze、Node及Chrome本地合成DOM8场景通过，最终Android构建28秒成功；新版日志为android-build.log，旧native-tests.log仅代表1.5.0原生回归，不能算本轮新测试。公开发布说明见docs/RELEASE_1.6.0.md，真实联通登录与特殊移动卡仍待手机复测。
+
+## iOS 云端模拟器截图与产物
+
+ios-selection-simulator.png、ios-dashboard-simulator.png、ios-widget-guide-simulator.png、ios-settings-simulator.png 为 [run36817117891](https://github.com/huachen19867/liuliang-buddy/actions/runs/36817117891) 在 iOS18.5 ARM64 模拟器生成的1206×2622实际应用画面，未加工。分别显示首次选择、未连接移动首页、手动添加指引和设置；不包含真实号码、会话或流量样本。设置中的5GB是提醒阈值，不是套餐余额；首页中的卡片预览不是系统Widget截图。未验证真实Widget摆放、通知授权或官网登录。
+
+该次CI已通过107项Flutter、analyze、Swift快照检查、Runner及Widget扩展编译、独立冷启动和界面烟雾流程。正常入口模拟器应用在Release以ios-simulator.tar.gz交付，56,893,081字节，SHA-256 b5f39594fc16f463bb5abb896d0708c14a53092ff3105d6798cf92d4aed7d21d；不能安装到iPhone。云端详细日志和诊断保存在忽略的.tools/ios-ci/final，不上传系统日志到应用源码。
