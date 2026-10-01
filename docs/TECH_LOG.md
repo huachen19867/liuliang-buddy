@@ -277,3 +277,5 @@ Release切换AOT、R8、资源裁剪、ARM64 ABI，拒绝无发布签名的Relea
 WidgetAccountDetails新增小组件专用secondaryStatus/primarySummary；正常状态隐藏，异常和24h较早记录保留。可选行使用GONE，不留空行；零元/负余额保留，分类缺值改短横，联通无分类的唯一aggregate仍显示。共用通知/QS摘要未改。原生26项0失败；Flutter生产逻辑没改，不重复其144项验收。玻璃质感采用ARGB半透明白小框，不伪装普通RemoteViews不支持的壁纸背景blur。预览与最终安装包继续验证。
 
 最终透明度将shell从B8降为60、卡片D9降为C4，避免双层叠加过于不透明；只资源调整后重建，未重复无关测试。最终APK27,184,865字节/SHA256 4317ae6c55066af6c105177efe30e39b3ec98607f32c5d35539f5058f31b7b9b；签名证书不变/v2通过/非debuggable/code14/API24-36/ARM64/16KB ZIP对齐通过。版本1.9.1，唯一正式APK。
+
+1.9.1公开发布完成：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.9.1 ，draft=false/prerelease=false、仓库isPrivate=false，target/tag 2ef53695ef70d00b676e52a1ef0a704d64fc6b1d。Assets只有一个APK，uploaded/27,184,865字节/digest4317ae6c与本地完整SHA一致。XML真实布局预览800×960、53个ID/30项合成绑定和脚本语法校验通过，已目视中文/双卡/隐藏行；未伪称手机实拍或真背景blur。源码只push public，工作区干净；本发布回执另作docs提交。
