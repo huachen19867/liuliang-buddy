@@ -1,7 +1,6 @@
 param(
     [ValidateSet('Release', 'Debug')][string]$Mode = 'Release',
-    [switch]$UseMirrors,
-    [switch]$CreateLegacyUpgrade
+    [switch]$UseMirrors
 )
 $ErrorActionPreference = 'Stop'
 $taskRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -86,15 +85,3 @@ if (-not (Test-Path -LiteralPath $taskApk)) { $taskApk = Join-Path $taskRoot "ap
 $taskOutput = Join-Path $taskRoot "artifacts/liuliang-buddy-$taskVariant.apk"
 Copy-Item -LiteralPath $taskApk -Destination $taskOutput
 Get-FileHash -LiteralPath $taskOutput -Algorithm SHA256
-if ($CreateLegacyUpgrade) {
-    if ($Mode -ne 'Release') { throw 'Legacy upgrade is a release-mode distribution option.' }
-    $taskLegacyKey = Join-Path $env:USERPROFILE '.android/debug.keystore'
-    if (-not (Test-Path -LiteralPath $taskLegacyKey)) { throw 'Old test signing key is absent; cannot create a compatible upgrade.' }
-    $taskLegacyOutput = Join-Path $taskRoot 'artifacts/liuliang-buddy-legacy-upgrade.apk'
-    $env:LIULIANG_LEGACY_PASSWORD = 'android'
-    try {
-        & (Join-Path $taskSdk 'build-tools/36.0.0/apksigner.bat') sign --ks $taskLegacyKey --ks-key-alias androiddebugkey --ks-pass env:LIULIANG_LEGACY_PASSWORD --key-pass env:LIULIANG_LEGACY_PASSWORD --out $taskLegacyOutput $taskOutput
-        if ($LASTEXITCODE -ne 0) { throw 'Legacy release-mode signing failed.' }
-        Get-FileHash -LiteralPath $taskLegacyOutput -Algorithm SHA256
-    } finally { Remove-Item Env:LIULIANG_LEGACY_PASSWORD -ErrorAction SilentlyContinue }
-}
