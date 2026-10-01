@@ -335,44 +335,19 @@ class ResortCarrierMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (text, color, symbol) = switch (carrier) {
-      Carrier.mobile => ('CM', const Color(0xFF57A5C7), Icons.waves_rounded),
-      Carrier.broadnet => ('CBN', const Color(0xFFDF8B77), Icons.wifi_rounded),
-      Carrier.unicom => ('CU', const Color(0xFFC76579), Icons.link_rounded),
-      Carrier.telecom => ('CT', const Color(0xFF7C80C6), Icons.cloud_rounded),
-    };
     return Container(
       width: 44,
       height: 44,
+      padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: .13),
-        shape: BoxShape.circle,
-        border: Border.all(color: color.withValues(alpha: .4), width: 1.3),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE7EBF0)),
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Icon(symbol, size: 23, color: color),
-          Positioned(
-            bottom: 2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 7,
-                  height: 1,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
-        ],
+      child: Image.asset(
+        'assets/carriers/${carrier.name}.png',
+        fit: BoxFit.contain,
+        semanticLabel: '${carrier.label}标识',
       ),
     );
   }

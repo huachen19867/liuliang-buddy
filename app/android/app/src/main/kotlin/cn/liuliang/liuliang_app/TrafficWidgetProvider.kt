@@ -488,14 +488,15 @@ class TrafficWidgetProvider : AppWidgetProvider() {
 
         private fun bindCard(views: RemoteViews, ids: IntArray, carrier: String, card: WidgetCardData, threshold: Double, now: Long) {
             val display = WidgetPresentation.present(card, threshold, now)
-            val (defaultName, badge) = when (carrier) {
-                "mobile" -> "中国移动" to "移"
-                "broadnet" -> "中国广电" to "广"
-                "unicom" -> "中国联通" to "联"
-                else -> "中国电信" to "电"
+            val (defaultName, logo) = when (carrier) {
+                "mobile" -> "中国移动" to R.drawable.carrier_mobile
+                "broadnet" -> "中国广电" to R.drawable.carrier_broadnet
+                "unicom" -> "中国联通" to R.drawable.carrier_unicom
+                else -> "中国电信" to R.drawable.carrier_telecom
             }
             val valid = WidgetAccountDetails.validQuery(card, now)
-            views.setTextViewText(ids[1], badge)
+            views.setImageViewResource(ids[1], logo)
+            views.setContentDescription(ids[1], "${defaultName}标识")
             views.setTextViewText(ids[2], WidgetAccountDetails.safeName(card.name) ?: card.accountLabel ?: defaultName)
             fun optionalText(id: Int, value: String?) {
                 views.setTextViewText(id, value ?: "")

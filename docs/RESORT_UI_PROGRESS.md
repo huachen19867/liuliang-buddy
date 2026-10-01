@@ -13,3 +13,5 @@
 新增首页 UI 回归用例，覆盖窄屏大字、元余额、备注/脱敏号码、分类余额、编辑回调、角色短句与关闭动画状态。账号备注断言已限定到对应账号卡，避免桌面预览复用同一备注时产生重复匹配；演示的定向流量明细补齐 `GB` 单位。`app/assets/resort/` 中的原创场景、角色与桌面贴纸资源已存在，且已在 `pubspec.yaml` 声明。按共享 SDK 协调要求，本代理未运行 Flutter、Dart 或 Gradle 命令，也未生成测试截图；待根代理串行格式化、运行测试并检查真实素材截图后追加结果，不以 fallback 预览代替角色素材验收。
 
 根代理最终使用实际角色素材生成截图并目视核对，Flutter 144 项通过，analyze 无问题。截图位于 artifacts/ui-preview.png、carrier-selection-four-demo.png、dashboard-two-mobile-unlimited-demo.png 等，均有演示标识，不是运营商实测余额。新版手机和 Launcher 实测待后续反馈。
+
+1.9.2四家Logo已改为官网下载的原版图形标识，替换原先的自绘徽章。此记录描述1.9阶段的进展，当前素材来源以app/assets/carriers/README.md为准。

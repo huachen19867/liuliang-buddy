@@ -81,3 +81,7 @@ android-system-surfaces-settings-demo.png 为真实Flutter设置组件渲染，D
 ## 1.9.1 桌面布局输出
 
 widget-glass-preview.png由scripts/preview-native-widget.cjs读取实际Android布局及drawable生成，使用合成两卡数据，非真机截图、无模拟背景blur。最终APK版本和摘要见docs/RELEASE_1.9.1.md。
+
+## 1.9.2 运营商Logo输出
+
+首次选择、首页与widget-glass-preview.png均已更新为四家官网原版图形。图仍分别为Flutter实际组件合成数据截图和Android XML浏览器布局预览，不是运营商或手机实测。标识资源及来源在app/assets/carriers/，原图在scripts/carrier-originals/。

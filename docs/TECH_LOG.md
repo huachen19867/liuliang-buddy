@@ -279,3 +279,11 @@ WidgetAccountDetails新增小组件专用secondaryStatus/primarySummary；正常
 最终透明度将shell从B8降为60、卡片D9降为C4，避免双层叠加过于不透明；只资源调整后重建，未重复无关测试。最终APK27,184,865字节/SHA256 4317ae6c55066af6c105177efe30e39b3ec98607f32c5d35539f5058f31b7b9b；签名证书不变/v2通过/非debuggable/code14/API24-36/ARM64/16KB ZIP对齐通过。版本1.9.1，唯一正式APK。
 
 1.9.1公开发布完成：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.9.1 ，draft=false/prerelease=false、仓库isPrivate=false，target/tag 2ef53695ef70d00b676e52a1ef0a704d64fc6b1d。Assets只有一个APK，uploaded/27,184,865字节/digest4317ae6c与本地完整SHA一致。XML真实布局预览800×960、53个ID/30项合成绑定和脚本语法校验通过，已目视中文/双卡/隐藏行；未伪称手机实拍或真背景blur。源码只push public，工作区干净；本发布回执另作docs提交。
+
+## 2026-10-01：运营商官网原版 Logo
+
+老板要求原Logo代替自绘图标与汉字徽章。先读本日志、复用工作区官方页面归档，下载移动/联通/广电公开Logo，电信从企业官网index.html导航切换资源确认dianxin.png。不使用天翼账号Logo或16pxfavicon冒充高清标识；原始PNG及URL/crop记录存scripts/carrier-originals/，本地Chrome仅裁切图形部分和保持比例导出，保留原色。官网广电WAF需要正常浏览页面后取资源；电信部分Invoke-WebRequest提前断流改为正常浏览上下文请求取得200 image/png。
+
+Flutter ResortCarrierMark与安卓badge ImageView统一128px资源，添加无障碍运营商名，不再显示CM/CBN或移/广代用品。桌面头部由19dp增24dp容纳23dp标识，不改查询缓存/通知逻辑。完整Flutter144项通过；实际选择页和XML预览目视四家标识正确。原图透明色调在view_image显示成色块，Chrome正常透明渲染与canvas导出证实是原图alpha呈现问题，不擅自改色。正式1.9.2构建进行中。
+
+最终144项Flutter通过/analyze无问题；Release1.9.2/code15、27,313,816字节、SHA256 4c68d09a3a19313f8f80c252ae9c72df519fc83ef5dcada58bc152900ad8291c，v2/正式证书33b11555/非debuggable/ARM64/API24-36/16KB ZIP对齐通过，APK四张Logo存在。pubspec仅声明四张PNG，原图与README不入Logo资源打包。透明标识与两卡预览、四家选择页目视正常；没有新真机验收。
