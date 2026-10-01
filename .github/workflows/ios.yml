@@ -23,7 +23,11 @@ jobs:
           channel: stable
           cache: true
       - name: Verify and build unsigned iOS simulator app
-        run: bash scripts/verify-ios.sh
+        timeout-minutes: 25
+        run: bash scripts/verify-ios.sh build
+      - name: Launch simulator and verify actual iOS UI
+        timeout-minutes: 15
+        run: bash scripts/verify-ios.sh smoke
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -33,5 +37,6 @@ jobs:
             app/build/ios-verification.log
             app/build/ios-onboarding.png
             app/build/ios-smoke/*.png
+            app/build/ios-diagnostics/
           if-no-files-found: warn
           retention-days: 14
