@@ -55,24 +55,48 @@ object WidgetAccountDetails {
 
     fun balance(card: WidgetCardData, now: Long): String = if (validQuery(card, now) && card.balanceYuan?.isFinite() == true) {
         String.format(Locale.CHINA, "话费 %.2f 元", card.balanceYuan)
-    } else "话费 未提供"
+    } else ""
+
+    fun secondaryStatus(card: WidgetCardData, now: Long): String? = when (card.status) {
+        "loading" -> "查询中"
+        "authExpired" -> "登录已过期"
+        "error" -> "查询失败"
+        "success" -> when {
+            !validQuery(card, now) -> "待确认"
+            now - card.queriedAt!! > 24L * 60L * 60L * 1000L -> "记录较早"
+            else -> null
+        }
+        else -> "未连接"
+    }
+
+    fun primarySummary(card: WidgetCardData, now: Long): String? {
+        if (!validQuery(card, now)) return null
+        val hasCategory = listOf(
+            card.generalState to card.generalRemainingBytes,
+            card.directedState to card.directedRemainingBytes,
+            card.otherState to card.otherRemainingBytes,
+        ).any { (state, bytes) -> state == "unlimited" || (state == "provided" && bytes != null && bytes >= 0L) }
+        if (hasCategory) return null
+        val display = WidgetPresentation.present(card, 0.0, now)
+        return if (display.amount != "—") "${display.label} ${display.amount}" else null
+    }
 
     fun traffic(state: String, bytes: Long?, estimated: Boolean, validQuery: Boolean): String = when {
-        !validQuery -> "未提供"
+        !validQuery -> "—"
         state == "unlimited" -> "不限量"
         state == "provided" && bytes != null && bytes >= 0L -> (if (estimated) "约 " else "") + WidgetPresentation.formatBytes(bytes)
-        else -> "未提供"
+        else -> "—"
     }
 
     fun voice(card: WidgetCardData, now: Long): String = when {
-        !validQuery(card, now) -> "未提供"
+        !validQuery(card, now) -> "—"
         card.voiceState == "unlimited" -> "不限量"
         card.voiceState == "provided" && card.voiceRemainingMinutes != null -> {
             val value = card.voiceRemainingMinutes
             val amount = if (value % 1.0 == 0.0) String.format(Locale.CHINA, "%.0f", value) else String.format(Locale.CHINA, "%.1f", value)
             (if (card.voiceEstimated) "约 " else "") + amount + " 分钟"
         }
-        else -> "未提供"
+        else -> "—"
     }
 }
 

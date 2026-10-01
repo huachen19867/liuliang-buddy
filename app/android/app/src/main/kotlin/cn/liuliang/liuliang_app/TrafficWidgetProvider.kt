@@ -469,7 +469,8 @@ class TrafficWidgetProvider : AppWidgetProvider() {
                 views.setViewVisibility(ids[0], if (card == null || index >= visible) View.GONE else View.VISIBLE)
                 if (card != null && carrier != null && index < visible) bindCard(views, ids, carrier, card, threshold, now)
             }
-            views.setTextViewText(R.id.widget_more, if (cards.size > visible) "另${cards.size - visible}张，请打开应用" else "上次查询记录 · 点击打开并刷新")
+            views.setTextViewText(R.id.widget_more, if (cards.size > visible) "另${cards.size - visible}张，请打开应用" else "")
+            views.setViewVisibility(R.id.widget_more, if (cards.size > visible) View.VISIBLE else View.GONE)
             views.setViewVisibility(R.id.widget_empty, if (cards.isEmpty()) View.VISIBLE else View.GONE)
             val intent = Intent(context, MainActivity::class.java).apply {
                 action = "cn.liuliang.liuliang_app.OPEN_WIDGET"
@@ -496,17 +497,21 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             val valid = WidgetAccountDetails.validQuery(card, now)
             views.setTextViewText(ids[1], badge)
             views.setTextViewText(ids[2], WidgetAccountDetails.safeName(card.name) ?: card.accountLabel ?: defaultName)
-            views.setTextViewText(ids[3], display.state)
-            views.setTextViewText(ids[4], WidgetAccountDetails.safePhoneHint(card.phoneHint) ?: "号码未备注")
-            views.setTextViewText(ids[5], WidgetAccountDetails.balance(card, now))
-            views.setTextViewText(ids[6], "${display.label} ${display.amount}")
-            views.setTextViewText(ids[7], display.time.removePrefix("上次查询 "))
+            fun optionalText(id: Int, value: String?) {
+                views.setTextViewText(id, value ?: "")
+                views.setViewVisibility(id, if (value.isNullOrEmpty()) View.GONE else View.VISIBLE)
+            }
+            optionalText(ids[3], WidgetAccountDetails.secondaryStatus(card, now) ?: if (display.low) "余量偏低" else null)
+            optionalText(ids[4], WidgetAccountDetails.safePhoneHint(card.phoneHint))
+            optionalText(ids[5], WidgetAccountDetails.balance(card, now))
+            optionalText(ids[6], WidgetAccountDetails.primarySummary(card, now))
+            optionalText(ids[7], if (valid) display.time.removePrefix("上次查询 ") else null)
             views.setTextViewText(ids[8], WidgetAccountDetails.traffic(card.generalState, card.generalRemainingBytes, card.trafficEstimated, valid))
             views.setTextViewText(ids[9], WidgetAccountDetails.traffic(card.directedState, card.directedRemainingBytes, card.trafficEstimated, valid))
             views.setTextViewText(ids[10], WidgetAccountDetails.traffic(card.otherState, card.otherRemainingBytes, card.trafficEstimated, valid))
             views.setTextViewText(ids[11], WidgetAccountDetails.voice(card, now))
             val warning = Color.rgb(184, 86, 74)
-            views.setTextColor(ids[3], if (display.low || display.stale || card.status == "error" || card.status == "authExpired") warning else Color.rgb(89, 112, 106))
+            views.setTextColor(ids[3], if (display.low || display.stale || card.status == "error" || card.status == "authExpired") warning else Color.rgb(87, 98, 116))
         }
     }
 }

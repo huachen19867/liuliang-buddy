@@ -32,11 +32,15 @@ class WidgetAccountDetailsTest {
         assertNull(parsed.directedRemainingBytes)
         assertEquals("不限量", WidgetAccountDetails.traffic(parsed.directedState, parsed.directedRemainingBytes, false, true))
         assertEquals("28.5 分钟", WidgetAccountDetails.voice(parsed, now))
-        assertEquals("话费 未提供", WidgetAccountDetails.balance(parsed.copy(queriedAt = null), now))
-        assertEquals("未提供", WidgetAccountDetails.voice(parsed.copy(status = "unsupported"), now))
-        assertEquals("未提供", WidgetAccountDetails.traffic("provided", 0L, false, false))
-        assertEquals("未提供", WidgetAccountDetails.traffic("unknown", gib, false, true))
-        assertEquals("话费 未提供", WidgetAccountDetails.balance(parsed.copy(queriedAt = now + 300_001L), now))
+        assertEquals("0 分钟", WidgetAccountDetails.voice(parsed.copy(voiceRemainingMinutes = 0.0), now))
+        assertEquals("不限量", WidgetAccountDetails.voice(parsed.copy(voiceState = "unlimited", voiceRemainingMinutes = null), now))
+        assertEquals("—", WidgetAccountDetails.voice(parsed.copy(voiceRemainingMinutes = null), now))
+        assertEquals("", WidgetAccountDetails.balance(parsed.copy(queriedAt = null), now))
+        assertEquals("—", WidgetAccountDetails.voice(parsed.copy(status = "unsupported"), now))
+        assertEquals("—", WidgetAccountDetails.traffic("provided", 0L, false, false))
+        assertEquals("—", WidgetAccountDetails.traffic("unknown", gib, false, true))
+        assertEquals("—", WidgetAccountDetails.traffic("provided", null, false, true))
+        assertEquals("", WidgetAccountDetails.balance(parsed.copy(queriedAt = now + 300_001L), now))
     }
 
     @Test fun invalidNumericsDoNotSaturateIntoAnOfficialBalance() {
@@ -67,6 +71,72 @@ class WidgetAccountDetailsTest {
         assertNull(parsed.phoneHint)
         assertNull(parsed.balanceYuan)
         assertEquals("unavailable", parsed.generalState)
-        assertEquals("未提供", WidgetAccountDetails.traffic(parsed.otherState, parsed.otherRemainingBytes, false, true))
+        assertEquals("—", WidgetAccountDetails.traffic(parsed.otherState, parsed.otherRemainingBytes, false, true))
+        assertEquals("套餐明细合计 1.00 GB", WidgetAccountDetails.primarySummary(parsed, now))
+    }
+
+    @Test fun missingBalanceIsOmittedWhileOfficialZeroAndNegativeBalancesRemain() {
+        assertEquals("", WidgetAccountDetails.balance(card(), now))
+        assertEquals("", WidgetAccountDetails.balance(card(mapOf("balanceYuan" to Double.NaN)), now))
+        assertEquals("话费 0.00 元", WidgetAccountDetails.balance(card(mapOf("balanceYuan" to 0.0)), now))
+        assertEquals("话费 -3.25 元", WidgetAccountDetails.balance(card(mapOf("balanceYuan" to -3.25)), now))
+        val cached = card(mapOf("balanceYuan" to 12.5, "queriedAt" to now - 25L * 60L * 60L * 1000L))
+        assertEquals("话费 12.50 元", WidgetAccountDetails.balance(cached.copy(status = "error"), now))
+        assertEquals("", WidgetAccountDetails.balance(cached.copy(status = "notConnected"), now))
+    }
+
+    @Test fun normalSuccessOmitsSecondaryStatusWhileActionableStatesRemainVisible() {
+        val parsed = card(mapOf("primaryValue" to gib, "primaryLabel" to "通用剩余"))
+        assertNull(WidgetAccountDetails.secondaryStatus(parsed, now))
+        assertNull(WidgetAccountDetails.secondaryStatus(parsed.copy(queriedAt = now - 24L * 60L * 60L * 1000L), now))
+        assertEquals("记录较早", WidgetAccountDetails.secondaryStatus(parsed.copy(queriedAt = now - 24L * 60L * 60L * 1000L - 1), now))
+        assertEquals("待确认", WidgetAccountDetails.secondaryStatus(parsed.copy(queriedAt = null), now))
+        assertEquals("查询失败", WidgetAccountDetails.secondaryStatus(parsed.copy(status = "error"), now))
+        assertEquals("登录已过期", WidgetAccountDetails.secondaryStatus(parsed.copy(status = "authExpired"), now))
+        assertEquals("查询中", WidgetAccountDetails.secondaryStatus(parsed.copy(status = "loading"), now))
+        assertEquals("未连接", WidgetAccountDetails.secondaryStatus(parsed.copy(status = "notConnected", queriedAt = null), now))
+    }
+
+    @Test fun confirmedTrafficCategoriesSuppressDuplicatePrimarySummary() {
+        val parsed = card(mapOf("primaryValue" to gib, "primaryLabel" to "套餐明细合计"))
+        for (category in listOf("general", "directed", "other")) {
+            val provided = card(mapOf("primaryValue" to gib, "primaryLabel" to "套餐明细合计", "${category}State" to "provided", "${category}RemainingBytes" to 0L))
+            val unlimited = card(mapOf("primaryValue" to gib, "primaryLabel" to "套餐明细合计", "${category}State" to "unlimited"))
+            assertNull("$category provided", WidgetAccountDetails.primarySummary(provided, now))
+            assertNull("$category unlimited", WidgetAccountDetails.primarySummary(unlimited, now))
+        }
+        assertNull(WidgetAccountDetails.primarySummary(parsed.copy(generalState = "provided", generalRemainingBytes = gib), now))
+    }
+
+    @Test fun absentPrimaryAmountAndInvalidQueryDoNotCreatePlaceholderSummary() {
+        assertNull(WidgetAccountDetails.primarySummary(card(), now))
+        assertNull(WidgetAccountDetails.primarySummary(card(mapOf("primaryValue" to -1L)), now))
+        val parsed = card(mapOf("primaryValue" to gib, "primaryLabel" to "套餐明细合计"))
+        assertNull(WidgetAccountDetails.primarySummary(parsed.copy(queriedAt = null), now))
+        assertNull(WidgetAccountDetails.primarySummary(parsed.copy(queriedAt = 0L), now))
+        assertNull(WidgetAccountDetails.primarySummary(parsed.copy(queriedAt = now + 300_001L), now))
+        assertNull(WidgetAccountDetails.primarySummary(parsed.copy(status = "notConnected"), now))
+        assertNull(WidgetAccountDetails.primarySummary(parsed.copy(status = "unsupported"), now))
+    }
+
+    @Test fun legacyUnicomAggregateAndCachedAmountsRemainWithoutInventedCategories() {
+        val parsed = WidgetInstances.fromPayload(
+            listOf(mapOf("accountId" to "unicom", "carrier" to "unicom", "status" to "success", "queriedAt" to now, "primaryValue" to 3L * gib, "primaryLabel" to "套餐余量")),
+            setOf("unicom"),
+        ).single()
+        assertEquals("套餐余量 3.00 GB", WidgetAccountDetails.primarySummary(parsed, now))
+        assertEquals("unavailable", parsed.generalState)
+        assertEquals("unavailable", parsed.directedState)
+        assertEquals("unavailable", parsed.otherState)
+        for (status in listOf("loading", "error", "authExpired")) {
+            val cached = parsed.copy(status = status, queriedAt = now - 25L * 60L * 60L * 1000L)
+            assertEquals("套餐余量 3.00 GB", WidgetAccountDetails.primarySummary(cached, now))
+            assertEquals(now - 25L * 60L * 60L * 1000L, cached.queriedAt)
+        }
+        assertEquals("套餐余量 0 MB", WidgetAccountDetails.primarySummary(parsed.copy(remainingBytes = 0L), now))
+        assertEquals("含不限量套餐 不限量", WidgetAccountDetails.primarySummary(parsed.copy(remainingBytes = null, label = "含不限量套餐", unlimited = true), now))
+        assertEquals("套餐估算余量 约 3.00 GB", WidgetAccountDetails.primarySummary(parsed.copy(label = "套餐估算余量"), now))
+        val invalidCategory = parsed.copy(generalState = "provided", generalRemainingBytes = null)
+        assertEquals("套餐余量 3.00 GB", WidgetAccountDetails.primarySummary(invalidCategory, now))
     }
 }
