@@ -223,3 +223,5 @@ iOS run36826003180已success：Xcode编译、完整123项Flutter、analyze、Swi
 本机取回Actions归档两次受代理超时（gh等待及HttpClient90秒），直连60秒亦失败，不记为产物通过或空文件成功。改用GitHub runner取已验收归档并上传现有Release；新增手动publish-ios-artifact workflow，严格校验成功main分支iOS工作流与tag格式，只发布模拟器和四张截图，使用仓库临时token，不在本机保存凭证。构建结果不受下载路径故障影响。
 
 iOS归档改由云端发布助手run36828372883取得run36826003180已验收artifact并上传Release草稿，success；模拟器包56,902,762字节、SHA-256 8304ec122473e14aa5815fb6b921d26bcac13c3dc0dab960cfd024db448a64e6。GitHub digest与云端sha256sum一致；四张原始1206×2622截图改从Release正常下载到本机，逐张目视核对且hash与云端/GitHub一致，复制artifacts索引。首页包含未连接的通话短信面板，设置5GB是阈值，无真实账号或编造余额。截图不是实际系统Widget验收，不交付iPhone签名包。
+
+公开1.7.0发布完成：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.7.0 ，draft=false/prerelease=true，标签与源码目标fb50e4984095ee9286b07775da2ef7f0a24cca44一致。发布树app/、原iOS验证脚本及工作流与已通过run36826003180的e697ecb相同，后来只有文档/截图和已单独成功验收的产物发布助手。七个资产均uploaded，APK9b191abb/91,439,548字节、模拟器8304ec12/56,902,762字节及五张PNG摘要核对一致。只推public，公开仓库private=false；本段回执另作文档提交，不改已发布tag或安装包。
