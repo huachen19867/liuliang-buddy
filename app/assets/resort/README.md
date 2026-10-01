@@ -1,4 +1,4 @@
-# 少女风素材索引
+# 治愈风素材索引
 
 2026-10-01。mascot.png 为棕色盘发、绿眼角色；widget-mascot.png 为趴在卡片边缘的简化形态；app-icon.png 为应用图标；hero.png 为海滨温泉背景。角色由用户提供的参考图衍生，服装按场景调整；背景为生成场景。使用内置 imagegen 生成，scripts/generate-brand-assets.cjs 仅做本地尺寸和图标导出。
 

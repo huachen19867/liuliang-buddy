@@ -22,7 +22,7 @@
 
 广电已同步但套餐用途不明确时，卡片主位显示“套餐明细合计”，只有全部明细的剩余额和单位都可确认才计算。这是各项余量的数学合计，用途以各套餐规则为准，不能代表全都可通用；不进入通用总览或低量提醒。首页和桌面使用同一摘要，明细可展开并点击查看完整名称。移动的“流量总览”可能包含分类，不纳入这个合计。
 
-新版使用奶油白与青瓷绿的微缩温泉少女风，角色只在页头和桌面卡片边缘陪衬。支持卡片备注与脱敏号码；无可确认数据时显示待确认。页面演示见[首次选择](artifacts/carrier-selection-four-demo.png)、[双移动卡](artifacts/dashboard-two-mobile-unlimited-demo.png)、[首页](artifacts/ui-preview.png)。素材来源见[素材索引](app/assets/resort/README.md)。
+新版使用奶油白与青瓷绿的微缩温泉治愈风，角色只在页头和桌面卡片边缘陪衬。支持卡片备注与脱敏号码；无可确认数据时显示待确认。页面演示见[首次选择](artifacts/carrier-selection-four-demo.png)、[双移动卡](artifacts/dashboard-two-mobile-unlimited-demo.png)、[首页](artifacts/ui-preview.png)。素材来源见[素材索引](app/assets/resort/README.md)。
 
 ## 文件索引
 
@@ -47,7 +47,7 @@
 | docs/IOS_WIDGET.md | 小/中/大号组件、通知与手动添加的范围 |
 | docs/IOS_FOUNDATION_PROGRESS.md | Xcode 工程接线与本地静态检查 |
 | scripts/verify-ios.sh | macOS Flutter/Swift 验证、编译、模拟器安装与截图 |
-| scripts/generate-ios-icons.cjs | 复用统一少女风素材生成 Android/iOS 图标 |
+| scripts/generate-ios-icons.cjs | 复用统一治愈风素材生成 Android/iOS 图标 |
 | .github/workflows/ios.yml | GitHub macOS 构建、日志与模拟器产物 |
 | .github/workflows/publish-ios-artifact.yml | 手动取回已成功验收的主分支产物并上传现有发布草稿 |
 | .github/ISSUE_TEMPLATE/ios_bug_report.yml | iOS 编译、查询和组件反馈模板 |
@@ -58,7 +58,7 @@
 | docs/ACCOUNT_IDENTITY_PROGRESS.md | 备注、脱敏号码与分类余额 |
 | docs/WIDGET_RESORT_PROGRESS.md | 原生小组件布局和缩放 |
 | scripts/generate-brand-assets.cjs | 统一素材导出双平台图标和安卓桌面贴纸 |
-| docs/RESORT_UI_PROGRESS.md | 首页少女风重做范围、数据展示约束与验证状态 |
+| docs/RESORT_UI_PROGRESS.md | 首页治愈风重做范围、数据展示约束与验证状态 |
 | app/lib/data/carrier_selection.dart | 选择保存、旧版迁移及查询门禁 |
 | docs/ONBOARDING_DESIGN.md | 选择流程、旧版迁移与本地记录行为 |
 | docs/UNICOM_TELECOM_RESEARCH.md | 联通、电信入口及尚未接通的证据边界 |

@@ -256,7 +256,7 @@ Release切换AOT、R8、资源裁剪、ARM64 ABI，拒绝无发布签名的Relea
 
 仅proguard及pubspec1.8.1+12提交2afb682；隔离.tools/hotfix-1.8.1工作树构建，避免正在工作的UI/备注代码混入。正式Release18,383,087字节，SHA-256 59fe631319748e3ed998ae134cf3a89c6e781856d0fd4a0f1be4adbe66b53caa，原正式证书33b11555/v2、非debuggable、ARM64/API24/36。用户亲自确认系统安装提示后同签名覆盖成功，ADB冷启动进入首次选择页，PID6565持续存在，启动之后crash buffer无新增本应用异常；老板确认“已安装，没有问题”。原始系统日志/截图仅留忽略.tools目录，不公开个人数据。仅本台荣耀实测，不声称iQOO或所有机型已验证；公开1.8.1唯一APK分发回执随后补充。
 
-## 2026-10-01：1.9 少女风和卡片身份
+## 2026-10-01：1.9 治愈风和卡片身份
 
 复用工作区已下载的官方 AppWidget/Flutter/运营商页面参考，未新增重复架构。角色替换为老板提供的棕色盘发绿眼参考，青瓷绿/奶油白主题、微缩温泉页头、简化桌面贴纸和双平台图标落地；数据优先。账号备注/手填号码沿用稳定 accountId，后台重新读取元数据防覆盖；展示号码脱敏。三类流量依赖单位和完整性，未知用途不冒充通用，通话不叠加共享套餐，电信余额仅官网余额元节点。
 
@@ -265,3 +265,7 @@ Release切换AOT、R8、资源裁剪、ARM64 ABI，拒绝无发布签名的Relea
 最终 analyze 无问题，JUnit21/Flutter144通过。正常 Flutter Release ARM64 构建成功，未采用 --no-pub 或直接 assembleRelease；wrapper restored，DPAPI私钥不入库。APK27,185,049字节/SHA256 43aa24ea8a1f24804dc410f98dcf6294ad4a5e2274870572cbf16e4a609bfddc；v2/非debuggable/code13/API24-36/ARM64/16KB ZIP对齐通过，正式证书33b11555保持。角色四张PNG新增约7.53MB，整体比1.8.1增加8.80MB。准备唯一APK公开发布，不附源码以外多余二进制。
 
 1.9.0 正式公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.9.0 ，仓库isPrivate=false，Release draft=false/prerelease=false，target a3b85a2443f6dc36bb1e979994b7dfed0b5f5a26。唯一上传资产liuliang-buddy-release.apk，uploaded/27,185,049字节，GitHub digest 43aa24ea8a1f24804dc410f98dcf6294ad4a5e2274870572cbf16e4a609bfddc与本地一致。截图放公开仓库和发布正文，不占Assets；来源/验证边界写明，仅push public。工作区源码提交后无未提交修改，回执单独文档提交，不变更已发布APK或tag。
+
+## 2026-10-01：公开介绍用语调整
+
+按老板要求，将 README、发布说明、界面进展、素材索引、截图索引和本日志中的风格称呼统一为“治愈风”，同步 GitHub 1.9.0 标题和正文。复用现有项目及发布记录，此次只改介绍文字，无需下载新参考项目或重建 APK；正式包、签名、下载资产与标签保持原值。通过文本检索、diff 检查与远端发布回读核对。

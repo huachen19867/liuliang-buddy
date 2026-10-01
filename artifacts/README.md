@@ -76,4 +76,4 @@ android-system-surfaces-settings-demo.png 为真实Flutter设置组件渲染，D
 
 ## 1.9.0 新界面输出
 
-少女风实际组件演示：ui-preview.png、carrier-selection-four-demo.png、dashboard-two-mobile-unlimited-demo.png、dashboard-unicom-broadnet-demo.png、dashboard-telecom-demo.png、dashboard-voice-sms-demo.png。全部是合成演示数据，不是手机或运营商实测。唯一正式包为 liuliang-buddy-release.apk；版本和摘要见 docs/RELEASE_1.9.0.md。新 Launcher 效果仍待设备验证。
+治愈风实际组件演示：ui-preview.png、carrier-selection-four-demo.png、dashboard-two-mobile-unlimited-demo.png、dashboard-unicom-broadnet-demo.png、dashboard-telecom-demo.png、dashboard-voice-sms-demo.png。全部是合成演示数据，不是手机或运营商实测。唯一正式包为 liuliang-buddy-release.apk；版本和摘要见 docs/RELEASE_1.9.0.md。新 Launcher 效果仍待设备验证。
