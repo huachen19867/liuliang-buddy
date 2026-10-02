@@ -102,6 +102,7 @@ object WidgetInstances {
         val seen = mutableSetOf<String>()
         return values.mapNotNull { item ->
             val map = item as? Map<*, *> ?: return@mapNotNull null
+            if (map["enabled"] == false) return@mapNotNull null
             val accountId = (map["accountId"] as? String)?.takeIf {
                 it.matches(Regex("[A-Za-z0-9_]{1,48}"))
             } ?: return@mapNotNull null
@@ -109,7 +110,7 @@ object WidgetInstances {
             if (carrier !in WidgetCarrierSelection.order || carrier !in selected || !seen.add(accountId)) {
                 return@mapNotNull null
             }
-            if (accountId != carrier && accountId != "${carrier}_2") return@mapNotNull null
+            if (accountId !in listOf(carrier, "${carrier}_2", "${carrier}_3", "${carrier}_4")) return@mapNotNull null
             val status = map["status"] as? String ?: return@mapNotNull null
             if (status !in setOf("notConnected", "loading", "success", "authExpired", "error")) {
                 return@mapNotNull null
@@ -453,8 +454,9 @@ class TrafficWidgetProvider : AppWidgetProvider() {
         }
 
         private fun createViews(context: Context, options: android.os.Bundle): RemoteViews {
-            val views = RemoteViews(context.packageName, R.layout.traffic_widget)
             val (cards, threshold) = displayCards(context)
+            val compact = WidgetAccountLayout.isCompact(cards.size)
+            val views = RemoteViews(context.packageName, if (compact) R.layout.traffic_widget_compact else R.layout.traffic_widget)
             val now = System.currentTimeMillis()
             val visible = WidgetAccountLayout.visibleCount(cards.size, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 280))
             val slots = listOf(
@@ -467,7 +469,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
                 val card = cards.getOrNull(index)
                 val carrier = card?.carrier
                 views.setViewVisibility(ids[0], if (card == null || index >= visible) View.GONE else View.VISIBLE)
-                if (card != null && carrier != null && index < visible) bindCard(views, ids, carrier, card, threshold, now)
+                if (card != null && carrier != null && index < visible) bindCard(views, ids, carrier, card, threshold, now, compact)
             }
             views.setTextViewText(R.id.widget_more, if (cards.size > visible) "另${cards.size - visible}张，请打开应用" else "")
             views.setViewVisibility(R.id.widget_more, if (cards.size > visible) View.VISIBLE else View.GONE)
@@ -486,7 +488,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             return views
         }
 
-        private fun bindCard(views: RemoteViews, ids: IntArray, carrier: String, card: WidgetCardData, threshold: Double, now: Long) {
+        private fun bindCard(views: RemoteViews, ids: IntArray, carrier: String, card: WidgetCardData, threshold: Double, now: Long, compact: Boolean) {
             val display = WidgetPresentation.present(card, threshold, now)
             val (defaultName, logo) = when (carrier) {
                 "mobile" -> "中国移动" to R.drawable.carrier_mobile
@@ -502,17 +504,24 @@ class TrafficWidgetProvider : AppWidgetProvider() {
                 views.setTextViewText(id, value ?: "")
                 views.setViewVisibility(id, if (value.isNullOrEmpty()) View.GONE else View.VISIBLE)
             }
-            optionalText(ids[3], WidgetAccountDetails.secondaryStatus(card, now) ?: if (display.low) "余量偏低" else null)
-            optionalText(ids[4], WidgetAccountDetails.safePhoneHint(card.phoneHint))
-            optionalText(ids[5], WidgetAccountDetails.balance(card, now))
-            optionalText(ids[6], WidgetAccountDetails.primarySummary(card, now))
+            if (compact) {
+                optionalText(ids[3], null)
+                optionalText(ids[4], null)
+                optionalText(ids[5], null)
+                optionalText(ids[6], WidgetAccountLayout.compactDetail(card, now, display.low))
+            } else {
+                optionalText(ids[3], WidgetAccountDetails.secondaryStatus(card, now) ?: if (display.low) "余量偏低" else null)
+                optionalText(ids[4], WidgetAccountDetails.safePhoneHint(card.phoneHint))
+                optionalText(ids[5], WidgetAccountDetails.balance(card, now))
+                optionalText(ids[6], WidgetAccountDetails.primarySummary(card, now))
+            }
             optionalText(ids[7], if (valid) display.time.removePrefix("上次查询 ") else null)
             views.setTextViewText(ids[8], WidgetAccountDetails.traffic(card.generalState, card.generalRemainingBytes, card.trafficEstimated, valid))
             views.setTextViewText(ids[9], WidgetAccountDetails.traffic(card.directedState, card.directedRemainingBytes, card.trafficEstimated, valid))
             views.setTextViewText(ids[10], WidgetAccountDetails.traffic(card.otherState, card.otherRemainingBytes, card.trafficEstimated, valid))
             views.setTextViewText(ids[11], WidgetAccountDetails.voice(card, now))
             val warning = Color.rgb(184, 86, 74)
-            views.setTextColor(ids[3], if (display.low || display.stale || card.status == "error" || card.status == "authExpired") warning else Color.rgb(87, 98, 116))
+            views.setTextColor(if (compact) ids[6] else ids[3], if (display.low || display.stale || card.status == "error" || card.status == "authExpired") warning else Color.rgb(87, 98, 116))
         }
     }
 }

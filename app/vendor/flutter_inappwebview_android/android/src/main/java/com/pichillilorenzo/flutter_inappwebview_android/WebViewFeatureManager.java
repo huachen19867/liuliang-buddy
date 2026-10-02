@@ -40,7 +40,7 @@ public class WebViewFeatureManager extends ChannelDelegateImpl {
           ProfileStore store = ProfileStore.getInstance();
           boolean allDeleted = true;
           for (String name : store.getAllProfileNames()) {
-            if (name.matches("liuliang_[a-z]+_2")) {
+            if (name.matches("liuliang_(mobile|broadnet|unicom|telecom)_[2-4]")) {
               allDeleted &= store.deleteProfile(name);
             }
           }

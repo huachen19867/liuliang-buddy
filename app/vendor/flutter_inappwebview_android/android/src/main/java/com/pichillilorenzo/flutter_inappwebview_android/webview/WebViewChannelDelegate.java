@@ -81,7 +81,7 @@ public class WebViewChannelDelegate extends ChannelDelegateImpl {
         return;
       }
       String profileName = call.argument("profileName");
-      if (profileName == null || !profileName.matches("liuliang_[a-z]+_2")) {
+      if (profileName == null || !profileName.matches("liuliang_(mobile|broadnet|unicom|telecom)_[2-4]")) {
         result.error("INVALID_PROFILE", "Invalid account profile name", null);
         return;
       }

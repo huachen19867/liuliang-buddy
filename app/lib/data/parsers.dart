@@ -426,7 +426,12 @@ CarrierSnapshot parseMobile(
     phoneMasked: phoneMasked,
     buckets: buckets,
     allowances: allowances,
-    message: buckets.any((bucket) => bucket.isUnlimited)
+    message:
+        !buckets.any(
+          (bucket) => bucket.remainingBytes != null || bucket.isUnlimited,
+        )
+        ? '官网仅返回通话或短信余量，尚未返回可确认的流量额度'
+        : buckets.any((bucket) => bucket.isUnlimited)
         ? '官网标记含不限量套餐，达量限速和适用范围以套餐规则为准'
         : null,
   );

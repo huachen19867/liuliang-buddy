@@ -146,6 +146,28 @@ const modal = rows => `<div id="balanceModal" style="display:none"><div class="m
     assert.equal(f.messages.length, 0, 'cleared official component cannot replay queued balances');
     cases.push('removed official rows invalidate pending bridge payload');
     await f.context.close();
+    f = await fixture(sample);
+    await f.page.evaluate(match[1]);
+    await f.page.waitForTimeout(80);
+    assert.equal(f.messages.length, 2,
+      'explicit re-injection re-reads rows after an early ignored native event');
+    cases.push('explicit native rescan re-reads existing current DOM');
+    const countBefore = f.messages.length;
+    await f.page.evaluate(() => {
+      const balance = document.querySelector('#balanceModal .bill-balance');
+      balance.textContent = '已使用1GB / 8GB';
+      const chatter = document.createElement('div');
+      document.body.appendChild(chatter);
+      window.testMutationTimer = setInterval(() => {
+        chatter.textContent = String(Date.now());
+      }, 40);
+    });
+    await f.page.waitForTimeout(650);
+    await f.page.evaluate(() => clearInterval(window.testMutationTimer));
+    assert.ok(f.messages.length > countBefore,
+      'continuous unrelated DOM updates must not starve balance scanning');
+    cases.push('continuous mutations cannot postpone balance scanning indefinitely');
+    await f.context.close();
     const report = {passed: true, syntheticOnly: true, actualAccountVerified: false,
       networkPolicy: 'Every browser request fulfilled or aborted locally', fulfilled, aborted, cases};
     const directory = path.join(__dirname, '../artifacts');

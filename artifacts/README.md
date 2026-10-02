@@ -87,3 +87,9 @@ widget-glass-preview.png由scripts/preview-native-widget.cjs读取实际Android�
 首次选择、首页与widget-glass-preview.png均已更新为四家官网原版图形。图仍分别为Flutter实际组件合成数据截图和Android XML浏览器布局预览，不是运营商或手机实测。标识资源及来源在app/assets/carriers/，原图在scripts/carrier-originals/。
 
 1.9.3将宿主透明框和wrap_content玻璃背景分开，widget-glass-preview.png在400dp宿主验证底色仅贴内容，桌面网格需用户手动缩放。移动Shell与联通兼容风险见对应进展记录，不把这些预览当真实验证码/余量验证。
+
+## 1.10.0 三四卡输出
+
+widget-three-preview.png、widget-four-preview.png 读取当前 traffic_widget_compact.xml 和正式素材，以合成数据绑定三/四卡；280dp宿主、背景紧随卡片验证，非手机实拍。carrier-count-four-demo.png 展示同家四张的明确数量选择，dashboard-four-accounts-demo.png 为真实Flutter组件演示，用于四账号滚动布局验证，不代表真实余额。正式包及最终验证摘要见 docs/RELEASE_1.10.0.md。
+
+1.10.0正式APK 27447596 字节/SHA256 46a37628054f377a3e640a3a1b5dc78c715dce249fa9161f3d2750a7c0663606，正式v2证书33b11555不变，版本17、API24/36、ARM64、非debuggable及16KB ZIP对齐通过。Flutter166/analyze无问题/JUnit29/浏览器合成回归通过；非真实账号或新包真机验收。

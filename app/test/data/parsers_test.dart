@@ -6,6 +6,30 @@ import 'package:liuliang_app/data/traffic_summary.dart';
 void main() {
   final queriedAt = DateTime.utc(2026, 9, 30, 3, 4, 5);
 
+  test('mobile voice-only success explicitly reports absent traffic', () {
+    final snapshot = parseMobile({
+      'data': {
+        'resultData': {
+          'planRemianVoiceInfo': {
+            'totalInfo': {'unit': '01', 'remainNum': '20', 'sumNum': '100'},
+          },
+        },
+      },
+    });
+    expect(snapshot.status, QueryStatus.success);
+    expect(snapshot.buckets, isEmpty);
+    expect(snapshot.allowances.single.remaining, 20);
+    expect(snapshot.message, contains('尚未返回可确认的流量额度'));
+    expect(
+      parseMobile({
+        'data': {
+          'resultData': {'planRemianFlowInfo': {}},
+        },
+      }).status,
+      QueryStatus.error,
+    );
+  });
+
   test('mobile uses explicit units and keeps directed and total separate', () {
     final snapshot = parseMobile({
       'data': {

@@ -289,10 +289,10 @@ void main() {
         screen = tester.widget<CarrierSelectionScreen>(
           find.byType(CarrierSelectionScreen),
         );
-        screen.onAddSecondAccount!(Carrier.mobile);
+        screen.onAccountCountsChanged!({Carrier.mobile: 2});
         await tester.pumpAndSettle();
         if (!supportsProfiles) {
-          expect(find.text('这台手机暂不支持第二张同运营商卡'), findsOneWidget);
+          expect(find.text('这台手机暂不支持同运营商的额外号码'), findsOneWidget);
           await tester.tap(find.text('知道了'));
           await tester.pumpAndSettle();
         }
@@ -359,7 +359,7 @@ void main() {
     screen = tester.widget<CarrierSelectionScreen>(
       find.byType(CarrierSelectionScreen),
     );
-    screen.onAddSecondAccount!(Carrier.mobile);
+    screen.onAccountCountsChanged!({Carrier.mobile: 2});
     await tester.pumpAndSettle();
     expect(
       (await SharedPreferences.getInstance()).getBool(

@@ -1,5 +1,7 @@
 # iOS 小组件与原生桥接
 
+2026-10-02 更新：每家数量扩到一至四张、总四张；第三/第四账号采用新增固定 UUID，旧第二账号 UUID 保持不变，清理遍历全部十二个副账号仓库。快照门禁接受 primary/_2/_3/_4。Widget small/medium/large 仍分别展示1/2/4张；本轮源码与验证进度见 [多账号说明](MULTI_ACCOUNT_PROGRESS.md) 和 [版本说明](RELEASE_1.10.0.md)。以下原双账号说明保留作实现沿革。
+
 本实现最低 iOS 17，Runner 标识为 `cn.liuliang.liuliangApp`，扩展为 `cn.liuliang.liuliangApp.TrafficWidget`，二者共享 App Group `group.cn.liuliang.liuliangApp`。签名时必须在开发者账户中为两个 target 配置同一 App Group；Windows 源码检查不能替代 Xcode 构建、签名和真机验收。
 
 已读取技术日志，复用 `references/ios-home-widget` 中固定提交的 BSD-3-Clause home_widget 示例和已保存的 Apple WidgetKit 说明，采用 App Group + WidgetKit 的公开平台方案。本项目不引入 home_widget 插件或它的后台执行能力，沿用自己的显示快照协议。

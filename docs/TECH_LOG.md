@@ -303,3 +303,15 @@ Flutter ResortCarrierMark与安卓badge ImageView统一128px资源，添加无�
 正式Release1.9.3/code16构建成功，27,314,188字节/SHA256 adcfe6a21c0d0298799f6ca62399debb608d4724e17982b7b6d6aecc4f956bf4；v2/正式证书33b11555/非debuggable/ARM64/API24-36/16KB ZIP对齐通过。wrapper恢复官方配置，源码只push public。版本不能标联通/移动短信已完全修复，已在README关联发布说明和进展边界。
 
 1.9.3正式公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.9.3 ，draft=false/prerelease=false，仓库isPrivate=false，target1125b2bb91f2c3e4d1257cefb5974cb8141367a6。Assets唯一uploaded APK27,314,188字节，远端完整digest adcfe6a21c0d0298799f6ca62399debb608d4724e17982b7b6d6aecc4f956bf4与本机一致。初次gh create HEAD EOF，回读不存在后重试成功。公开发布不意味着移动验证码或联通登录后余额已完成真机验收；相关限制保留在发布正文。源码只push public，回执另文档提交。
+
+## 2026-10-02：三四张卡与官网查询反馈
+
+老板明确移动流量和话费两项都缺，电信官网已登录有余量但首页仍连接。先定位本日志，复用已下载 Google AppWidget、ChinaMobileMonitor、ChinaUnicomMonitor、FlowLite 与官网归档，并新增匿名官网记录，索引见 references/README.md。不重复引入框架。继续既有 SOL 账号/UI、Astra 查询与原生审查分工，根完成原生紧凑布局和集成；既有代理模型不冒称已更换。
+
+账号稳定 primary/_2 扩至 _3/_4，新增 enabled 可选字段保留 schema1 兼容，减少数量隐藏而不删身份或会话，后台只遍历 visibleAccounts。Android/iOS 门禁与所有已知 Profile 清理同步扩展，原 iOS UUID 保留。Android 三四卡 50dp 紧凑行，默认280dp完整显示四卡，短宿主隐藏整卡并说明张数；透明宿主/wrap_content背景与 Room Release 无参构造 keep 均保留。紧凑卡状态和唯一联通合计优先，次选话费/脱敏号码，详细页保留所有信息。scripts/preview-native-widget.cjs 新增3/4参数，从实XML绑定合成数据生成预览。
+
+电信固定窗口扫描消除持续DOM变化饥饿，重复注入显式读当前DOM，主流程onLoadStop查询中接线；不重放旧正文。联通仅官网既有精确会话请求异步12秒限时，原成功回调先执行，不改认证。移动当前getNewMarginInfo无独立话费，缺流量提示明确，不猜curFeeTotal/realFee单位与意义。匿名联通非阻塞与10组Node、电信13组全本地Chrome均通过，不等同真实账号成功。后续SDK/签名/发布验收另补。
+
+集成验收首先发现新ExpansionTile置于DecoratedBox后Material绘制断言，改为透明Material托管，未关闭断言。新增流程测试显式恢复debug平台变量，历史截图预期改张数/展开明细，选择按钮测试先滚动至可见。再发现widget_bridge仍遍历隐藏历史，补enabled过滤与不挤占当前四账号回归。完整166项已通过一次，补数量截图及静态lint清理后重跑最终验收，不将失败运行记为通过。
+
+最终Flutter166/analyze无问题、原生JUnit29项0失败，数量截图补回调后单项通过并目视；Nodefetch/XHR、联通10、电信Chrome13均通过。正常Release构建139.9秒完成，APK27447596字节/SHA256 46a37628054f377a3e640a3a1b5dc78c715dce249fa9161f3d2750a7c0663606；1.10.0/code17/v2/正式证书33b11555/非debuggable/ARM64/API24-36/16KB ZIP对齐通过。官方wrapper恢复，DPAPI私钥继续ignored。截图全部合成样本，手机已拔USB，本轮不声称各号码、各省或Launcher真机验收。准备唯一APK公开发布，移动话费缺失边界明确。

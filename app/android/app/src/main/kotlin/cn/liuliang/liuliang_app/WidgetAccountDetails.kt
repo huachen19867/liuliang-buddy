@@ -100,12 +100,27 @@ object WidgetAccountDetails {
     }
 }
 
-/** A short widget omits complete cards and explains the omission. */
+/** Three/four accounts use compact rows; a short host explains omitted accounts. */
 object WidgetAccountLayout {
     const val CARD_HEIGHT_DP = 100
+    const val COMPACT_CARD_HEIGHT_DP = 50
+    fun isCompact(total: Int): Boolean = total >= 3
+
     fun visibleCount(total: Int, minHeightDp: Int): Int {
         if (total <= 0) return 0
-        val available = (minHeightDp.takeIf { it > 0 } ?: 280) - 68
-        return (available / (CARD_HEIGHT_DP + 6)).coerceIn(1, 4).coerceAtMost(total)
+        val height = minHeightDp.takeIf { it > 0 } ?: 280
+        val stride = if (isCompact(total)) COMPACT_CARD_HEIGHT_DP + 4 else CARD_HEIGHT_DP + 6
+        // 52dp shell/header; reserve the 16dp omission footer only when needed.
+        val allFit = 52 + stride * total.coerceAtMost(4) <= height
+        val available = height - 52 - if (allFit) 0 else 16
+        return (available / stride).coerceIn(1, 4).coerceAtMost(total)
+    }
+
+    fun compactDetail(card: WidgetCardData, now: Long, low: Boolean): String? {
+        val status = WidgetAccountDetails.secondaryStatus(card, now) ?: if (low) "余量偏低" else null
+        val summary = WidgetAccountDetails.primarySummary(card, now)
+        if (summary != null) return listOfNotNull(status, summary).joinToString(" · ")
+        return status ?: WidgetAccountDetails.balance(card, now).takeIf { it.isNotEmpty() }
+            ?: WidgetAccountDetails.safePhoneHint(card.phoneHint)
     }
 }

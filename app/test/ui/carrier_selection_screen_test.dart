@@ -14,7 +14,7 @@ void main() {
 
     expect(find.text('先选好你的运营商'), findsOneWidget);
     expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
-    expect(find.textContaining('连续轻点两下即可加入第二张'), findsOneWidget);
+    expect(find.textContaining('每家可选 1–4 张'), findsOneWidget);
     expect(find.textContaining('不读取 SIM 卡槽'), findsOneWidget);
     expect(find.text('中国移动'), findsOneWidget);
     expect(find.text('中国广电'), findsOneWidget);
@@ -44,6 +44,9 @@ void main() {
     expect(changes, hasLength(1));
     expect(changes.single, {Carrier.mobile, Carrier.broadnet});
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('carrier-selection-continue')),
+    );
     await tester.tap(find.byKey(const ValueKey('carrier-selection-continue')));
     await tester.pumpAndSettle();
     expect(submitted, hasLength(1));
@@ -51,28 +54,54 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('双击同运营商只请求一次第二账户，不切掉已选第一账户', (tester) async {
-    var secondRequests = 0;
+  testWidgets('明确选择同家四张并保持运营商选择', (tester) async {
+    final counts = <Map<Carrier, int>>[];
     final changes = <Set<Carrier>>[];
     await tester.pumpWidget(
       _host(
         selected: {Carrier.mobile},
         accountCounts: const {Carrier.mobile: 1},
         onChanged: changes.add,
-        onAddSecond: (_) => secondRequests++,
+        onCountsChanged: counts.add,
       ),
     );
     await tester.pumpAndSettle();
 
-    final option = find.byKey(const ValueKey('carrier-option-mobile'));
-    await tester.tap(option);
-    await tester.pump(const Duration(milliseconds: 80));
+    final option = find.byKey(const ValueKey('carrier-count-mobile-4'));
+    await tester.ensureVisible(option);
     await tester.tap(option);
     await tester.pumpAndSettle();
 
-    expect(secondRequests, 1);
+    expect(counts.single, {Carrier.mobile: 4});
     expect(changes, isEmpty);
-    expect(find.textContaining('已加入 1 张'), findsOneWidget);
+    expect(find.textContaining('已加入 4 张'), findsOneWidget);
+  });
+
+  testWidgets('混合四张时禁用超过总量的数量选项', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        selected: {Carrier.mobile, Carrier.unicom},
+        accountCounts: const {Carrier.mobile: 3, Carrier.unicom: 1},
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<ChoiceChip>(
+            find.byKey(const ValueKey('carrier-count-mobile-4')),
+          )
+          .onSelected,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<ChoiceChip>(
+            find.byKey(const ValueKey('carrier-count-unicom-2')),
+          )
+          .onSelected,
+      isNull,
+    );
+    expect(find.text('4 / 4 张已选择'), findsOneWidget);
   });
 
   testWidgets('至少选一家；单运营商配置可独立继续并支持管理文案', (tester) async {
@@ -138,11 +167,13 @@ Widget _host({
   ValueChanged<Set<Carrier>>? onContinue,
   Map<Carrier, int> accountCounts = const {},
   ValueChanged<Carrier>? onAddSecond,
+  ValueChanged<Map<Carrier, int>>? onCountsChanged,
   bool isInitialSetup = true,
   bool demo = false,
   double textScale = 1,
 }) {
   var selectedState = selected;
+  var countsState = accountCounts;
   return MaterialApp(
     home: StatefulBuilder(
       builder: (context, setState) => MediaQuery(
@@ -150,8 +181,12 @@ Widget _host({
         child: CarrierSelectionScreen(
           availableCarriers: available,
           selectedCarriers: selectedState,
-          accountCounts: accountCounts,
+          accountCounts: countsState,
           onAddSecondAccount: onAddSecond,
+          onAccountCountsChanged: (counts) {
+            setState(() => countsState = counts);
+            onCountsChanged?.call(counts);
+          },
           onSelectionChanged: (next) {
             setState(() => selectedState = next);
             onChanged?.call(next);

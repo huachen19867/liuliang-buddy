@@ -66,6 +66,11 @@ void main() {
   testWidgets('窄屏大字保持官网点击和查询入口可用', (tester) async {
     await open(tester, textScale: 2);
     expect(tester.takeException(), isNull);
+    expect(find.text('查询流量'), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('official-query-flow'))).height,
+      greaterThanOrEqualTo(48),
+    );
     await tester.tap(find.text('官网获取验证码'));
     await tester.tap(find.byTooltip('查询流量'));
     expect(formTaps, 1);
@@ -77,6 +82,11 @@ void main() {
     await open(tester, keyboardHeight: 250, textScale: 2);
     expect(tester.takeException(), isNull);
     expect(find.text(message), findsNothing);
+    expect(find.text('查询流量'), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('official-query-flow'))).height,
+      greaterThanOrEqualTo(48),
+    );
     expect(tester.getSize(find.byKey(formKey)).height, greaterThan(200));
     await tester.tap(find.byTooltip('收起键盘'));
     await tester.tap(find.text('官网获取验证码'));
@@ -93,6 +103,8 @@ void main() {
     expect(tester.getSize(find.byKey(formKey)).height, greaterThan(100));
     await tester.tap(find.text('官网获取验证码'));
     expect(formTaps, 1);
+    await tester.tap(find.text('查询流量'));
+    expect(queries, 1);
   });
 
   testWidgets('官网表单避让系统底部导航区域', (tester) async {

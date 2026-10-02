@@ -29,7 +29,7 @@ internal object SystemSurfacePresentation {
                 "unicom" -> "中国联通"
                 "telecom" -> "中国电信"
                 else -> "流量卡"
-            } + if (card.accountId?.endsWith("_2") == true) " 2" else ""
+            } + (card.accountId?.substringAfterLast('_')?.takeIf { it in setOf("2", "3", "4") }?.let { " $it" } ?: "")
             val display = WidgetPresentation.present(card, thresholdGb, nowMillis)
             "$name · ${display.amount} ${display.label} · ${display.state} · ${display.time}"
         }

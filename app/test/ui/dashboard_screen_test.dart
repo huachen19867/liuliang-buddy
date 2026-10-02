@@ -121,6 +121,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    for (final carrier in Carrier.values) {
+      final details = find.byKey(ValueKey('account-details-${carrier.name}'));
+      await tester.ensureVisible(details);
+      await tester.tap(
+        find.descendant(of: details, matching: find.text('套餐与通话明细')),
+      );
+      await tester.pumpAndSettle();
+    }
     expect(find.text('等待连接'), findsNWidgets(8));
     expect(find.text('剩余 0 条'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -451,6 +459,111 @@ void main() {
     await tester.ensureVisible(find.text('连接号码').last);
     await tester.tap(find.text('连接号码').last);
     expect(connected, ['mobile_2']);
+  });
+
+  testWidgets('四个同家账号紧凑展示并保存真实渲染演示截图', (tester) async {
+    _configureViewport(tester, const Size(390, 2200));
+    final selection = CarrierSelection.complete([Carrier.mobile]);
+    final accounts = CarrierAccounts.fromSelection(
+      selection,
+    ).withCount(Carrier.mobile, 4);
+    final entries = [
+      for (var index = 0; index < accounts.accounts.length; index++)
+        DashboardAccountEntry(
+          accounts.accounts[index],
+          _snapshot(
+            Carrier.mobile,
+            QueryStatus.success,
+            remainingGiB: 5.0 + index * 3,
+            totalGiB: 30,
+          ),
+        ),
+    ];
+    final refreshed = <String>[];
+    await tester.pumpWidget(
+      _host(
+        snapshots: [entries.first.snapshot!],
+        selectedCarriers: const {Carrier.mobile},
+        accountEntries: entries,
+        onRefreshAccount: refreshed.add,
+        demo: true,
+        textScale: 1,
+        previewBoundaryKey: _previewBoundaryKey,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
+    expect(find.text('4 个号码 · 可分别查询'), findsOneWidget);
+    for (final account in accounts.accounts) {
+      expect(
+        find.byKey(ValueKey('account-card-${account.id}')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(ValueKey('account-details-${account.id}')),
+        findsOneWidget,
+      );
+    }
+    expect(tester.takeException(), isNull);
+    await _writeScreenshot(tester, 'dashboard-four-accounts-demo.png');
+    final fourth = find.byKey(const ValueKey('account-card-mobile_4'));
+    final refresh = find.descendant(
+      of: fourth,
+      matching: find.widgetWithText(OutlinedButton, '刷新'),
+    );
+    await tester.ensureVisible(refresh);
+    await tester.tap(refresh);
+    expect(refreshed, ['mobile_4']);
+    final details = find.byKey(const ValueKey('account-details-mobile_4'));
+    await tester.ensureVisible(details);
+    await tester.tap(
+      find.descendant(of: details, matching: find.text('套餐与通话明细')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: details, matching: find.text('通话余量')),
+      findsWidgets,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('三四个同家账号在320像素大字屏可逐卡操作', (tester) async {
+    _configureViewport(tester, const Size(320, 640));
+    for (final count in [3, 4]) {
+      final accounts = CarrierAccounts.fromSelection(
+        CarrierSelection.complete([Carrier.mobile]),
+      ).withCount(Carrier.mobile, count);
+      final connected = <String>[];
+      await tester.pumpWidget(
+        _host(
+          snapshots: const [],
+          selectedCarriers: const {Carrier.mobile},
+          accountEntries: [
+            for (final account in accounts.accounts)
+              DashboardAccountEntry(account, null),
+          ],
+          onConnectAccount: connected.add,
+          demo: true,
+          textScale: 1.6,
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final account in accounts.accounts) {
+        final card = find.byKey(ValueKey('account-card-${account.id}'));
+        final button = find.descendant(
+          of: card,
+          matching: find.widgetWithText(FilledButton, '连接号码'),
+        );
+        await tester.ensureVisible(button);
+        await tester.tap(button);
+        expect(tester.takeException(), isNull);
+      }
+      expect(
+        connected,
+        accounts.accounts.map((account) => account.id).toList(),
+      );
+      expect(find.text('$count 个号码 · 可分别查询'), findsOneWidget);
+    }
   });
 
   testWidgets('缓存与 error 状态可查看旧值但不会进入汇总', (tester) async {
@@ -797,8 +910,20 @@ void main() {
       expect(find.text(carrier.label), findsOneWidget);
     }
     expect(find.text('余额查询接入中'), findsNothing);
-    expect(find.text('0 家已选择'), findsOneWidget);
+    expect(find.text('0 / 4 张已选择'), findsOneWidget);
     await _writeScreenshot(tester, 'carrier-selection-four-demo.png');
+
+    tester.view.physicalSize = const Size(390, 1060);
+    await tester.pumpWidget(
+      _selectionHost(
+        selected: {Carrier.mobile},
+        isInitialSetup: true,
+        accountCounts: const {Carrier.mobile: 4},
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('4 / 4 张已选择'), findsOneWidget);
+    await _writeScreenshot(tester, 'carrier-count-four-demo.png');
 
     tester.view.physicalSize = const Size(390, 1360);
     await tester.pumpWidget(
@@ -862,6 +987,7 @@ void main() {
 Widget _selectionHost({
   required Set<Carrier> selected,
   required bool isInitialSetup,
+  Map<Carrier, int> accountCounts = const {},
 }) {
   final typography = Typography.material2021(platform: TargetPlatform.android);
   return MaterialApp(
@@ -883,6 +1009,8 @@ Widget _selectionHost({
     ),
     home: CarrierSelectionScreen(
       selectedCarriers: selected,
+      accountCounts: accountCounts,
+      onAccountCountsChanged: (_) {},
       isInitialSetup: isInitialSetup,
       demo: true,
       onSelectionChanged: (_) {},
@@ -917,6 +1045,9 @@ Widget _host({
   VoidCallback? onManageCarriers,
   bool widgetSupported = true,
   Key? previewBoundaryKey,
+  List<DashboardAccountEntry>? accountEntries,
+  ValueChanged<String>? onConnectAccount,
+  ValueChanged<String>? onRefreshAccount,
 }) {
   final callbacks = calls ?? _CallbackCalls();
   final typography = Typography.material2021(platform: TargetPlatform.android);
@@ -948,6 +1079,9 @@ Widget _host({
       onSettings: () => callbacks.settings++,
       onAbout: () => callbacks.about++,
       selectedCarriers: selectedCarriers,
+      accountEntries: accountEntries,
+      onConnectAccount: onConnectAccount,
+      onRefreshAccount: onRefreshAccount,
       onManageCarriers: onManageCarriers,
       onAddWidget: onAddWidget,
       widgetSupported: widgetSupported,

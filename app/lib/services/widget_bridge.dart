@@ -52,7 +52,9 @@ Map<String, Object?> buildWidgetPayload(
   if (accounts != null) {
     final instances = <Map<String, Object?>>[];
     for (final account in accounts.accounts) {
-      if (!selected.contains(account.carrier) || instances.length >= 4) {
+      if (!account.enabled ||
+          !selected.contains(account.carrier) ||
+          instances.length >= 4) {
         continue;
       }
       // An account map is authoritative. The carrier list may contain only a

@@ -38,6 +38,22 @@ const _notifications = MethodChannel('cn.liuliang/notifications');
 const _secure = FlutterSecureStorage();
 const _widgetBridge = WidgetBridge();
 
+AccountWebViewSettings officialPageSettings(
+  Carrier carrier, {
+  String? profileName,
+}) => AccountWebViewSettings(profileName: profileName)
+  ..supportZoom = true
+  ..builtInZoomControls = true
+  ..enableViewportScale = true
+  ..displayZoomControls = carrier == Carrier.unicom
+  // The PC login form otherwise opens as a tiny full-page overview.
+  // Keep the official DOM and let the user pan or pinch the native view.
+  ..loadWithOverviewMode = carrier != Carrier.unicom
+  ..initialScale = carrier == Carrier.unicom ? 100 : 0;
+
+int accountLowTrafficNotificationId(CarrierAccount account) =>
+    account.carrier.index * 4 + account.slot;
+
 @pragma('vm:entry-point')
 Future<void> backgroundRefreshEntrypoint() => runBackgroundRefreshEntrypoint();
 
@@ -97,13 +113,14 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   final Map<String, bool> _warnedLow = {};
   final Set<String> _inFlight = {};
   final Set<String> _awaitingLoginReturn = {};
+  final Set<String> _openingLogin = {};
   SharedPreferences? _prefs;
   CarrierSelection _selection = CarrierSelection.unconfigured();
   CarrierAccounts _accounts = CarrierAccounts.fromSelection(
     CarrierSelection.unconfigured(),
   );
   Set<Carrier> _draftSelection = {};
-  final Set<Carrier> _draftSecond = {};
+  final Map<Carrier, int> _draftAccountCounts = {};
   bool _restoring = true;
   bool _savingSelection = false;
   final Map<String, Map<String, dynamic>> _broadnetSessions = {};
@@ -160,35 +177,20 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   CarrierAccount? _account(String id) => _accounts.find(id);
 
-  Future<bool> _canAddSecond(
-    Carrier carrier,
-    Set<Carrier> pending,
-    Set<Carrier> selected,
-  ) async {
+  Future<bool> _canSetAccountCounts(Map<Carrier, int> counts) async {
+    if (counts.values.any((count) => count < 1 || count > 4) ||
+        counts.values.fold<int>(0, (sum, count) => sum + count) > 4) {
+      _showInfo('最多照顾四张卡', '每家可选一到四张，合计最多四张。请先调整数量。');
+      return false;
+    }
+    if (!counts.entries.any(
+      (entry) =>
+          entry.value > 1 && entry.value > _accounts.enabledCount(entry.key),
+    )) {
+      return true;
+    }
     if (_profileClearPending) {
-      _showInfo('第二张卡暂时锁住了', '上次清除网页登录资料还未完成，请重试清除后再加入。');
-      return false;
-    }
-    if (_accounts.find('${carrier.name}_2') != null ||
-        pending.contains(carrier)) {
-      return false;
-    }
-    final effectiveSelected = {...selected, carrier};
-    final existing = _accounts.accounts
-        .where((a) => effectiveSelected.contains(a.carrier))
-        .length;
-    final newPrimaries = effectiveSelected
-        .where((c) => _accounts.find(c.name) == null)
-        .length;
-    final newSeconds = {...pending, carrier}
-        .where(
-          (c) =>
-              effectiveSelected.contains(c) &&
-              _accounts.find('${c.name}_2') == null,
-        )
-        .length;
-    if (existing + newPrimaries + newSeconds > 4) {
-      _showInfo('最多照顾四张卡', '请先整理已有卡片，再加入新的号码。');
+      _showInfo('额外号码暂时锁住了', '上次清除网页登录资料还未完成，请重试清除后再加入。');
       return false;
     }
     if (demoMode) return true;
@@ -205,7 +207,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         // A missing or older plugin must not share the primary account store.
       }
       if (mounted) {
-        _showInfo('第二张卡暂时无法加入', '无法确认独立网页登录资料已准备好，请稍后重试。');
+        _showInfo('额外号码暂时无法加入', '无法确认独立网页登录资料已准备好，请稍后重试。');
       }
       return false;
     }
@@ -217,12 +219,11 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       }
     } on PlatformException {
       // Installed WebView does not expose isolated profiles.
+    } on MissingPluginException {
+      // Older plugin builds must not share the primary session.
     }
     if (mounted) {
-      _showInfo(
-        '这台手机暂不支持第二张同运营商卡',
-        '当前网页内核无法把两个号码的登录会话分开。为了避免把同一份余额显示两次，暂时只能连接这家运营商的一张卡。',
-      );
+      _showInfo('这台手机暂不支持同运营商的额外号码', '当前网页内核无法把多个号码的登录会话分开。暂时只能连接每家运营商的一张卡。');
     }
     return false;
   }
@@ -243,7 +244,33 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     if (account?.carrier == Carrier.broadnet && controller != null) {
       await _saveSession(account!, controller, generation);
     }
-    if (_current(generation)) setState(() => _visibleAccountId = null);
+    if (!_current(generation) || _visibleAccountId != account?.id) return;
+    setState(() => _visibleAccountId = null);
+    if (account != null && controller != null) {
+      try {
+        final url = await controller.getUrl();
+        final uri = url == null ? null : Uri.tryParse(url.toString());
+        if (!_current(generation) || uri == null || isCarrierLoginPage(uri)) {
+          return;
+        }
+        if (account.carrier == Carrier.telecom &&
+            isCarrierResponseAllowed(
+              Carrier.telecom,
+              uri,
+              uri,
+              'telecomRendered',
+            ) &&
+            _awaitingLoginReturn.contains(account.id)) {
+          await _resumeTelecomRenderedReturn(account, controller, generation);
+        } else if (isCarrierResponsePageCurrent(account.carrier, uri, uri)) {
+          _openingLogin.remove(account.id);
+          _awaitingLoginReturn.remove(account.id);
+          await _refreshAccount(account.id);
+        }
+      } on Exception {
+        // Closing the official page remains available if it was disposed.
+      }
+    }
   }
 
   Future<void> _dismissOfficialKeyboard(String accountId) async {
@@ -605,7 +632,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   void _connectAccount(String accountId) {
     final account = _account(accountId);
-    if (account == null) return;
+    if (account == null || !account.enabled) return;
     if (_profileClearPending) {
       _showInfo('查询暂时锁住了', '上次清除网页登录资料还未完成，请在设置里重试清除。');
       return;
@@ -617,14 +644,26 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _showInfo('这是界面预览', '请安装手机测试包后连接号码。演示流量不是您的实际余额。');
       return;
     }
+    final generation = _generation;
+    _inFlight.remove(accountId);
+    _awaitingLoginReturn.remove(accountId);
+    _refreshThrottle.loginOrLoadFailed(accountId);
     setState(() {
       _visibleAccountId = accountId;
       _webMessage = null;
       _connected.add(accountId);
+      _openingLogin.add(accountId);
+      _putSnapshot(
+        account,
+        _snapshot(
+          account,
+        ).copyWith(status: QueryStatus.loading, message: '正在打开官方验证页'),
+      );
     });
+    _armOfficialTimeout(account, generation, openingLogin: true);
+    unawaited(_publishWidget());
     final prefs = _prefs;
     if (prefs != null) {
-      final generation = _generation;
       final saved = _store(() async {
         if (_current(generation)) {
           await prefs.setBool(account.connectedKey, true);
@@ -634,11 +673,98 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     }
     final controller = _controllers[accountId];
     if (controller != null) {
-      unawaited(
-        controller.loadUrl(
-          urlRequest: URLRequest(url: WebUri(_loginUrl(carrier))),
+      unawaited(_loadOfficialLogin(account, controller, generation));
+    }
+  }
+
+  Future<void> _loadOfficialLogin(
+    CarrierAccount account,
+    InAppWebViewController controller,
+    int generation,
+  ) async {
+    try {
+      await controller.loadUrl(
+        urlRequest: URLRequest(url: WebUri(_loginUrl(account.carrier))),
+      );
+    } on Exception {
+      if (!_current(generation)) return;
+      _openingLogin.remove(account.id);
+      _awaitingLoginReturn.remove(account.id);
+      _timeouts[account.id]?.cancel();
+      setState(
+        () => _putSnapshot(
+          account,
+          _snapshot(
+            account,
+          ).copyWith(status: QueryStatus.error, message: '官方登录页暂时无法打开，请重试'),
         ),
       );
+      unawaited(_publishWidget());
+    }
+  }
+
+  void _armOfficialTimeout(
+    CarrierAccount account,
+    int generation, {
+    bool openingLogin = false,
+  }) {
+    final accountId = account.id;
+    _timeouts[accountId]?.cancel();
+    _timeouts[accountId] = Timer(const Duration(seconds: 35), () {
+      if (!_current(generation)) return;
+      final pending = openingLogin
+          ? _openingLogin.remove(accountId)
+          : _inFlight.remove(accountId);
+      if (!pending) return;
+      if (openingLogin) _awaitingLoginReturn.remove(accountId);
+      final failed = _snapshot(account).copyWith(
+        status: QueryStatus.error,
+        message: openingLogin ? '官方验证页加载超时，请重新连接' : '未取得可识别的套餐余量，请打开官方查询页确认',
+      );
+      setState(() {
+        _putSnapshot(account, failed);
+        if (_visibleAccountId == accountId) _webMessage = failed.message;
+      });
+      unawaited(
+        _store(() async {
+          if (_current(generation)) {
+            await _prefs?.setString(
+              account.snapshotKey,
+              jsonEncode(failed.toJson()),
+            );
+          }
+        }),
+      );
+      unawaited(_publishWidget());
+    });
+  }
+
+  Future<void> _resumeTelecomRenderedReturn(
+    CarrierAccount account,
+    InAppWebViewController controller,
+    int generation,
+  ) async {
+    if (!_current(generation)) return;
+    final id = account.id;
+    _openingLogin.remove(id);
+    _awaitingLoginReturn.remove(id);
+    if (_inFlight.add(id)) {
+      _refreshThrottle.started(id, DateTime.now());
+      setState(
+        () => _putSnapshot(
+          account,
+          _snapshot(
+            account,
+          ).copyWith(status: QueryStatus.loading, message: '正在读取官网本次打开的套餐页面'),
+        ),
+      );
+      _armOfficialTimeout(account, generation);
+      unawaited(_publishWidget());
+    }
+    try {
+      await controller.evaluateJavascript(source: telecomRenderedCaptureScript);
+    } on Exception {
+      // The active 35-second deadline settles an unavailable rendered page.
     }
   }
 
@@ -659,7 +785,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     bool automatic = false,
   }) async {
     final account = _account(accountId);
-    if (account == null) return;
+    if (account == null || !account.enabled) return;
     if (_profileClearPending) {
       if (!automatic) {
         _showInfo('查询暂时锁住了', '上次清除网页登录资料还未完成，请在设置里重试清除。');
@@ -672,7 +798,9 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       if (!automatic) _connectAccount(accountId);
       return;
     }
-    if (_inFlight.contains(accountId)) return;
+    if (_inFlight.contains(accountId) || _openingLogin.contains(accountId)) {
+      return;
+    }
     if (_refreshThrottle.blocks(accountId, DateTime.now())) return;
     final controller = _controllers[accountId];
     if (controller == null) return;
@@ -695,25 +823,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       ),
     );
     unawaited(_publishWidget());
-    _timeouts[accountId]?.cancel();
-    _timeouts[accountId] = Timer(const Duration(seconds: 35), () {
-      if (!_current(generation) || !_inFlight.remove(accountId)) return;
-      final failed = _snapshot(
-        account,
-      ).copyWith(status: QueryStatus.error, message: '未取得可识别的套餐余量，请打开官方查询页确认');
-      setState(() => _putSnapshot(account, failed));
-      unawaited(
-        _store(() async {
-          if (_current(generation)) {
-            await _prefs?.setString(
-              account.snapshotKey,
-              jsonEncode(failed.toJson()),
-            );
-          }
-        }),
-      );
-      unawaited(_publishWidget());
-    });
+    _armOfficialTimeout(account, generation);
     try {
       await controller.loadUrl(
         urlRequest: URLRequest(url: WebUri(_queryUrl(carrier))),
@@ -875,7 +985,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           _nativeMobile) {
         try {
           await _notifications.invokeMethod('notify', {
-            'id': carrier.index * 2 + (account.isPrimary ? 1 : 2),
+            'id': accountLowTrafficNotificationId(account),
             'title': '${account.label}流量快见底了',
             'body':
                 '通用流量剩余 ${(remaining / 1073741824).toStringAsFixed(2)} GB，数据以运营商查询为准。',
@@ -938,6 +1048,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               _webMessage ??
               (carrier == Carrier.mobile
                   ? '请在官网自行勾选协议并获取验证码。完成验证后点击上方「查询流量」。'
+                  : carrier == Carrier.unicom
+                  ? '在官网选择「随机密码登录」获取短信密码。表单可双指缩放、左右移动；登录后点击「查询流量」。'
                   : '在官网完成验证后点击上方「查询流量」。关闭此页可回到首页。'),
           onClose: () => unawaited(_closeOfficialPage()),
           onQuery: () => unawaited(_refreshAccount(accountId)),
@@ -953,11 +1065,17 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   '移动网页登录帮助',
                   '输入完整手机号后，请在官网阅读并自行勾选协议，再点击「获取验证码」。如果按钮没有反应，可先收起键盘，查看官网是否显示协议或错误提示。\n\n$mobileLoginHelpMessage',
                 )
+              : carrier == Carrier.unicom
+              ? () => _showInfo(
+                  '联通网页登录帮助',
+                  '在联通官网选择「随机密码登录」，自行输入手机号、按官网要求勾选协议并获取短信密码。登录框来自联通官网，可以双指放大或缩小、左右移动；Android 也可使用网页缩放按钮。\n\n完成官网登录后点击本页「查询流量」，等待官网套餐页面加载。若官网仍要求验证或报错，请按官网提示处理。',
+                )
               : null,
           child: InAppWebView(
             key: ValueKey('${account.id}_$_generation'),
             // Every account is loaded only after its WebView profile is set.
-            initialSettings: AccountWebViewSettings(
+            initialSettings: officialPageSettings(
+              carrier,
               profileName: _ios ? account.profileName : null,
             ),
             initialUserScripts: UnmodifiableListView([
@@ -988,12 +1106,14 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   }
                 } on Exception {
                   if (_current(generation)) {
+                    _openingLogin.remove(accountId);
+                    _timeouts[accountId]?.cancel();
                     setState(
                       () => _putSnapshot(
                         account,
                         _snapshot(account).copyWith(
                           status: QueryStatus.error,
-                          message: '此 iPhone 暂无法打开第二张卡的独立登录会话',
+                          message: '此 iPhone 暂无法打开额外号码的独立登录会话',
                         ),
                       ),
                     );
@@ -1019,12 +1139,14 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                       .setAccountProfile(account.profileName!);
                 } catch (_) {
                   if (_current(generation)) {
+                    _openingLogin.remove(accountId);
+                    _timeouts[accountId]?.cancel();
                     setState(
                       () => _putSnapshot(
                         account,
                         _snapshot(account).copyWith(
                           status: QueryStatus.error,
-                          message: '此手机的网页内核暂不支持第二张同运营商卡',
+                          message: '此手机的网页内核暂不支持同运营商的额外号码',
                         ),
                       ),
                     );
@@ -1038,24 +1160,9 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                 handlerName: 'trafficResponse',
                 callback: (args) => _receive(account, args, generation),
               );
-              if (_snapshot(account).status == QueryStatus.notConnected) {
-                try {
-                  await controller.loadUrl(
-                    urlRequest: URLRequest(url: WebUri(_loginUrl(carrier))),
-                  );
-                } on Exception {
-                  if (_current(generation)) {
-                    setState(
-                      () => _putSnapshot(
-                        account,
-                        _snapshot(account).copyWith(
-                          status: QueryStatus.error,
-                          message: '官方登录页暂时无法打开',
-                        ),
-                      ),
-                    );
-                  }
-                }
+              if (_openingLogin.contains(accountId) ||
+                  _snapshot(account).status == QueryStatus.notConnected) {
+                await _loadOfficialLogin(account, controller, generation);
               } else {
                 await _refreshAccount(accountId);
               }
@@ -1069,6 +1176,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               final uri = Uri.tryParse(url.toString());
               if (uri != null && isCarrierLoginPage(uri)) {
                 _timeouts[accountId]?.cancel();
+                _openingLogin.remove(accountId);
                 _inFlight.remove(accountId);
                 _refreshThrottle.loginOrLoadFailed(accountId);
                 _awaitingLoginReturn.add(accountId);
@@ -1082,12 +1190,34 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   ),
                 );
                 unawaited(_publishWidget());
+              } else if (carrier == Carrier.telecom &&
+                  uri != null &&
+                  isCarrierResponseAllowed(
+                    Carrier.telecom,
+                    uri,
+                    uri,
+                    'telecomRendered',
+                  ) &&
+                  (_awaitingLoginReturn.contains(accountId) ||
+                      _openingLogin.contains(accountId) ||
+                      _inFlight.contains(accountId))) {
+                // Telecom changes its SPA hash after login without always
+                // emitting onLoadStop. This reads that new official route.
+                unawaited(
+                  _resumeTelecomRenderedReturn(account, controller, generation),
+                );
               }
             },
             onLoadStop: (controller, url) async {
               if (!_current(generation)) return;
-              if (url != null &&
-                  isCarrierLoginPage(Uri.parse(url.toString()))) {
+              if (url == null ||
+                  Uri.tryParse(url.toString())?.scheme != 'https' ||
+                  !_allowedUrl(carrier, url)) {
+                return;
+              }
+              final finishedOpeningLogin = _openingLogin.remove(accountId);
+              if (finishedOpeningLogin) _timeouts[accountId]?.cancel();
+              if (isCarrierLoginPage(Uri.parse(url.toString()))) {
                 _awaitingLoginReturn.add(accountId);
                 if (carrier == Carrier.broadnet) {
                   _broadnetSessions.remove(accountId);
@@ -1115,13 +1245,13 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                 );
                 unawaited(_publishWidget());
               } else if (carrier == Carrier.broadnet &&
-                  url?.host == 'www.10099.com.cn') {
+                  url.host == 'www.10099.com.cn') {
                 await _saveSession(account, controller, generation);
               }
               if (_current(generation) &&
-                  url != null &&
                   !isCarrierLoginPage(Uri.parse(url.toString())) &&
-                  _awaitingLoginReturn.remove(accountId)) {
+                  (_awaitingLoginReturn.remove(accountId) ||
+                      finishedOpeningLogin)) {
                 unawaited(_refreshAccount(accountId));
                 return;
               }
@@ -1136,12 +1266,24 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   // The existing timeout preserves the last verified data.
                 }
               }
+              if (_current(generation) &&
+                  carrier == Carrier.telecom &&
+                  _inFlight.contains(accountId)) {
+                try {
+                  await controller.evaluateJavascript(
+                    source: telecomRenderedCaptureScript,
+                  );
+                } on Exception {
+                  // The existing timeout preserves the last verified data.
+                }
+              }
             },
             onReceivedError: (controller, request, error) {
               if (request.isForMainFrame != true || !_current(generation)) {
                 return;
               }
               _timeouts[accountId]?.cancel();
+              _openingLogin.remove(accountId);
               _inFlight.remove(accountId);
               _refreshThrottle.loginOrLoadFailed(accountId);
               setState(() {
@@ -1163,27 +1305,21 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   Future<void> _applySelection(
     Set<Carrier> carriers, {
-    Set<Carrier> secondAccounts = const {},
+    Map<Carrier, int> accountCounts = const {},
   }) async {
     if (_savingSelection || carriers.isEmpty || _clearing) return;
     final previousSelection = _selection;
     final previousAccounts = _accounts;
     final selection = CarrierSelection.complete(carriers);
-    var nextAccounts = _accounts.ensureSelection(selection);
-    final pendingCount = secondAccounts
-        .where(
-          (carrier) =>
-              carriers.contains(carrier) &&
-              nextAccounts.find('${carrier.name}_2') == null,
-        )
-        .length;
-    if (nextAccounts.visibleCount(selection) + pendingCount > 4) {
-      _showInfo('最多照顾四张卡', '当前保存的号码加上新选择会超过四张，请先取消第二张卡后再保存。');
+    final counts = {
+      for (final carrier in carriers) carrier: accountCounts[carrier] ?? 1,
+    };
+    if (counts.values.any((count) => count < 1 || count > 4) ||
+        counts.values.fold<int>(0, (sum, count) => sum + count) > 4) {
+      _showInfo('最多照顾四张卡', '每家可选一到四张，合计最多四张。请先调整数量。');
       return;
     }
-    for (final carrier in secondAccounts.where(carriers.contains)) {
-      nextAccounts = nextAccounts.addSecond(carrier);
-    }
+    final nextAccounts = _accounts.withAccountCounts(selection, counts);
     final restoredNew = <String, CarrierSnapshot>{};
     final restoredSessions = <String, Map<String, dynamic>>{};
     final connectedNew = <String>{};
@@ -1241,6 +1377,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _refreshThrottle.clear();
       _inFlight.clear();
       _awaitingLoginReturn.clear();
+      _openingLogin.clear();
       _warnedLow.clear();
     });
     final generation = _generation;
@@ -1299,32 +1436,27 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   Future<void> _manageCarriers() async {
     var draft = _selection.selectedCarriers.toSet();
-    final draftSecond = <Carrier>{};
+    var draftCounts = {
+      for (final carrier in Carrier.values)
+        carrier: _accounts.enabledCount(carrier) == 0
+            ? 1
+            : _accounts.enabledCount(carrier),
+    };
     final result = await Navigator.of(context)
-        .push<(Set<Carrier>, Set<Carrier>)>(
+        .push<(Set<Carrier>, Map<Carrier, int>)>(
           MaterialPageRoute(
             builder: (context) => StatefulBuilder(
               builder: (context, update) => CarrierSelectionScreen(
                 selectedCarriers: draft,
-                accountCounts: {
-                  for (final carrier in Carrier.values)
-                    carrier:
-                        _accounts.accounts
-                            .where((a) => a.carrier == carrier)
-                            .length +
-                        (draftSecond.contains(carrier) ? 1 : 0),
-                },
+                accountCounts: draftCounts,
                 onSelectionChanged: (value) => update(() => draft = value),
-                onAddSecondAccount: (carrier) async {
-                  if (await _canAddSecond(carrier, draftSecond, draft)) {
-                    update(() {
-                      draft.add(carrier);
-                      draftSecond.add(carrier);
-                    });
+                onAccountCountsChanged: (counts) async {
+                  if (await _canSetAccountCounts(counts) && context.mounted) {
+                    update(() => draftCounts = {...draftCounts, ...counts});
                   }
                 },
                 onContinue: (value) =>
-                    Navigator.pop(context, (value, draftSecond)),
+                    Navigator.pop(context, (value, draftCounts)),
                 isInitialSetup: false,
                 demo: demoMode,
               ),
@@ -1332,7 +1464,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           ),
         );
     if (result != null && mounted) {
-      await _applySelection(result.$1, secondAccounts: result.$2);
+      await _applySelection(result.$1, accountCounts: result.$2);
     }
   }
 
@@ -1382,6 +1514,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _visibleAccountId = null;
       _inFlight.clear();
       _awaitingLoginReturn.clear();
+      _openingLogin.clear();
       _refreshThrottle.clear();
     });
     for (final timer in _timeouts.values) {
@@ -1657,6 +1790,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _broadnetSessions.clear();
       _inFlight.clear();
       _awaitingLoginReturn.clear();
+      _openingLogin.clear();
     });
     if (_nativeMobile && !demoMode) {
       try {
@@ -1701,11 +1835,17 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                     (_prefs?.getBool('account_profiles_may_exist') ?? false) ||
                     _accounts.accounts.any((account) => !account.isPrimary) ||
                     Carrier.values.any(
-                      (carrier) =>
-                          (_prefs?.containsKey('connected_${carrier.name}_2') ??
-                              false) ||
-                          (_prefs?.containsKey('snapshot_${carrier.name}_2') ??
-                              false),
+                      (carrier) => [2, 3, 4].any(
+                        (slot) =>
+                            (_prefs?.containsKey(
+                                  'connected_${CarrierAccount.idFor(carrier, slot)}',
+                                ) ??
+                                false) ||
+                            (_prefs?.containsKey(
+                                  'snapshot_${CarrierAccount.idFor(carrier, slot)}',
+                                ) ??
+                                false),
+                      ),
                     ),
               );
         } else if (_ios) {
@@ -1727,7 +1867,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       }
     }
     for (final carrier in Carrier.values) {
-      for (final id in [carrier.name, '${carrier.name}_2']) {
+      for (final id in [
+        for (var slot = 1; slot <= 4; slot++)
+          CarrierAccount.idFor(carrier, slot),
+      ]) {
         try {
           if (carrier == Carrier.broadnet) {
             await _secure.delete(
@@ -1829,29 +1972,16 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           else if (!_selection.setupCompleted)
             CarrierSelectionScreen(
               selectedCarriers: _draftSelection,
-              accountCounts: {
-                for (final carrier in Carrier.values)
-                  carrier:
-                      (_draftSelection.contains(carrier) ? 1 : 0) +
-                      (_draftSecond.contains(carrier) ? 1 : 0),
-              },
+              accountCounts: _draftAccountCounts,
               onSelectionChanged: (value) =>
                   setState(() => _draftSelection = value),
-              onAddSecondAccount: (carrier) async {
-                if (await _canAddSecond(
-                      carrier,
-                      _draftSecond,
-                      _draftSelection,
-                    ) &&
-                    mounted) {
-                  setState(() {
-                    _draftSelection.add(carrier);
-                    _draftSecond.add(carrier);
-                  });
+              onAccountCountsChanged: (counts) async {
+                if (await _canSetAccountCounts(counts) && mounted) {
+                  setState(() => _draftAccountCounts.addAll(counts));
                 }
               },
               onContinue: (value) => unawaited(
-                _applySelection(value, secondAccounts: _draftSecond),
+                _applySelection(value, accountCounts: _draftAccountCounts),
               ),
               demo: demoMode,
             )

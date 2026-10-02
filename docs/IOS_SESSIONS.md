@@ -1,5 +1,7 @@
 # iOS 网页会话与平台行为
 
+2026-10-02 更新：每家数量扩到一至四张、总四张；第三/第四账号采用新增固定 UUID，旧第二账号 UUID 保持不变，清理遍历全部十二个副账号仓库。快照门禁接受 primary/_2/_3/_4。Widget small/medium/large 仍分别展示1/2/4张；本轮源码与验证进度见 [多账号说明](MULTI_ACCOUNT_PROGRESS.md) 和 [版本说明](RELEASE_1.10.0.md)。以下原双账号说明保留作实现沿革。
+
 2026-10-01。公开 Flutter iOS 工程复用现有四家运营商官网链接、响应来源门禁、解析器和前台五分钟查询。主账号继续使用 `WKWebsiteDataStore.default()`，保留升级前可能已有的 Cookie 和网站存储。每家第二账号使用 iOS 17 的 `WKWebsiteDataStore(forIdentifier:)`，对应固定的四个 UUID；同一账号跨应用启动仍用同一持久仓库。没有使用 `nonPersistent()` 代替持久隔离。
 
 `app/vendor/flutter_inappwebview_ios` 是 pub.dev `flutter_inappwebview_ios` 1.1.2 的项目内副本，保留 Apache-2.0 `LICENSE`。`AccountWebViewSettings.toMap()` 传递 `liuliangAccountProfile`；本地 Swift 补丁在创建 `WKWebView` 之前设置 `WKWebViewConfiguration.websiteDataStore`。无效或不支持的 profile 不创建网页，避免落入主账号默认仓库。插件的管理通道 `com.pichillilorenzo/flutter_inappwebview_manager` 增加 `liuliangSupportsAccountProfiles` 和 `liuliangDeleteAccountProfiles`，后者遍历四个固定仓库清空全部 WebKit 网站数据，不依赖当前卡片列表，因此收起的历史第二账号也会清理。

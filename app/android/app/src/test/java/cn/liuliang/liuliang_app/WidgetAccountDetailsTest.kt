@@ -55,14 +55,27 @@ class WidgetAccountDetailsTest {
         assertEquals("约 1.00 GB", WidgetAccountDetails.traffic("provided", gib, true, true))
     }
 
-    @Test fun shortWidgetsExplainHiddenCardsAndTallWidgetsKeepAllFour() {
+    @Test fun defaultWidgetFitsThreeAndFourCompactAccounts() {
         assertEquals(0, WidgetAccountLayout.visibleCount(0, 180))
-        assertEquals(1, WidgetAccountLayout.visibleCount(4, 180))
-        assertEquals(2, WidgetAccountLayout.visibleCount(4, 280))
-        assertEquals(3, WidgetAccountLayout.visibleCount(4, 386))
-        assertEquals(4, WidgetAccountLayout.visibleCount(4, 492))
-        assertEquals(1, WidgetAccountLayout.visibleCount(1, 600))
-        assertEquals(2, WidgetAccountLayout.visibleCount(4, 0))
+        assertEquals(2, WidgetAccountLayout.visibleCount(4, 180))
+        assertEquals(4, WidgetAccountLayout.visibleCount(4, 280))
+        assertEquals(3, WidgetAccountLayout.visibleCount(3, 280))
+        assertEquals(4, WidgetAccountLayout.visibleCount(4, 0))
+        assertEquals(1, WidgetAccountLayout.visibleCount(1, 180))
+        assertEquals(2, WidgetAccountLayout.visibleCount(2, 280))
+        assertTrue(WidgetAccountLayout.isCompact(3))
+        assertFalse(WidgetAccountLayout.isCompact(2))
+        assertEquals(1, WidgetAccountLayout.visibleCount(4, 90))
+    }
+
+    @Test fun compactDetailKeepsStatusAndUniqueAggregateAheadOfOptionalIdentity() {
+        val parsed = card(mapOf("primaryValue" to gib, "primaryLabel" to "套餐余量", "phoneHint" to "138****5678", "balanceYuan" to 0.0))
+        assertEquals("套餐余量 1.00 GB", WidgetAccountLayout.compactDetail(parsed, now, false))
+        assertEquals("查询失败 · 套餐余量 1.00 GB", WidgetAccountLayout.compactDetail(parsed.copy(status = "error"), now, false))
+        val detailed = parsed.copy(generalState = "provided", generalRemainingBytes = gib)
+        assertEquals("话费 0.00 元", WidgetAccountLayout.compactDetail(detailed, now, false))
+        assertEquals("138****5678", WidgetAccountLayout.compactDetail(detailed.copy(balanceYuan = null), now, false))
+        assertEquals("余量偏低", WidgetAccountLayout.compactDetail(detailed, now, true))
     }
 
     @Test fun legacySnapshotKeepsPrimarySummaryWithUnavailableNewDetails() {

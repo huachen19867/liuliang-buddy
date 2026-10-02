@@ -16,6 +16,7 @@ class CarrierSelectionScreen extends StatelessWidget {
     this.querySupportedCarriers = Carrier.values,
     this.accountCounts = const {},
     this.onAddSecondAccount,
+    this.onAccountCountsChanged,
     required this.selectedCarriers,
     required this.onSelectionChanged,
     required this.onContinue,
@@ -27,6 +28,7 @@ class CarrierSelectionScreen extends StatelessWidget {
   final List<Carrier> querySupportedCarriers;
   final Map<Carrier, int> accountCounts;
   final ValueChanged<Carrier>? onAddSecondAccount;
+  final ValueChanged<Map<Carrier, int>>? onAccountCountsChanged;
   final Set<Carrier> selectedCarriers;
   final ValueChanged<Set<Carrier>> onSelectionChanged;
   final ValueChanged<Set<Carrier>> onContinue;
@@ -50,11 +52,14 @@ class CarrierSelectionScreen extends StatelessWidget {
     final orderedSelection = carriers
         .where(selected.contains)
         .toList(growable: false);
-    final canContinue = orderedSelection.isNotEmpty;
+    final counts = {
+      for (final carrier in orderedSelection)
+        carrier: (accountCounts[carrier] ?? 1).clamp(1, 4).toInt(),
+    };
+    final total = counts.values.fold<int>(0, (sum, count) => sum + count);
+    final canContinue = orderedSelection.isNotEmpty && total <= 4;
     final title = isInitialSetup ? '先选好你的运营商' : '管理运营商';
-    final subtitle = isInitialSetup
-        ? '轻点选择一家；同一家有两张卡，连续轻点两下即可加入第二张。'
-        : '轻点选择运营商；连续轻点两下，可加入同一家第二张卡。';
+    const subtitle = '选择运营商，再选择每家的号码数量。每家可选 1–4 张，合计最多 4 张。';
 
     return Scaffold(
       backgroundColor: _canvas,
@@ -125,7 +130,7 @@ class CarrierSelectionScreen extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${orderedSelection.length} 家已选择',
+                        '$total / 4 张已选择',
                         style: const TextStyle(
                           color: _mutedInk,
                           fontSize: 12,
@@ -148,20 +153,7 @@ class CarrierSelectionScreen extends StatelessWidget {
                           carriers[index],
                         ),
                         selected: selected.contains(carriers[index]),
-                        count:
-                            accountCounts[carriers[index]] ??
-                            (selected.contains(carriers[index]) ? 1 : 0),
-                        onDoubleTap: onAddSecondAccount == null
-                            ? null
-                            : () {
-                                final carrier = carriers[index];
-                                if (!selected.contains(carrier)) {
-                                  onSelectionChanged(
-                                    Set.unmodifiable({...selected, carrier}),
-                                  );
-                                }
-                                onAddSecondAccount!(carrier);
-                              },
+                        count: counts[carriers[index]] ?? 0,
                         onTap: () {
                           final next = {...selected};
                           if (!next.add(carriers[index])) {
@@ -170,15 +162,52 @@ class CarrierSelectionScreen extends StatelessWidget {
                           onSelectionChanged(Set.unmodifiable(next));
                         },
                       ),
+                      if (selected.contains(carriers[index]))
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              for (var count = 1; count <= 4; count++)
+                                ChoiceChip(
+                                  key: ValueKey(
+                                    'carrier-count-${carriers[index].name}-$count',
+                                  ),
+                                  label: Text('$count 张'),
+                                  selected: counts[carriers[index]] == count,
+                                  onSelected:
+                                      total -
+                                              (counts[carriers[index]] ?? 1) +
+                                              count >
+                                          4
+                                      ? null
+                                      : onAccountCountsChanged != null
+                                      ? (_) => onAccountCountsChanged!(
+                                          Map.unmodifiable({
+                                            ...counts,
+                                            carriers[index]: count,
+                                          }),
+                                        )
+                                      : count == 2 && onAddSecondAccount != null
+                                      ? (_) =>
+                                            onAddSecondAccount!(carriers[index])
+                                      : null,
+                                ),
+                            ],
+                          ),
+                        ),
                     ],
                   const SizedBox(height: 22),
                   if (!canContinue)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.only(bottom: 10),
                       child: Text(
-                        '至少选择一家运营商后才能继续。',
+                        orderedSelection.isEmpty
+                            ? '至少选择一家运营商后才能继续。'
+                            : '合计最多 4 张，请减少号码数量后再保存。',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: _mutedInk,
                           fontSize: 12,
                           height: 1.4,
@@ -270,7 +299,6 @@ class _CarrierOption extends StatelessWidget {
     required this.querySupported,
     required this.selected,
     required this.count,
-    this.onDoubleTap,
     required this.onTap,
   });
 
@@ -279,7 +307,6 @@ class _CarrierOption extends StatelessWidget {
   final bool querySupported;
   final bool selected;
   final int count;
-  final VoidCallback? onDoubleTap;
   final VoidCallback onTap;
 
   @override
@@ -293,7 +320,6 @@ class _CarrierOption extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          onDoubleTap: onDoubleTap,
           borderRadius: BorderRadius.circular(18),
           child: AnimatedContainer(
             duration: resortMotionDuration(context, 160),
@@ -338,7 +364,7 @@ class _CarrierOption extends StatelessWidget {
                                   ? '已加入首页 · 余额查询接入中'
                                   : '余额查询接入中'
                             : selected
-                            ? '已加入 $count 张 · 双击可加第二张'
+                            ? '已加入 $count 张 · 下方选择数量'
                             : '点按即可选择',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,

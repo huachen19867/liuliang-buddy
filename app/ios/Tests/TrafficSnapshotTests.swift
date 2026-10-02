@@ -12,6 +12,15 @@ enum TrafficSnapshotTests {
             TrafficSnapshot.parse(["schema": 2, "instances": rows])!
         }
         let two = snapshot([row(), row("mobile_2", value: 2_147_483_648)])
+        let fourIds = ["mobile", "mobile_2", "mobile_3", "mobile_4"]
+        precondition(snapshot(fourIds.map { row($0) }).instances.map { $0.accountId } == fourIds)
+        for invalid in ["mobile_1", "mobile_5", "unicom_3"] {
+            precondition(snapshot([row(invalid)]).instances.isEmpty)
+        }
+        var disabled = row("mobile_3")
+        disabled["enabled"] = false
+        precondition(snapshot([disabled, row("mobile_3")]).instances.count == 1)
+        precondition(snapshot([disabled]).instances.isEmpty)
         precondition(two.instances.count == 2)
         precondition(two.instances[0].valueText == "1.00 GB")
         precondition(two.instances[1].valueText == "2.00 GB")

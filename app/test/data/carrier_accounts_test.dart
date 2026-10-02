@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liuliang_app/data/carrier_accounts.dart';
 import 'package:liuliang_app/data/carrier_selection.dart';
@@ -57,7 +59,8 @@ void main() {
         selection,
       ).addSecond(Carrier.mobile);
       final one = both.removeSecond('mobile_2');
-      expect(one.accounts.map((a) => a.id), ['mobile']);
+      expect(one.visibleAccounts(selection).map((a) => a.id), ['mobile']);
+      expect(one.find('mobile_2')!.enabled, isFalse);
       expect(one.addSecond(Carrier.mobile).accounts.map((a) => a.id), [
         'mobile',
         'mobile_2',
@@ -79,4 +82,132 @@ void main() {
     expect(withSecond.find('telecom'), isNotNull);
     expect(() => withSecond.addSecond(Carrier.mobile), returnsNormally);
   });
+
+  test(
+    'four same-carrier accounts round trip with independent stable keys',
+    () {
+      final selection = CarrierSelection.complete([Carrier.mobile]);
+      final accounts = CarrierAccounts.fromSelection(
+        selection,
+      ).withAccountCounts(selection, {Carrier.mobile: 4});
+      final restored = CarrierAccounts.restore(
+        savedJson: accounts.toStorageString(),
+        selection: selection,
+      );
+      expect(restored.visibleAccounts(selection).map((a) => a.id), [
+        'mobile',
+        'mobile_2',
+        'mobile_3',
+        'mobile_4',
+      ]);
+      for (var slot = 2; slot <= 4; slot++) {
+        final account = restored.find('mobile_$slot')!;
+        expect(account.profileName, 'liuliang_mobile_$slot');
+        expect(account.connectedKey, 'connected_mobile_$slot');
+        expect(account.snapshotKey, 'snapshot_mobile_$slot');
+      }
+      expect(restored.find('mobile')!.profileName, isNull);
+    },
+  );
+
+  test(
+    'reducing and readding keeps hidden identities and does not renumber gaps',
+    () {
+      final selection = CarrierSelection.complete([Carrier.broadnet]);
+      final accounts = CarrierAccounts.fromSelection(selection)
+          .withCount(Carrier.broadnet, 4)
+          .updateIdentity('broadnet_2', note: '家人', phoneNumber: '13800138000')
+          .updateIdentity('broadnet_4', note: '工作', phoneNumber: '13900139000');
+      final gap = accounts.removeSecond('broadnet_2');
+      expect(gap.visibleAccounts(selection).map((a) => a.id), [
+        'broadnet',
+        'broadnet_3',
+        'broadnet_4',
+      ]);
+      final smaller = gap.withCount(Carrier.broadnet, 1);
+      final restored = CarrierAccounts.restore(
+        savedJson: smaller.toStorageString(),
+        selection: selection,
+      );
+      expect(restored.accounts, hasLength(4));
+      expect(restored.visibleCount(selection), 1);
+      final reopened = restored.withCount(Carrier.broadnet, 4);
+      expect(reopened.find('broadnet_2')!.note, '家人');
+      expect(reopened.find('broadnet_4')!.note, '工作');
+      expect(
+        reopened.find('broadnet_4')!.broadnetSessionKey,
+        'broadnet_session_broadnet_4',
+      );
+    },
+  );
+
+  test(
+    'mixed carriers obey four visible limit while retaining old histories',
+    () {
+      final all = CarrierSelection.complete(Carrier.values);
+      var accounts = CarrierAccounts.fromSelection(all);
+      for (final carrier in Carrier.values) {
+        accounts = accounts.withCount(carrier, 4);
+      }
+      final selected = CarrierSelection.complete([
+        Carrier.mobile,
+        Carrier.unicom,
+      ]);
+      final mixed = accounts.withAccountCounts(selected, {
+        Carrier.mobile: 3,
+        Carrier.unicom: 1,
+      });
+      expect(mixed.visibleCount(selected), 4);
+      expect(mixed.accounts, hasLength(16));
+      expect(mixed.visibleAccounts(selected).map((a) => a.id), [
+        'mobile',
+        'mobile_2',
+        'mobile_3',
+        'unicom',
+      ]);
+      expect(
+        () => mixed.withAccountCounts(selected, {
+          Carrier.mobile: 4,
+          Carrier.unicom: 1,
+        }),
+        throwsStateError,
+      );
+      expect(() => mixed.withCount(Carrier.mobile, 5), throwsRangeError);
+    },
+  );
+
+  test(
+    'legacy records missing enabled stay active; untrusted slot IDs are rejected',
+    () {
+      final selection = CarrierSelection.complete([Carrier.mobile]);
+      final legacy = jsonEncode({
+        'schemaVersion': 1,
+        'accounts': [
+          {'id': 'mobile', 'carrier': 'mobile', 'label': '中国移动 1'},
+          {
+            'id': 'mobile_2',
+            'carrier': 'mobile',
+            'label': '中国移动 2',
+            'note': '旧备注',
+          },
+        ],
+      });
+      final restored = CarrierAccounts.restore(
+        savedJson: legacy,
+        selection: selection,
+      );
+      expect(restored.visibleCount(selection), 2);
+      expect(restored.find('mobile_2')!.note, '旧备注');
+      for (final id in ['mobile_1', 'mobile_5', 'mobile_02', 'unicom_3']) {
+        expect(
+          CarrierAccount.fromJson({
+            'id': id,
+            'carrier': 'mobile',
+            'label': '伪记录',
+          }),
+          isNull,
+        );
+      }
+    },
+  );
 }

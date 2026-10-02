@@ -201,6 +201,15 @@ class WidgetPresentationTest {
         assertTrue(failed.unlimited)
     }
 
+    @Test fun fourSameCarrierAccountsRejectInvalidAndDisabledRecords() {
+        fun row(id: String, enabled: Boolean = true) = mapOf(
+            "accountId" to id, "carrier" to "mobile", "status" to "notConnected", "enabled" to enabled)
+        val valid = listOf("mobile", "mobile_2", "mobile_3", "mobile_4")
+        val raw = listOf(row("mobile_3", false), row("mobile_1"), row("mobile_5"), row("unicom_3")) +
+            valid.map { row(it) } + row("mobile_4")
+        assertEquals(valid, WidgetInstances.fromPayload(raw, setOf("mobile")).map { it.accountId })
+    }
+
     @Test fun accountInstancesKeepTwoSameCarrierEntriesSeparateAndCapAtFour() {
         val raw = listOf(
             mapOf(

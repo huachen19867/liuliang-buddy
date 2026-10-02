@@ -6,7 +6,13 @@ const telecomRenderedCaptureScript = r'''
   'use strict';
   if (window.top !== window || location.origin !== 'https://e.dlife.cn' ||
       location.pathname !== '/portal/web/index.html') return;
-  if (window.__liuliangTelecomProbe) return;
+  if (window.__liuliangTelecomProbe) {
+    // Explicit native query/load completion may arrive after an early bridge
+    // message was ignored. Re-read current DOM, never replay cached rows.
+    if (typeof window.__liuliangTelecomRescan === 'function')
+      window.__liuliangTelecomRescan();
+    return;
+  }
   window.__liuliangTelecomProbe = true;
   let previous = '', pending = null, timer = null;
   const flush = () => {
@@ -64,8 +70,13 @@ const telecomRenderedCaptureScript = r'''
     if (body !== previous) { pending = body; flush(); }
   };
   const schedule = () => {
-    if (timer !== null) clearTimeout(timer);
+    // Continuous unrelated page mutations must not postpone scanning forever.
+    if (timer !== null) return;
     timer = setTimeout(scan, 300);
+  };
+  window.__liuliangTelecomRescan = () => {
+    previous = ''; pending = null;
+    scan();
   };
   window.addEventListener('flutterInAppWebViewPlatformReady', () => { scan(); flush(); });
   window.addEventListener('hashchange', schedule);

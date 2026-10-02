@@ -31,78 +31,97 @@ class CarrierBrowserShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
-      builder: (context, constraints) => Column(
-        children: [
-          Material(
-            color: ResortPalette.canvas,
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        tooltip: '返回首页',
-                        onPressed: onClose,
-                        icon: const Icon(Icons.close),
-                      ),
-                      Expanded(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      if (keyboardVisible)
+      builder: (context, constraints) {
+        final queryButton = Tooltip(
+          message: '查询流量',
+          child: FilledButton(
+            key: const ValueKey('official-query-flow'),
+            onPressed: onQuery,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(96, 48),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            ),
+            child: const Text('查询流量'),
+          ),
+        );
+        final inlineQuery = constraints.maxWidth >= 480;
+        return Column(
+          children: [
+            Material(
+              color: ResortPalette.canvas,
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
                         IconButton(
-                          tooltip: '收起键盘',
-                          onPressed: onDismissKeyboard,
-                          icon: const Icon(Icons.keyboard_hide_rounded),
+                          tooltip: '返回首页',
+                          onPressed: onClose,
+                          icon: const Icon(Icons.close),
                         ),
-                      IconButton(
-                        tooltip: '查询流量',
-                        onPressed: onQuery,
-                        icon: const Icon(Icons.search_rounded),
-                      ),
-                      IconButton(
-                        tooltip: '重新加载官方页面',
-                        onPressed: onReload,
-                        icon: const Icon(Icons.refresh),
-                      ),
-                      if (onHelp != null)
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        if (keyboardVisible)
+                          IconButton(
+                            tooltip: '收起键盘',
+                            onPressed: onDismissKeyboard,
+                            icon: const Icon(Icons.keyboard_hide_rounded),
+                          ),
+                        if (inlineQuery) queryButton,
                         IconButton(
-                          tooltip: '登录遇到问题？',
-                          onPressed: onHelp,
-                          icon: const Icon(Icons.help_outline_rounded),
+                          tooltip: '重新加载官方页面',
+                          onPressed: onReload,
+                          icon: const Icon(Icons.refresh),
                         ),
-                    ],
-                  ),
-                  // The keyboard already reduces Scaffold's available height.
-                  // Give that space to the official form and its own dialogs.
-                  if (!keyboardVisible && constraints.maxHeight >= 240)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          message,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: ResortPalette.muted,
+                        if (onHelp != null)
+                          IconButton(
+                            tooltip: '登录遇到问题？',
+                            onPressed: onHelp,
+                            icon: const Icon(Icons.help_outline_rounded),
+                          ),
+                      ],
+                    ),
+                    if (!inlineQuery)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: queryButton,
+                        ),
+                      ),
+                    // The keyboard already reduces Scaffold's available height.
+                    // Give that space to the official form and its own dialogs.
+                    if (!keyboardVisible && constraints.maxHeight >= 240)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            message,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: ResortPalette.muted,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          Expanded(child: SafeArea(top: false, child: child)),
-        ],
-      ),
+            Expanded(child: SafeArea(top: false, child: child)),
+          ],
+        );
+      },
     );
   }
 }

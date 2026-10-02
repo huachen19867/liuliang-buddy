@@ -1,5 +1,7 @@
 # 同运营商多号码实现复核
 
+本文保留 2026-10-01 首版的双号码实现追溯。2026-10-02 当前配置已扩展到每家 1–4 张、合计最多四张，数量选择与隐藏记录契约见 [MULTI_ACCOUNT_PROGRESS.md](MULTI_ACCOUNT_PROGRESS.md)；下文“每家最多两张”和“双击”属于历史版本说明。
+
 2026-10-01。已先检查 `docs/TECH_LOG.md`、现有四家官网探针、`references/` 参考索引及本地 `flutter_inappwebview_android` 1.1.3 源码。现有首页、缓存、控制器、超时与查询都按 `Carrier` 作键，直接增加第二张 UI 卡会显示同一份余额，也会共享 Android WebView 默认 Cookie。已有本地 AndroidX WebKit 1.12.0 AAR 的 API jar 经 `javap` 核对，包含 `ProfileStore`、`WebViewCompat.setProfile(WebView, String)` 和 `WebViewFeature.MULTI_PROFILE`。插件的 `WebViewEnvironment` 仅支持 Windows，并不能让 Android WebView 使用独立会话。
 
 本版为每张卡建立稳定 `CarrierAccount.id`。第一张沿用运营商名，如 `mobile`，继续使用旧 `snapshot_mobile`、`connected_mobile` 和 Android WebView 默认 Profile，故升级不搬移或丢弃旧 Cookie 与记录。第二张用 `mobile_2` 等稳定 ID，独立记录写入 `snapshot_mobile_2`、`connected_mobile_2`，Android Profile 名为 `liuliang_mobile_2`。广电安全存储分别用旧 `broadnet_session` 和新增 `broadnet_session_broadnet_2`。`carrier_accounts_v1` 只保存 ID、运营商与展示标签，不保存手机号或凭证。隐藏或收起第二张卡保留本地历史；明确执行“清除本地连接”时才枚举四家主副八组已知键并尝试删除所有应用命名 Profile。

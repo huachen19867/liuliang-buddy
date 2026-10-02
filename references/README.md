@@ -47,3 +47,5 @@ ios-platform-review 保存 2026-10-01 的 Flutter 官方 iOS 开发环境源文�
 carrier-brand/记录2026-10-01四家官网Logo下载调查与公开HTML/CSS，原始资源与具体URL见scripts/carrier-originals/和app/assets/carriers/README.md。仅裁切原版图形保留原色，标识识别使用不改变商标归属；不复制运营商业务代码。
 
 unicom-query-20261001/记录当前联通公开E5/头部JS及无账号会话形态；匿名只验证正常官网函数调用，无登录/验证码或真实余额，观察JSON脱敏为URL、状态、键名和真假标志。研究见docs/UNICOM_QUERY_PROGRESS.md。最小兼容通过官网原函数，不复制认证或令牌生成。
+
+carrier-compatibility-20261002/记录三家官方登录入口的移动视口匿名观察，以及联通异步原函数查询的脱敏负例验证。电信登录iframe临时参数不保留在索引中；公开页面归档仅研究，不当作真实登录或余量验收。结论、有限修复与接线要求见docs/CARRIER_COMPATIBILITY_1.10.md。

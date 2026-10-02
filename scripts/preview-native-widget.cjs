@@ -8,8 +8,10 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const resourceRoot = path.join(root, 'app/android/app/src/main/res');
-const layoutPath = path.join(resourceRoot, 'layout/traffic_widget.xml');
-const outputPath = path.join(root, 'artifacts/widget-glass-preview.png');
+const count = Number(process.argv[2] || 2);
+if (![2, 3, 4].includes(count)) throw new Error('Preview count must be 2, 3 or 4.');
+const layoutPath = path.join(resourceRoot, count >= 3 ? 'layout/traffic_widget_compact.xml' : 'layout/traffic_widget.xml');
+const outputPath = path.join(root, count === 2 ? 'artifacts/widget-glass-preview.png' : `artifacts/widget-${count === 3 ? 'three' : 'four'}-preview.png`);
 
 const demo = {
   widget_root: { visibility: 'visible' },
@@ -43,6 +45,29 @@ const demo = {
   slot_3: { visibility: 'gone' },
   slot_4: { visibility: 'gone' },
 };
+
+if (count >= 3) {
+  const names = ['中国移动 1', '中国移动 2', '中国联通 1', '中国电信 1'];
+  for (let index = 1; index <= count; index++) {
+    demo['slot_' + index] = { visibility: 'visible' };
+    demo['slot_' + index + '_name'] = { text: names[index - 1] };
+    for (const field of ['state', 'phone', 'balance', 'summary']) demo['slot_' + index + '_' + field] = { visibility: 'gone' };
+    demo['slot_' + index + '_time'] = { text: '10/02 10:15', visibility: 'visible' };
+    for (const field of ['general', 'directed', 'other', 'voice']) demo['slot_' + index + '_' + field] = { text: '—' };
+  }
+  demo.slot_1_general = { text: '51.81 GB' };
+  demo.slot_1_directed = { text: '30.00 GB' };
+  demo.slot_1_voice = { text: '120 分钟' };
+  demo.slot_2_badge = { src: '@drawable/carrier_mobile' };
+  demo.slot_2_general = { text: '不限量' };
+  demo.slot_2_voice = { text: '0 分钟' };
+  demo.slot_3_summary = { text: '套餐余量 20.00 GB', visibility: 'visible' };
+  if (count === 4) {
+    demo.slot_4_general = { text: '约 12.50 GB' };
+    demo.slot_4_voice = { text: '约 80 分钟' };
+    demo.slot_4_summary = { text: '话费 38.00 元', visibility: 'visible' };
+  }
+}
 
 function readRequired(file) {
   if (!fs.existsSync(file)) throw new Error(`Required input not found: ${path.relative(root, file)}`);
@@ -276,7 +301,7 @@ async function main() {
       const background = attr(source, 'background');
       if (background) Object.assign(element.style, drawableStyle(background, element));
       if (type === 'ImageView') {
-        const src = attr(source, 'src');
+        const src = override.src || attr(source, 'src');
         if (src) Object.assign(element.style, drawableStyle(src, element));
         const scaleType = attr(source, 'scaleType');
         if (scaleType === 'fitCenter') element.style.objectFit = 'contain';
@@ -304,16 +329,16 @@ async function main() {
 
     const root = render(documentXml.documentElement);
     root.style.width = '384px';
-    root.style.height = '400px';
+    root.style.height = '${count >= 3 ? 280 : 400}px';
     root.style.position = 'absolute';
     root.style.left = '0';
     root.style.top = '0';
     document.getElementById('widget-stage').appendChild(root);
 
     const visibleIds = Object.keys(demo).filter((id) => demo[id].visibility === 'visible');
-    const hiddenSlots = ['slot_3', 'slot_4'].filter((id) => getComputedStyle(document.getElementById(id)).display !== 'none');
-    const hiddenFields = ['slot_1_state', 'slot_1_phone', 'slot_1_balance', 'slot_1_summary', 'slot_2_state', 'slot_2_phone', 'slot_2_balance', 'slot_2_summary']
-      .filter((id) => getComputedStyle(document.getElementById(id)).display !== 'none');
+    const count = ${count};
+    const hiddenSlots = ['slot_1', 'slot_2', 'slot_3', 'slot_4'].filter((id) => demo[id]?.visibility === 'gone' && getComputedStyle(document.getElementById(id)).display !== 'none');
+    const hiddenFields = Object.keys(demo).filter((id) => id.startsWith('slot_') && demo[id].visibility === 'gone').filter((id) => getComputedStyle(document.getElementById(id)).display !== 'none');
     const placeholderTexts = ['未连接', '运营商', '先在应用里选择运营商'];
     const shownPlaceholder = [...document.querySelectorAll('#widget-stage [data-native-type="TextView"]')]
       .find((element) => placeholderTexts.includes(element.textContent.trim()) && element.getClientRects().length > 0);
@@ -334,7 +359,7 @@ async function main() {
 
     await page.setContent(html, { waitUntil: 'load' });
     await page.evaluate(() => document.fonts.ready);
-    const report = await page.evaluate(() => {
+    const report = await page.evaluate((count) => {
       if (window.__previewError) throw new Error(window.__previewError);
       return {
         xmlIds: window.__previewXmlIds || 0,
@@ -345,18 +370,18 @@ async function main() {
         paintedBounds: document.getElementById('widget_root').getBoundingClientRect().toJSON(),
         screenshotSize: '800x960 (400x480 logical pixels at 2x)',
         ids: [...document.querySelectorAll('[data-xml-id]')].map((node) => node.dataset.xmlId),
-        cards: ['slot_1', 'slot_2'].map((id) => document.getElementById(id).getBoundingClientRect().toJSON()),
+        cards: Array.from({ length: count }, (_, i) => document.getElementById('slot_' + (i + 1)).getBoundingClientRect().toJSON()),
       };
-    });
+    }, count);
     if (!report.xmlIds || report.hiddenSlots.length || report.hiddenFields.length || report.title !== 'XML布局预览 · 合成数据 · 非手机实拍') {
       throw new Error('Rendered preview checks failed.');
     }
-    if (report.paintedBounds.bottom > report.cards[1].bottom + 16) throw new Error('Widget background extends into empty host space.');
+    if (report.paintedBounds.bottom > report.cards.at(-1).bottom + 16) throw new Error('Widget background extends into empty host space.');
     if (report.cards.some((card) => card.width <= 0 || card.height <= 0)) throw new Error('One of the two cards has no visible layout bounds.');
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     await page.screenshot({ path: outputPath });
     console.log(`XML ID check: ${report.xmlIds} IDs; ${Object.keys(demo).length} sample/visibility bindings present.`);
-    console.log('Layout check: two cards visible; state, phone, balance, summary and unused slots hidden.');
+    console.log(`Layout check: ${count} cards visible; optional fields and unused slots match bindings.`);
     console.log(`Saved ${path.relative(root, outputPath)} (${report.screenshotSize}).`);
   } finally {
     await browser.close();

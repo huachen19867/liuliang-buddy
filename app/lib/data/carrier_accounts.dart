@@ -11,6 +11,7 @@ class CarrierAccount {
     required this.label,
     this.note,
     this.phoneNumber,
+    this.enabled = true,
   });
 
   final String id;
@@ -20,6 +21,7 @@ class CarrierAccount {
   /// Optional user-entered identity, never read from a SIM or login form.
   final String? note;
   final String? phoneNumber;
+  final bool enabled;
 
   String get displayName =>
       note?.trim().isNotEmpty == true ? note!.trim() : label;
@@ -60,10 +62,25 @@ class CarrierAccount {
       label: label,
       note: note.trim().isEmpty ? null : note.trim(),
       phoneNumber: phoneNumber.trim().isEmpty ? null : phoneNumber.trim(),
+      enabled: enabled,
     );
   }
 
   bool get isPrimary => id == carrier.name;
+  int get slot => isPrimary ? 1 : int.parse(id.split('_').last);
+  static String idFor(Carrier carrier, int slot) {
+    if (slot < 1 || slot > 4) throw RangeError.range(slot, 1, 4);
+    return slot == 1 ? carrier.name : '${carrier.name}_$slot';
+  }
+
+  CarrierAccount withEnabled(bool value) => CarrierAccount(
+    id: id,
+    carrier: carrier,
+    label: label,
+    note: note,
+    phoneNumber: phoneNumber,
+    enabled: value,
+  );
   String? get profileName => isPrimary ? null : 'liuliang_$id';
   String get snapshotKey => 'snapshot_$id';
   String get connectedKey => 'connected_$id';
@@ -76,6 +93,7 @@ class CarrierAccount {
     'label': label,
     'note': note,
     'phoneNumber': phoneNumber,
+    'enabled': enabled,
   };
 
   static CarrierAccount? fromJson(Object? value) {
@@ -89,7 +107,11 @@ class CarrierAccount {
     if (carrier.isEmpty) return null;
     final found = carrier.first;
     final id = value['id'] as String;
-    if (id != found.name && id != '${found.name}_2') return null;
+    if (![
+      for (var slot = 1; slot <= 4; slot++) idFor(found, slot),
+    ].contains(id)) {
+      return null;
+    }
     final label = value['label'] as String;
     if (label.trim().isEmpty || label.length > 40) return null;
     // Invalid optional additions must not discard valid legacy account IDs.
@@ -99,6 +121,7 @@ class CarrierAccount {
       id: id,
       carrier: found,
       label: label,
+      enabled: id == found.name || value['enabled'] != false,
       note:
           rawNote is String &&
               rawNote.trim().isNotEmpty &&
@@ -167,7 +190,7 @@ class CarrierAccounts {
           );
         }
       }
-      if (values.length > 8) return CarrierAccounts.fromSelection(selection);
+      if (values.length > 16) return CarrierAccounts.fromSelection(selection);
       return CarrierAccounts._(_ordered(values));
     } catch (_) {
       return CarrierAccounts.fromSelection(selection);
@@ -194,36 +217,87 @@ class CarrierAccounts {
     if (!accounts.any((a) => a.id == carrier.name)) {
       throw StateError('Select the carrier first');
     }
-    if (accounts.any((a) => a.id == '${carrier.name}_2')) return this;
-    if (accounts.length >= 8) {
-      throw StateError('At most eight stored account records');
-    }
-    return CarrierAccounts._(
-      _ordered([
-        ...accounts,
-        CarrierAccount(
-          id: '${carrier.name}_2',
-          carrier: carrier,
-          label: '${carrier.label} 2',
-        ),
-      ]),
+    return withCount(
+      carrier,
+      enabledCount(carrier) < 2 ? 2 : enabledCount(carrier),
     );
+  }
+
+  int enabledCount(Carrier carrier) =>
+      accounts.where((a) => a.carrier == carrier && a.enabled).length;
+
+  /// Adjusts displayed quantity without discarding identities or session IDs.
+  CarrierAccounts withCount(Carrier carrier, int count) {
+    if (count < 1 || count > 4) throw RangeError.range(count, 1, 4);
+    if (find(carrier.name) == null) {
+      throw StateError('Select the carrier first');
+    }
+    final values = [...accounts];
+    var active = enabledCount(carrier);
+    for (var slot = 4; slot >= 2 && active > count; slot--) {
+      final index = values.indexWhere(
+        (a) => a.id == CarrierAccount.idFor(carrier, slot),
+      );
+      if (index >= 0 && values[index].enabled) {
+        values[index] = values[index].withEnabled(false);
+        active--;
+      }
+    }
+    for (var slot = 2; slot <= 4 && active < count; slot++) {
+      final id = CarrierAccount.idFor(carrier, slot);
+      final index = values.indexWhere((a) => a.id == id);
+      if (index >= 0 && values[index].enabled) continue;
+      if (index >= 0) {
+        values[index] = values[index].withEnabled(true);
+      } else {
+        values.add(
+          CarrierAccount(
+            id: id,
+            carrier: carrier,
+            label: '${carrier.label} $slot',
+          ),
+        );
+      }
+      active++;
+    }
+    return CarrierAccounts._(_ordered(values));
+  }
+
+  CarrierAccounts withAccountCounts(
+    CarrierSelection selection,
+    Map<Carrier, int> counts,
+  ) {
+    if (selection.selectedCarriers.fold<int>(
+          0,
+          (sum, carrier) => sum + (counts[carrier] ?? 1),
+        ) >
+        4) {
+      throw StateError('At most four displayed accounts');
+    }
+    var next = ensureSelection(selection);
+    for (final carrier in selection.selectedCarriers) {
+      next = next.withCount(carrier, counts[carrier] ?? 1);
+    }
+    return next;
   }
 
   /// Removes the card from the app layout while preserving its stored record.
   CarrierAccounts removeSecond(String id) {
     final account = find(id);
     if (account == null || account.isPrimary) return this;
-    return CarrierAccounts._(accounts.where((a) => a.id != id));
+    return CarrierAccounts._([
+      for (final value in accounts)
+        value.id == id ? value.withEnabled(false) : value,
+    ]);
   }
 
   List<CarrierAccount> visibleAccounts(CarrierSelection selection) => accounts
-      .where((a) => selection.allows(a.carrier))
+      .where((a) => a.enabled && selection.allows(a.carrier))
       .take(4)
       .toList(growable: false);
 
   int visibleCount(CarrierSelection selection) =>
-      accounts.where((a) => selection.allows(a.carrier)).length;
+      accounts.where((a) => a.enabled && selection.allows(a.carrier)).length;
 
   CarrierAccount? find(String id) {
     for (final account in accounts) {
@@ -259,8 +333,8 @@ class CarrierAccounts {
 
   static List<CarrierAccount> _ordered(Iterable<CarrierAccount> values) => [
     for (final carrier in Carrier.values) ...[
-      ...values.where((a) => a.carrier == carrier && a.isPrimary),
-      ...values.where((a) => a.carrier == carrier && !a.isPrimary),
+      ...(values.where((a) => a.carrier == carrier).toList()
+        ..sort((a, b) => a.slot.compareTo(b.slot))),
     ],
   ];
 }

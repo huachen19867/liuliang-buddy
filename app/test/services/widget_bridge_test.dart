@@ -6,6 +6,68 @@ import 'package:liuliang_app/services/widget_bridge.dart';
 
 void main() {
   final time = DateTime.utc(2026, 9, 30, 6, 30);
+  test(
+    'hidden history never occupies a widget slot or displaces selected accounts',
+    () {
+      final selection = CarrierSelection.complete([
+        Carrier.mobile,
+        Carrier.unicom,
+      ]);
+      final accounts = CarrierAccounts.fromSelection(selection)
+          .withCount(Carrier.mobile, 4)
+          .withCount(Carrier.mobile, 1)
+          .withCount(Carrier.unicom, 3);
+      final snapshots = <String, CarrierSnapshot>{
+        for (final account in accounts.accounts)
+          account.id: CarrierSnapshot(
+            carrier: account.carrier,
+            status: QueryStatus.success,
+            queriedAt: time,
+            buckets: [
+              TrafficBucket(
+                name: '通用',
+                kind: BucketKind.general,
+                remainingBytes: account.carrier.index * 100 + account.slot,
+              ),
+            ],
+          ),
+      };
+      final payload = buildWidgetPayload(
+        snapshots.values,
+        thresholdGb: 5,
+        selection: selection,
+        accounts: accounts,
+        accountSnapshots: snapshots,
+      );
+      final instances = payload['instances'] as List<Map<String, Object?>>;
+      expect(instances.map((row) => row['accountId']), [
+        'mobile',
+        'unicom',
+        'unicom_2',
+        'unicom_3',
+      ]);
+      expect(instances.map((row) => row['primaryValue']), [
+        1,
+        Carrier.unicom.index * 100 + 1,
+        Carrier.unicom.index * 100 + 2,
+        Carrier.unicom.index * 100 + 3,
+      ]);
+      final restored = accounts.withCount(Carrier.mobile, 4);
+      final mobileOnly = buildWidgetPayload(
+        [],
+        thresholdGb: 5,
+        selection: CarrierSelection.complete([Carrier.mobile]),
+        accounts: restored,
+        accountSnapshots: snapshots,
+      );
+      expect(
+        (mobileOnly['instances'] as List).map(
+          (row) => (row as Map)['accountId'],
+        ),
+        ['mobile', 'mobile_2', 'mobile_3', 'mobile_4'],
+      );
+    },
+  );
   test('secondary-only background result cannot fill the primary account', () {
     final selection = CarrierSelection.complete([Carrier.mobile]);
     final accounts = CarrierAccounts.fromSelection(

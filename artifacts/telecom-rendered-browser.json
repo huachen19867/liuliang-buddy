@@ -3,7 +3,7 @@
   "syntheticOnly": true,
   "actualAccountVerified": false,
   "networkPolicy": "Every browser request fulfilled or aborted locally",
-  "fulfilled": 14,
+  "fulfilled": 15,
   "aborted": 0,
   "cases": [
     "exact official balance label, signed yuan, ambiguous money rejected",
@@ -16,6 +16,8 @@
     "explicit unlimited total preserved for terminal Dart parsing",
     "login invalidates pending bridge payload",
     "voice-only response emitted, ambiguous type2 excluded, missing SMS preserved",
-    "removed official rows invalidate pending bridge payload"
+    "removed official rows invalidate pending bridge payload",
+    "explicit native rescan re-reads existing current DOM",
+    "continuous mutations cannot postpone balance scanning indefinitely"
   ]
 }

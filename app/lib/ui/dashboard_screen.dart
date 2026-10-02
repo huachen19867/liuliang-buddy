@@ -90,6 +90,7 @@ class DashboardScreen extends StatelessWidget {
               ),
           ];
     final theme = Theme.of(context);
+    final compact = entries.length >= 3;
 
     return Scaffold(
       backgroundColor: _canvas,
@@ -102,7 +103,7 @@ class DashboardScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildHeader(carriers),
+                  _buildHeader(carriers, compact: compact),
                   if (cleanupPending) ...[
                     const SizedBox(height: 12),
                     Container(
@@ -131,10 +132,28 @@ class DashboardScreen extends StatelessWidget {
                     thresholdGb: thresholdGb,
                     onRefreshAll: onRefreshAll,
                   ),
+                  if (compact)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        '${entries.length} 个号码 · 可分别查询',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: _mutedInk,
+                        ),
+                      ),
+                    ),
                   for (var index = 0; index < entries.length; index++) ...[
-                    SizedBox(height: index == 0 ? 18 : 13),
+                    SizedBox(
+                      height: compact
+                          ? 10
+                          : index == 0
+                          ? 18
+                          : 13,
+                    ),
                     _CarrierCard(
                       key: ValueKey('account-card-${entries[index].accountId}'),
+                      accountId: entries[index].accountId,
+                      compact: compact,
                       carrier: entries[index].carrier,
                       slotLabel: entries[index].slotLabel,
                       phoneHint:
@@ -211,12 +230,53 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(List<Carrier> carriers) {
+  Widget _buildHeader(List<Carrier> carriers, {bool compact = false}) {
     final carrierCaption = carriers.isEmpty
         ? '先选择运营商'
         : carriers.length == 1
         ? '${carriers.single.label}的流量，清楚一点'
         : '多家运营商的流量，清楚一点';
+    if (compact) {
+      return ResortPaper(
+        color: ResortPalette.mintWash,
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '流量小伙伴',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: ResortPalette.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    carrierCaption,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: ResortPalette.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const SizedBox(
+              width: 64,
+              height: 64,
+              child: ResortMascotSticker(message: '查询一下，今天也安心出发。'),
+            ),
+          ],
+        ),
+      );
+    }
     return ResortMiniScene(
       title: '流量小伙伴',
       subtitle: carrierCaption,
@@ -582,6 +642,8 @@ class _ThresholdHint extends StatelessWidget {
 class _CarrierCard extends StatelessWidget {
   const _CarrierCard({
     super.key,
+    required this.accountId,
+    this.compact = false,
     required this.carrier,
     required this.slotLabel,
     required this.phoneHint,
@@ -594,6 +656,8 @@ class _CarrierCard extends StatelessWidget {
   });
 
   final Carrier carrier;
+  final String accountId;
+  final bool compact;
   final String slotLabel;
   final String? phoneHint;
   final num? balanceYuan;
@@ -653,7 +717,7 @@ class _CarrierCard extends StatelessWidget {
 
     return ResortPaper(
       ticketNotches: true,
-      padding: const EdgeInsets.fromLTRB(13, 13, 13, 13),
+      padding: EdgeInsets.all(compact ? 11 : 13),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -729,7 +793,7 @@ class _CarrierCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 15),
+          SizedBox(height: compact ? 9 : 15),
           Container(
             padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
             decoration: BoxDecoration(
@@ -860,17 +924,40 @@ class _CarrierCard extends StatelessWidget {
               style: TextStyle(color: Color(0xFF8A8E95), fontSize: 12),
             ),
           ],
-          const SizedBox(height: 12),
-          _ServiceAllowances(snapshot: snapshot, status: status),
-          if (_detailBuckets.isNotEmpty) ...[
+          if (compact)
+            Material(
+              type: MaterialType.transparency,
+              child: ExpansionTile(
+                key: ValueKey('account-details-$accountId'),
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 8),
+                title: const Text('套餐与通话明细', style: TextStyle(fontSize: 12)),
+                children: [
+                  _ServiceAllowances(snapshot: snapshot, status: status),
+                  if (_detailBuckets.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    _TrafficBucketList(
+                      buckets: _detailBuckets,
+                      accent: accent,
+                      estimated: carrier == Carrier.telecom,
+                    ),
+                  ],
+                ],
+              ),
+            )
+          else ...[
             const SizedBox(height: 12),
-            _TrafficBucketList(
-              buckets: _detailBuckets,
-              accent: accent,
-              estimated: carrier == Carrier.telecom,
-            ),
+            _ServiceAllowances(snapshot: snapshot, status: status),
+            if (_detailBuckets.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _TrafficBucketList(
+                buckets: _detailBuckets,
+                accent: accent,
+                estimated: carrier == Carrier.telecom,
+              ),
+            ],
           ],
-          const SizedBox(height: 13),
+          SizedBox(height: compact ? 6 : 13),
           Row(
             children: [
               Expanded(

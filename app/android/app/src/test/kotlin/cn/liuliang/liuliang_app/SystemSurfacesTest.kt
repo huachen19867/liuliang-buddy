@@ -6,6 +6,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SystemSurfacesTest {
+    @Test fun laterAccountNumbersStayDistinctInNotifications() {
+        val lines = SystemSurfacePresentation.lines((2..4).map {
+            WidgetCardData("notConnected", null, "流量", accountId = "mobile_$it", carrier = "mobile")
+        }, 5.0, 1_790_744_400_000L)
+        for (index in 2..4) assertTrue(lines[index - 2].startsWith("中国移动 $index ·"))
+    }
+
     private val gib = 1024L * 1024L * 1024L
     private val now = 1_790_744_400_000L
 

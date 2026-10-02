@@ -10,28 +10,43 @@ const script = source.split("const unicomOfficialQueryScript = r'''")[1]
 let scenarios = 0;
 function setup(options = {}) {
   const calls = [];
+  const requests = [];
+  const callbacks = [];
+  const jq = {ajax(settings) {
+    requests.push(settings);
+    callbacks.push(() => settings.success({isLogin: options.login ?? false}));
+  }};
+  const originalAjax = jq.ajax;
   const session = {
     isLogin: false,
     userInfo: null,
     sendRequest() {
       calls.push('session');
       if (options.throws) throw new Error('official request failed');
-      this.isLogin = options.login ?? false;
-      this.userInfo = options.info ?? null;
-      return options.returned ?? this.isLogin;
+      jq.ajax({url: '/e3/static/check/checklogin/?_=123', type: 'POST',
+        async: false, success: () => {
+          this.isLogin = options.login ?? false;
+          this.userInfo = options.info ?? null;
+        }});
+      return false;
     },
   };
   const window = {
+    jQuery: jq, $: jq,
     myE3LoginObj: session,
     E3QueryMain: {loadData(...args) {calls.push(args);}},
     query_info: {personalInfo_back() {}},
   };
   window.top = options.iframe ? {} : window;
-  const context = vm.createContext({window, location: {
+  const context = vm.createContext({window, URL, location: {
+    href: 'https://iservice.10010.com/e5/index.html',
     origin: options.origin ?? 'https://iservice.10010.com',
     pathname: options.pathname ?? '/e5/index.html',
   }});
-  return {window, session, calls, run: () => vm.runInContext(script, context)};
+  const start = () => vm.runInContext(script, context);
+  const flush = () => {while (callbacks.length) callbacks.shift()();};
+  return {window, session, calls, requests, originalAjax, start, flush,
+    run: () => {start(); flush();}};
 }
 function test(name, fn) {
   fn();
@@ -59,6 +74,8 @@ test('missing official objects and functions do nothing', () => {
     t => delete t.window.E3QueryMain.loadData,
     t => delete t.window.query_info,
     t => delete t.window.query_info.personalInfo_back,
+    t => delete t.window.jQuery,
+    t => { t.window.$ = {}; },
   ]) {
     const t = setup(); mutate(t); t.run(); assert.deepEqual(t.calls, []);
     assert.equal(t.window.__liuliangUnicomOfficialQueryStarted, undefined);
@@ -95,8 +112,6 @@ test('confirmed mobile types use exact official query once', () => {
 test('strict confirmation and network type gate', () => {
   for (const options of [
     {login: 'true', info: {nettype: '11'}},
-    {login: true, returned: 'true', info: {nettype: '11'}},
-    {login: true, returned: false, info: {nettype: '11'}},
     {login: true},
     ...['', '1', '01,02,11', '03', 11, null, undefined].map(nettype =>
       ({login: true, info: {nettype}})),
@@ -109,5 +124,22 @@ test('balance callback exception remains bounded', () => {
   let count = 0;
   t.window.E3QueryMain.loadData = () => {count++; throw new Error('official');};
   t.run(); t.run(); assert.equal(count, 1);
+});
+test('session request asynchronous and bounded, original ajax restored immediately', () => {
+  const t = setup({login: true, info: {nettype: '11'}});
+  t.start();
+  assert.deepEqual(t.calls, ['session']);
+  assert.equal(t.requests[0].async, true);
+  assert.equal(t.requests[0].timeout, 12000);
+  assert.equal(t.window.jQuery.ajax, t.originalAjax);
+  t.start(); assert.equal(t.requests.length, 1);
+  t.flush(); assert.equal(t.calls.length, 2);
+});
+test('unexpected official request is not dispatched and wrapper restored', () => {
+  const t = setup();
+  t.session.sendRequest = () => t.window.$.ajax({
+    url: 'https://other.test/check/checklogin/', type: 'POST', async: false});
+  t.run(); assert.equal(t.requests.length, 0);
+  assert.equal(t.window.jQuery.ajax, t.originalAjax);
 });
 console.log(`${scenarios} official Unicom query scenarios passed (synthetic).`);

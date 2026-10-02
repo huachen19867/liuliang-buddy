@@ -49,10 +49,12 @@ struct TrafficAccountSnapshot: Codable, Identifiable {
     var queryDate: Date? { queriedAt.map { Date(timeIntervalSince1970: $0 / 1000) } }
 
     static func parse(_ row: [String: Any]) -> TrafficAccountSnapshot? {
+        if let enabled = row["enabled"] as? NSNumber,
+           CFGetTypeID(enabled) == CFBooleanGetTypeID(), !enabled.boolValue { return nil }
         let carriers = ["mobile", "unicom", "telecom", "broadnet"]
         guard let carrier = row["carrier"] as? String, carriers.contains(carrier),
               let id = row["accountId"] as? String,
-              id == carrier || id == "\(carrier)_2" else { return nil }
+              [carrier, "\(carrier)_2", "\(carrier)_3", "\(carrier)_4"].contains(id) else { return nil }
         let statuses = ["notConnected", "loading", "success", "authExpired", "error"]
         let rawStatus = row["status"] as? String ?? "notConnected"
         func finiteNumber(_ raw: Any?) -> Double? {
