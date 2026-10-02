@@ -397,3 +397,5 @@ iOS旧run36956057050回读failure，编译与冷启动已执行，失败发生�
 最终native小修仅防止估算标签重复“约”、保留紧凑摘要的过期提示；强制rerun BUILD SUCCESSFUL9秒，四份新JUnit XML时间2026-10-02T11:33:30Z，共32项0失败0错误，非旧结果。Dart SDK验证后未再改生产Dart。Swift审查补电信/非未连接门禁、计数总和≤200、Codable解码后的时间/数值复核及过期优先，新增回归尚待云端。原生XML两卡、三卡、四卡61个ID与隐藏字段校验通过并生成合成图。正式Release构建接续。
 
 正式Release41.5秒成功，APK28,039,020字节/SHA256 f88a7eadf0cebbee95645bfc93097d8228d0fb3bafff1263d4a5ca60307fa048；1.10.5/code22、正式v2证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐验证通过，wrapper恢复官方无diff。仅准备push public，发布一个APK；同名折叠仍在APP，桌面发布第一条可读单项而非同名组求和。
+
+Swift回归复核发现9e18+1的NSNumber转doubleValue后与9e18相同，不能当作明显超上界断言；仅测试样本改为9.1e18（仍在Int64范围），不改生产或APK。首次代理审查消息发送给已完成代理不会启动新turn，根接管补测试，避免依赖未收到的修正。此测试源码补正随主分支后续提交，iOS云端结果单独回读，不能冒称已通过。

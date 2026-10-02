@@ -95,7 +95,7 @@ enum TrafficSnapshotTests {
         let invalidPreviewRows: [[String: Any]] = [
             partialRow(preview: true),
             partialRow(preview: -1),
-            partialRow(preview: 9_000_000_000_000_000_001),
+            partialRow(preview: 9_100_000_000_000_000_000),
             partialRow(preview: Double.infinity)
         ]
         for invalid in invalidPreviewRows {
