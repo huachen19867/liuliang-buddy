@@ -84,7 +84,7 @@ enum TrafficSnapshotTests {
             partialRow(pending: 201),
             partialRow(readable: 1.5),
             partialRow(readable: true),
-            partialRow(preview: NSNull(), previewUnlimited: true, pending: 201)
+            partialRow(pending: 201, preview: NSNull(), previewUnlimited: true)
         ]
         for invalid in invalidPartialCounts {
             let parsed = snapshot([invalid]).instances[0]

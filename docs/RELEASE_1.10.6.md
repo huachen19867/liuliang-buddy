@@ -6,7 +6,7 @@
 
 根据用户追加决定，电信完整名称相同的子项在首页合并成一项，全部余量有效时相加并标记“合并约”。原始子项保留在详情内，合并是应用的估算展示，不证明各项独立可用。有缺项、单位不明确或异常数值时该合并项待确认；混合有限与不限量也不生成有限合计。其他运营商的折叠规则保持原状。
 
-本机正式签名包：`artifacts/liuliang-buddy-release.apk`。GitHub 上传因网络连接失败尚未完成，当前公开版本仍为1.10.5。
+1.10.6 未单独发布，以下是当时本机验收记录。全部改动已随 [1.10.7 正式版](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.7)公开；当前 artifacts/liuliang-buddy-release.apk 为1.10.7主包，不能用下方旧hash核验当前文件。
 
 完整Flutter278项/28秒通过，analyze无问题；Android本项目32项原生JUnit强制重跑通过，XML时间2026-10-02T12:16:49Z。实际FlowHome缓存恢复到组件MethodChannel用例通过，单位、缺项、溢出、手动优先、旧缓存重算、同名合并和小屏大字均有回归。
 

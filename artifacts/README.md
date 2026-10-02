@@ -97,3 +97,4 @@ widget-three-preview.png、widget-four-preview.png 读取当前 traffic_widget_c
 ## 1.10.7 输出
 
 `liuliang-buddy-release.apk` 为最新本机正式签名ARM64主包，1.10.7/code24，28,104,528字节（28.10MB），SHA256 `2cc9868d9ee02b1bacf9c113ac9c98deabe3df08fe0ea0fd320676bd45fe34d4`。正式v2证书33b11555，API24/36、16KB ZIP对齐通过，构建37.8秒。Flutter286项/Android本项目33项/analyze通过。移动余额本地Chrome17类结果在 `mobile-balance-browser.json`，均拦截网络，无实际账号；Node生产JS合成亦通过。本版包含1.10.6未上传的电信名称分类/同名合并，以及移动话费与安卓紧凑卡片。发布回执另补，iOS桌面话费本版未接入。
+1.10.7已正式公开，唯一APK uploaded，远端digest与上述hash一致：[正式版](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.7)。

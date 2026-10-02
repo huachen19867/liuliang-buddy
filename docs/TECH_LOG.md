@@ -428,3 +428,7 @@ Swift回归复核发现9e18+1的NSNumber转doubleValue后与9e18相同，不能�
 
 最终Flutter286项/14秒通过，analyze无问题；生产JS Node与真实Chrome17类本地合成通过，首轮中文乱码因夹具缺UTF-8，修正contentType后保持严格断言。原生 :app:testDebugUnitTest --rerun 14秒成功，四份XML时间2026-10-02T12:57:33Z共33项0失败0错误。三/四卡余额利用原独立金额行保留，时间并入以维持50dp，状态和流量摘要仍在原位。测试生成的无关选择/原生预览恢复本轮前文件；未删除用户素材。正式1.10.7/code24构建中，包含尚未公开1.10.6范围，仅准备public发布一个APK。
 正式1.10.7构建37.8秒成功，APK28104528字节/SHA256 2cc9868d9ee02b1bacf9c113ac9c98deabe3df08fe0ea0fd320676bd45fe34d4；code24/v2正式证书33b11555/API24-36/16KB ZIP对齐通过。仅准备public main和一个APK，网络恢复代理200；公开回执另补。
+
+1.10.7公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.7 ，非草稿/非预发布，target/tag均bcdd4ba5487cbe34063e6b22e582f7e0ee8f64a4。Assets唯一APK uploaded/28104528字节，远端sha256 2cc9868d9ee02b1bacf9c113ac9c98deabe3df08fe0ea0fd320676bd45fe34d4与本机一致，源码仅push public。没有移动真号/USB验收。
+
+回读旧iOS1.10.5 run37002298627发现已失败，原Swift测试参数顺序错误（pending必须在preview前）；已仅修正测试调用顺序，不改变Android生产代码/签名APK、不移动release tag。本次原始实现CI run37010280030尚未结束，不声称云端通过。该源码校正随文档回执主分支push，新CI结果另记。

@@ -6,6 +6,6 @@
 
 同时包含此前本机 1.10.6 的电信名称分类与同名合并。1.10.6 没有单独公开发布；产品规则及估算边界见 [1.10.6 说明](RELEASE_1.10.6.md)。
 
-本机正式签名构建37.8秒成功，版本1.10.7/code24，APK28,104,528字节（28.10MB），SHA256 `2cc9868d9ee02b1bacf9c113ac9c98deabe3df08fe0ea0fd320676bd45fe34d4`。v2正式证书33b11555、API24/36和16KB ZIP对齐通过。Flutter286项、Android本项目33项（XML 2026-10-02T12:57:33Z）、analyze及Chrome17类合成回归通过。GitHub发布回执待补。官网真实移动账号尚未验证，未取得官方首页登录后 DOM，标签兼容范围依据可见文字的严格匹配。iOS 桌面话费显示未在本版补齐。
+本机正式签名构建37.8秒成功，版本1.10.7/code24，APK28,104,528字节（28.10MB），SHA256 `2cc9868d9ee02b1bacf9c113ac9c98deabe3df08fe0ea0fd320676bd45fe34d4`。v2正式证书33b11555、API24/36和16KB ZIP对齐通过。Flutter286项、Android本项目33项（XML 2026-10-02T12:57:33Z）、analyze及Chrome17类合成回归通过。[GitHub 正式发布](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.7)已公开，非草稿、非预发布，target/tag为bcdd4ba5487cbe34063e6b22e582f7e0ee8f64a4，唯一APK uploaded，远端digest与本机完全一致。官网真实移动账号尚未验证，未取得官方首页登录后 DOM，标签兼容范围依据可见文字的严格匹配。iOS 桌面话费显示未在本版补齐。
 
 实现边界见 [移动余额读取](MOBILE_BALANCE.md) 与 [桌面展示](MOBILE_BALANCE_SURFACES.md)。
