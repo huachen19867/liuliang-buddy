@@ -13,3 +13,5 @@ iOS 源码接入相同结构字段与单项提示，仍没有可安装的签名�
 [两卡桌面预览](../artifacts/widget-partial-2-preview.png) · [三卡桌面预览](../artifacts/widget-partial-3-preview.png) · [四卡桌面预览](../artifacts/widget-partial-4-preview.png)，均为合成数据，非手机实拍。
 
 Release构建41.5秒成功，1.10.5/code22、ARM64/API24-36、非debuggable、v2正式证书33b115558027fdfa667a3f14a9351fbdb29901948c085daf739e16a9055a497e、16KB ZIP对齐通过。APK28,039,020字节（28.04MB），SHA256 f88a7eadf0cebbee95645bfc93097d8228d0fb3bafff1263d4a5ca60307fa048，仅发布一个APK。
+
+公开发布回读：draft=false/prerelease=false，target/tag为64dad650dd7097534c6db106aa1add443ade3e42，唯一APK上传完整，远端SHA256与本机一致。iOS本版 [run37002298627](https://github.com/huachen19867/liuliang-buddy/actions/runs/37002298627) 尚在运行。
