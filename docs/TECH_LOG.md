@@ -315,3 +315,5 @@ Flutter ResortCarrierMark与安卓badge ImageView统一128px资源，添加无�
 集成验收首先发现新ExpansionTile置于DecoratedBox后Material绘制断言，改为透明Material托管，未关闭断言。新增流程测试显式恢复debug平台变量，历史截图预期改张数/展开明细，选择按钮测试先滚动至可见。再发现widget_bridge仍遍历隐藏历史，补enabled过滤与不挤占当前四账号回归。完整166项已通过一次，补数量截图及静态lint清理后重跑最终验收，不将失败运行记为通过。
 
 最终Flutter166/analyze无问题、原生JUnit29项0失败，数量截图补回调后单项通过并目视；Nodefetch/XHR、联通10、电信Chrome13均通过。正常Release构建139.9秒完成，APK27447596字节/SHA256 46a37628054f377a3e640a3a1b5dc78c715dce249fa9161f3d2750a7c0663606；1.10.0/code17/v2/正式证书33b11555/非debuggable/ARM64/API24-36/16KB ZIP对齐通过。官方wrapper恢复，DPAPI私钥继续ignored。截图全部合成样本，手机已拔USB，本轮不声称各号码、各省或Launcher真机验收。准备唯一APK公开发布，移动话费缺失边界明确。
+
+1.10.0正式公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.0 ，仓库isPrivate=false，最新Release draft=false/prerelease=false，target/tag均4271666711457903714c7783c94848e31329632c。Assets唯一liuliang-buddy-release.apk，uploaded/27,447,596字节，远端完整digest 46a37628054f377a3e640a3a1b5dc78c715dce249fa9161f3d2750a7c0663606 与本机一致。源码只push public；截图在正文与源码、不占Assets。移动话费未接入、三家真实登录和新Launcher未新增验收的边界保留。公开回执另作docs提交，不更换APK或tag。
