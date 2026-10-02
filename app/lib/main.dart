@@ -1041,7 +1041,11 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       if (openingLogin) _awaitingLoginReturn.remove(accountId);
       final failed = _snapshot(account).copyWith(
         status: QueryStatus.error,
-        message: openingLogin ? '官方验证页加载超时，请重新连接' : '未取得可识别的套餐余量，请打开官方查询页确认',
+        message: openingLogin
+            ? '官方验证页加载超时，请重新连接'
+            : account.carrier == Carrier.unicom
+            ? '联通官网未返回可识别的套餐数据，请打开官方查询页确认登录和套餐；查询已结束，可重新尝试'
+            : '未取得可识别的套餐余量，请打开官方查询页确认',
       );
       setState(() {
         _putSnapshot(account, failed);

@@ -53,3 +53,5 @@ carrier-compatibility-20261002/记录三家官方登录入口的移动视口匿�
 unicom-solutions-20261002/ 保存 Newxin394/unicom-monitor 的 App 登录/续期/套餐查询摘录、aichuguang/unicom-monitor-v3 的验证码提交和前端官方 App 获取验证码说明，以及 Paladinfeng/CHU-Widget 的小程序查询源码。index.json 记录原文件 URL、blob SHA 和摘录行号；许可证分别为 MIT（Newxin README 有额外限制，未复制到应用）、未发现、MIT。只下载公开研究文件，不运行上游二进制或取得真实凭证；既有 ChinaUnicomMonitor 不重复下载。研究结论见 docs/UNICOM_INTERNET_SOLUTIONS.md。
 
 2026-10-02 手动套餐用途优化复用既有 FlowLite/README.md 的“首次个性化分组”使用说明，沿用用户修正分类的思路；不复制其移动套餐包或清除计数实现，不重复下载。应用实现按独立账号与唯一套餐名存覆盖，保留自动结果，首页与组件共用摘要；实现及边界见 docs/TRAFFIC_CLASSIFICATION_REVIEW.md。
+
+1.10.3联通双不限反馈复用unicom-query-20261001/0-1.html的官方personalInfo_back与flowTemplate成功门禁，以及既有FlowLite边界资料；不重新下载，不凭套餐名扩大认证或宣称无限GB。有限脚本就绪等待与部分结果保留见docs/RELEASE_1.10.3.md。

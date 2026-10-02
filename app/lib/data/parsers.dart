@@ -203,7 +203,7 @@ CarrierSnapshot parseUnicomWeb(
   }
 
   if (resource['successFlow'] == false || resource['successFlow'] == 'false') {
-    return fail(QueryStatus.error, '联通官网余量组件查询失败');
+    return fail(QueryStatus.error, '联通官网流量查询失败，请在官方查询页确认套餐');
   }
   final unlimited = resource['hasNolimitedFlow'];
   // The official page checks JavaScript truthiness, including string flags.
@@ -275,13 +275,15 @@ ServiceAllowance _unicomAllowance({
 }) {
   final over = _allowanceAmount(overage, kind);
   final exceeded = over != null && over > 0;
+  final unlimited = !exceeded && _isUnlimitedValue(remaining);
   return ServiceAllowance(
     kind: kind,
     label: label,
-    remaining: exceeded ? null : _allowanceAmount(remaining, kind),
+    remaining: exceeded || unlimited ? null : _allowanceAmount(remaining, kind),
     overage: exceeded ? over : null,
     rawRemaining: exceeded ? null : _text(remaining),
     rawUnit: kind == AllowanceKind.voice ? '分钟' : '条',
+    isUnlimited: unlimited,
   );
 }
 

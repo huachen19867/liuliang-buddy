@@ -365,3 +365,9 @@ iOS旧run36956057050回读failure，编译与冷启动已执行，失败发生�
 正式Release正常构建91秒成功，APK27,907,308字节/SHA256 6184e1a6efd977d32be82bfd7fad89186991014913d17b738e93934d78a030e0；1.10.2/code19/v2正式证书33b11555/非debuggable/ARM64/API24-36/16KB ZIP对齐通过，wrapper恢复官方配置。最后有限Astra审查无阻断，后台极小非事务发布窗口及改号码时第二次存储失败可能仅清覆盖的边界已记录，不改动通过后的生产Dart。前轮iOS run36965455032回读success，是修正smoke后的05b0e22，不能用来标新1.10.2云端通过。准备唯一APK正式公开发布，仅push public，截图在正文及源码。
 
 1.10.2 正式公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.2 ，draft=false/prerelease=false，target与tag均8baf3191fb615116de742f4030d256b3be3ae9bd。Assets唯一liuliang-buddy-release.apk，uploaded/27,907,308字节，远端完整digest 6184e1a6efd977d32be82bfd7fad89186991014913d17b738e93934d78a030e0 与本机一致，源码仅push public。一次API EOF后只读回查成功，不重复创建发布。新iOS run36969764815 回读in_progress：https://github.com/huachen19867/liuliang-buddy/actions/runs/36969764815 ，新版本暂不标云端通过。APK发布与卡片数据回归已完成，没有新增真号或USB验收。回执另docs提交，不移动tag/替换资产。
+
+## 2026-10-02：联通“双不限”反馈小修
+
+老板要求简单优化，截图为联通查询中且反馈仍连不上；追问官网是否能登录看套餐，答暂时不清楚。开始先读技术日志，复用已下载FlowLite和官方E5归档，不重复下载、不扩大成复杂多代理任务。官方0-1.html的personalInfo_back按hasNolimitedFlow展示已用，flowTemplate在successFlow=false显示失败，因此不能凭“双不限”卡名放宽登录或流量成功判断。发现初始化脚本在官方对象尚未就绪时直接返回，补最多16次/500ms readiness等待，每次重核精确HTTPS查询页，仅一次原认证请求，离页不执行。通话明确不限量文本通过现有noFlow保留部分有效结果而非生成数字；完整检查发现旧回归要求successFlow=false整条拒绝，依据官网template保持该门禁，不以局部值覆盖官方失败状态。联通超时说明细化，保持35秒截止与旧记录时间。13组Node合成回归通过，新增2项Dart回归；完整SDK/构建另补。没有真实用户账号或USB，不能声称连接问题已解决。
+
+首轮全量测试发现successFlow失败拒绝的历史约束，已保持失败门禁并更正新增用例，未删除旧断言；最终246项全量/22秒通过、analyze无问题、Node13通过。混用执行目录的文档脚本未成功写文件，已在根目录重新修改回读；根目录静态分析已中断并改app限定运行，避免扫描参考工程。Release169.3秒成功；1.10.3/code20/ARM64/API24-36/非debuggable/v2正式证书33b11555/16KB ZIP对齐通过，APK27907308字节/SHA256 320bc3c9189bea458472692c54a6d0e57ff4f057a8c3f5eb7e43413b721497ea。构建结束发现wrapper仍本机file路径，恢复本轮前官方tracked配置再提交；未更改native业务故不重复JUnit。仅发布一个APK，无实号或USB验证。

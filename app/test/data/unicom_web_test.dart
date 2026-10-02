@@ -93,4 +93,45 @@ void main() {
       );
     },
   );
+  test(
+    'explicit unlimited voice survives unavailable flow without inventing flow',
+    () {
+      final snapshot = parseUnicomWeb(
+        response(
+          null,
+          extra: {
+          'flowFlag': false,
+            'voiceFlag': true,
+            'remainVoice': '不限量',
+            'smsFlag': true,
+            'remainSms': 0,
+          },
+        ),
+      );
+      expect(snapshot.status, QueryStatus.success);
+      expect(snapshot.buckets, isEmpty);
+      expect(snapshot.allowances.first.isUnlimited, isTrue);
+      expect(snapshot.allowances.first.remaining, isNull);
+      expect(snapshot.allowances.last.remaining, 0);
+      expect(snapshot.generalRemainingBytes, isNull);
+      expect(snapshot.message, contains('没有可确认的流量额度'));
+    },
+  );
+  test(
+    'double unlimited package name and large numbers do not imply unlimited',
+    () {
+      final snapshot = parseUnicomWeb(
+        response(
+          null,
+          extra: {
+            'voiceFlag': true,
+            'remainVoice': 999999999999,
+            'packageName': '双不限',
+          },
+        ),
+      );
+      expect(snapshot.status, QueryStatus.error);
+      expect(snapshot.hasUnlimitedAllowance, isFalse);
+    },
+  );
 }

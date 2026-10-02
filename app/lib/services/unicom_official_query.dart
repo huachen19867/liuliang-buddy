@@ -6,10 +6,12 @@
 const unicomOfficialQueryScript = r'''
 (() => {
   'use strict';
+  function startWhenReady() {
   if (window.top !== window ||
       location.origin !== 'https://iservice.10010.com' ||
       !['/e5/index.html', '/e5/query.html'].includes(location.pathname)) return;
-  if (window.__liuliangUnicomOfficialQueryStarted) return;
+  if (window.__liuliangUnicomOfficialQueryStarted ||
+      window.__liuliangUnicomOfficialQueryPending) return;
   const session = window.myE3LoginObj;
   const query = window.E3QueryMain;
   const jq = window.jQuery;
@@ -17,7 +19,19 @@ const unicomOfficialQueryScript = r'''
       !query || typeof query.loadData !== 'function' ||
       !window.query_info ||
       typeof window.query_info.personalInfo_back !== 'function' ||
-      !jq || window.$ !== jq || typeof jq.ajax !== 'function') return;
+      !jq || window.$ !== jq || typeof jq.ajax !== 'function') {
+    // Some mobile WebViews finish navigation before deferred official scripts.
+    // Wait only for those functions, never repeat authentication requests.
+    const attempts = window.__liuliangUnicomReadinessAttempts || 0;
+    if (attempts >= 16) return;
+    window.__liuliangUnicomReadinessAttempts = attempts + 1;
+    window.__liuliangUnicomOfficialQueryPending = true;
+    setTimeout(() => {
+      window.__liuliangUnicomOfficialQueryPending = false;
+      startWhenReady();
+    }, 500);
+    return;
+  }
   // Existing official initialization owns ready or partially populated state.
   // Never treat a stale true flag as a newly confirmed session.
   if (session.isLogin === true || session.userInfo != null) return;
@@ -58,5 +72,7 @@ const unicomOfficialQueryScript = r'''
   } finally {
     jq.ajax = originalAjax;
   }
+  }
+  startWhenReady();
 })();
 ''';

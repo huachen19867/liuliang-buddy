@@ -12,6 +12,7 @@ function setup(options = {}) {
   const calls = [];
   const requests = [];
   const callbacks = [];
+  const timers = [];
   const jq = {ajax(settings) {
     requests.push(settings);
     callbacks.push(() => settings.success({isLogin: options.login ?? false}));
@@ -38,14 +39,16 @@ function setup(options = {}) {
     query_info: {personalInfo_back() {}},
   };
   window.top = options.iframe ? {} : window;
-  const context = vm.createContext({window, URL, location: {
+  const context = vm.createContext({window, URL,
+    setTimeout(callback, delay) { timers.push({callback, delay}); }, location: {
     href: 'https://iservice.10010.com/e5/index.html',
     origin: options.origin ?? 'https://iservice.10010.com',
     pathname: options.pathname ?? '/e5/index.html',
   }});
   const start = () => vm.runInContext(script, context);
   const flush = () => {while (callbacks.length) callbacks.shift()();};
-  return {window, session, calls, requests, originalAjax, start, flush,
+  const tick = () => { const timer = timers.shift(); if (timer) timer.callback(); };
+  return {window, session, calls, requests, originalAjax, start, flush, timers, tick, context,
     run: () => {start(); flush();}};
 }
 function test(name, fn) {
@@ -141,5 +144,35 @@ test('unexpected official request is not dispatched and wrapper restored', () =>
     url: 'https://other.test/check/checklogin/', type: 'POST', async: false});
   t.run(); assert.equal(t.requests.length, 0);
   assert.equal(t.window.jQuery.ajax, t.originalAjax);
+});
+test('deferred official scripts get one query after becoming ready', () => {
+  const t = setup({login: true, info: {nettype: '11'}});
+  const query = t.window.E3QueryMain;
+  delete t.window.E3QueryMain;
+  t.start(); t.start();
+  assert.equal(t.timers.length, 1);
+  assert.equal(t.timers[0].delay, 500);
+  t.window.E3QueryMain = query;
+  t.tick(); t.flush(); t.start();
+  assert.equal(t.requests.length, 1);
+  assert.equal(t.calls.length, 2);
+  assert.equal(t.timers.length, 0);
+});
+test('readiness polling stops after eight seconds without sending requests', () => {
+  const t = setup(); delete t.window.E3QueryMain;
+  t.start();
+  for (let n = 0; n < 20; n++) t.tick();
+  assert.equal(t.timers.length, 0);
+  assert.equal(t.window.__liuliangUnicomReadinessAttempts, 16);
+  assert.equal(t.requests.length, 0);
+  t.start(); assert.equal(t.timers.length, 0);
+});
+test('navigating away during readiness wait cannot start authentication', () => {
+  const t = setup(); const query = t.window.E3QueryMain;
+  delete t.window.E3QueryMain; t.start();
+  t.context.location.pathname = '/e5/login.html';
+  t.window.E3QueryMain = query; t.tick(); t.flush();
+  assert.equal(t.requests.length, 0);
+  assert.equal(t.timers.length, 0);
 });
 console.log(`${scenarios} official Unicom query scenarios passed (synthetic).`);
