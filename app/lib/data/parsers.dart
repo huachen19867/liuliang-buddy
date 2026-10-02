@@ -440,6 +440,14 @@ CarrierSnapshot parseMobile(
   );
 }
 
+/// Only the current official homepage's labelled yuan balance is accepted.
+/// Callers must first validate its page, URL and mobileBalanceRendered stage.
+/// The flow response's curFeeTotal/realFee fields do not establish a balance.
+num? parseMobileBalanceRendered(Map<String, dynamic> response) {
+  if (response['source'] != 'officialRendered') return null;
+  return _renderedYuan(response['balanceText']);
+}
+
 /// Parses a decoded qryUserRes response from wx.10099.com.cn.
 /// The referenced API has no documented unit field. Unlabelled numeric
 /// balances are retained as raw values rather than guessed to be KB.

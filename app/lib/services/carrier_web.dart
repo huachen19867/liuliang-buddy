@@ -50,8 +50,11 @@ bool isCarrierResponseAllowed(
   return switch (carrier) {
     Carrier.mobile =>
       page.host == 'wx.10086.cn' &&
+          page.path == Uri.parse(mobileQueryUrl).path &&
+          !isCarrierLoginPage(page) &&
           url.host == page.host &&
-          url.path.contains('getNewMarginInfo'),
+          ((stage == 'raw' && url.path.contains('getNewMarginInfo')) ||
+              (stage == 'mobileBalanceRendered' && url == page)),
     Carrier.broadnet =>
       page.host == 'www.10099.com.cn' &&
           (url.host == 'www.10099.com.cn' || url.host == 'wx.10099.com.cn') &&

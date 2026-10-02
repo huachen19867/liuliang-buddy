@@ -77,6 +77,14 @@ object WidgetAccountDetails {
         String.format(Locale.CHINA, "话费 %.2f 元", card.balanceYuan)
     } else ""
 
+    /** Compact rows keep the amount first, with its original query time trailing. */
+    fun compactBalance(card: WidgetCardData, now: Long): String {
+        if (!validQuery(card, now) || card.balanceYuan?.isFinite() != true) return ""
+        val amount = String.format(Locale.CHINA, "¥%.2f", card.balanceYuan)
+        val time = WidgetPresentation.present(card, 0.0, now).time.removePrefix("上次查询 ")
+        return if (time.isBlank() || time == "尚无查询时间") amount else "$amount · $time"
+    }
+
     fun secondaryStatus(card: WidgetCardData, now: Long): String? = when (card.status) {
         "loading" -> "查询中"
         "authExpired" -> "登录已过期"
@@ -147,7 +155,6 @@ object WidgetAccountLayout {
         val status = WidgetAccountDetails.secondaryStatus(card, now) ?: if (low) "余量偏低" else null
         val summary = WidgetAccountDetails.primarySummary(card, now)
         if (summary != null) return listOfNotNull(status, summary).joinToString(" · ")
-        return status ?: WidgetAccountDetails.balance(card, now).takeIf { it.isNotEmpty() }
-            ?: WidgetAccountDetails.safePhoneHint(card.phoneHint)
+        return status ?: WidgetAccountDetails.safePhoneHint(card.phoneHint)
     }
 }

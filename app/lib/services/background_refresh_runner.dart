@@ -17,6 +17,7 @@ import '../data/models.dart';
 import '../data/parsers.dart';
 import 'carrier_web.dart';
 import 'page_probe.dart';
+import 'mobile_query_assembly.dart';
 import 'unicom_official_query.dart';
 import 'unicom_app_client.dart';
 import 'response_policy.dart';
@@ -279,6 +280,8 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
   HeadlessInAppWebView? webView;
   Map<String, dynamic>? broadnetSession;
   var acceptingResponses = true;
+  final mobileQuery = MobileQueryAssembly();
+  CarrierSnapshot? pendingMobileFlow;
 
   void complete(CarrierSnapshot snapshot) {
     if (acceptingResponses && !result.isCompleted) {
@@ -303,6 +306,11 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
           source: responseCaptureScript,
           injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
         ),
+        if (carrier == Carrier.mobile)
+          UserScript(
+            source: mobileBalanceCaptureScript,
+            injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+          ),
         if (carrier == Carrier.broadnet)
           UserScript(
             groupName: 'broadnetRestore',
@@ -339,7 +347,63 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
                 !isCarrierNavigationAllowed(carrier, currentPage)) {
               return false;
             }
-            final parsed = _parseCapturedResponse(carrier, payload);
+            if (carrier == Carrier.mobile &&
+                payload['stage'] == 'mobileBalanceRendered') {
+              final responseUrl = Uri.tryParse(payload['url'] as String? ?? '');
+              final raw = payload['body'];
+              if (isCarrierResponseAllowed(
+                    carrier,
+                    responseUrl,
+                    capturedPage,
+                    'mobileBalanceRendered',
+                  ) &&
+                  raw is String) {
+                final decoded = decodeMobileResponse(raw);
+                if (decoded != null) {
+                  mobileQuery.acceptBalance(
+                    parseMobileBalanceRendered(decoded),
+                  );
+                }
+              }
+              return true;
+            }
+            var parsed = _parseCapturedResponse(carrier, payload);
+            if (parsed != null && carrier == Carrier.mobile) {
+              if (!mobileQuery.claimFlow()) return false;
+              if (parsed.status == QueryStatus.success) {
+                pendingMobileFlow = parsed.copyWith(
+                  balanceYuan: null,
+                  message: '${parsed.message ?? '流量已更新'}；话费余额暂未取得',
+                );
+                try {
+                  await created
+                      .evaluateJavascript(source: mobileBalanceCaptureScript)
+                      .timeout(const Duration(seconds: 1));
+                } on Exception {
+                  // Allowances remain useful if the balance is unavailable.
+                }
+                parsed = await mobileQuery.assemble(parsed);
+                Uri? latestPage;
+                try {
+                  latestPage = Uri.tryParse(
+                    (await created.getUrl())?.toString() ?? '',
+                  );
+                } on Exception {
+                  return false;
+                }
+                if (!acceptingResponses ||
+                    result.isCompleted ||
+                    !await _isTaskCurrent() ||
+                    latestPage == null ||
+                    !isCarrierResponsePageCurrent(
+                      carrier,
+                      capturedPage,
+                      latestPage,
+                    )) {
+                  return false;
+                }
+              }
+            }
             if (parsed != null) complete(parsed);
             return true;
           },
@@ -439,11 +503,12 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
     final completed = await result.future.timeout(
       const Duration(seconds: 40),
       onTimeout: () => _HeadlessResult(
-        CarrierSnapshot(
-          carrier: carrier,
-          status: QueryStatus.error,
-          message: '后台未取得可识别结果，保留上次查询时间',
-        ),
+        pendingMobileFlow ??
+            CarrierSnapshot(
+              carrier: carrier,
+              status: QueryStatus.error,
+              message: '后台未取得可识别结果，保留上次查询时间',
+            ),
       ),
     );
     return completed;
@@ -457,6 +522,7 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
     );
   } finally {
     acceptingResponses = false;
+    mobileQuery.cancel();
     try {
       await webView?.dispose().timeout(const Duration(seconds: 3));
     } catch (_) {

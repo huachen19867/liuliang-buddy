@@ -1,0 +1,92 @@
+{
+  "source": "production mobileBalanceCaptureScript, local intercepted Chrome pages",
+  "officialRequests": 0,
+  "realAccountVerified": false,
+  "scenarios": [
+    {
+      "name": "yuan",
+      "passed": true,
+      "count": 1
+    },
+    {
+      "name": "zero",
+      "passed": true,
+      "count": 1
+    },
+    {
+      "name": "debt",
+      "passed": true,
+      "count": 1
+    },
+    {
+      "name": "reversed",
+      "passed": true,
+      "count": 1
+    },
+    {
+      "name": "nested-unit",
+      "passed": true,
+      "count": 1
+    },
+    {
+      "name": "fee-separate",
+      "passed": true,
+      "count": 1
+    },
+    {
+      "name": "missing-yuan",
+      "passed": true,
+      "count": 0
+    },
+    {
+      "name": "wrong-unit",
+      "passed": true,
+      "count": 0
+    },
+    {
+      "name": "fee-only",
+      "passed": true,
+      "count": 0
+    },
+    {
+      "name": "fee-mixed",
+      "passed": true,
+      "count": 0
+    },
+    {
+      "name": "conflicting",
+      "passed": true,
+      "count": 0
+    },
+    {
+      "name": "hidden-stale",
+      "passed": true,
+      "count": 1
+    },
+    {
+      "name": "opacity-hidden",
+      "passed": true,
+      "count": 0
+    },
+    {
+      "name": "wrong-page",
+      "passed": true,
+      "count": 0
+    },
+    {
+      "name": "login-hash",
+      "passed": true,
+      "count": 0
+    },
+    {
+      "name": "subframe",
+      "passed": true,
+      "count": 0
+    },
+    {
+      "name": "fixed-window-and-reinjection",
+      "passed": true,
+      "count": 3
+    }
+  ]
+}

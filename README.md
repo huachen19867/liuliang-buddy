@@ -28,10 +28,17 @@
 
 三、四张卡演示：[数量选择](artifacts/carrier-count-four-demo.png)、[首页](artifacts/dashboard-four-accounts-demo.png)、[桌面四卡](artifacts/widget-four-preview.png)、[桌面三卡](artifacts/widget-three-preview.png)。首页是 Flutter 实际界面样本，桌面是读取原生 XML 的合成预览，均非真实账号或手机实拍。
 
+本机正在验收 1.10.7：移动话费余额读取及 Android 桌面同步，并包含此前未公开的电信分类/合并修改。详见 [1.10.7 说明](docs/RELEASE_1.10.7.md)。
+
 ## 文件索引
 
 | 位置 | 内容 |
 | --- | --- |
+| docs/RELEASE_1.10.7.md | 移动话费、两路结果合并与正式分发 |
+| docs/MOBILE_BALANCE.md | 移动官网渲染余额读取与严格单位边界 |
+| docs/MOBILE_BALANCE_SURFACES.md | Android 多卡紧凑余额展示 |
+| app/lib/services/mobile_query_assembly.dart | 同一查询轮次的流量和余额合并 |
+| scripts/test-mobile-balance-browser.cjs | 无账户、拦截网络的 Chrome 余额回归 |
 | docs/RELEASE_1.10.6.md | 电信名称分类、同名合并估算与正式分发 |
 | app/lib/data/telecom_name_classification.dart | 含定向/其余其他的共享名称规则 |
 | docs/TELECOM_NAME_RULE_DATA.md | 旧缓存重算、手动优先、同名求和边界 |

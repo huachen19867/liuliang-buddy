@@ -93,3 +93,7 @@ widget-glass-preview.png由scripts/preview-native-widget.cjs读取实际Android�
 widget-three-preview.png、widget-four-preview.png 读取当前 traffic_widget_compact.xml 和正式素材，以合成数据绑定三/四卡；280dp宿主、背景紧随卡片验证，非手机实拍。carrier-count-four-demo.png 展示同家四张的明确数量选择，dashboard-four-accounts-demo.png 为真实Flutter组件演示，用于四账号滚动布局验证，不代表真实余额。正式包及最终验证摘要见 docs/RELEASE_1.10.0.md。
 
 1.10.0正式APK 27447596 字节/SHA256 46a37628054f377a3e640a3a1b5dc78c715dce249fa9161f3d2750a7c0663606，正式v2证书33b11555不变，版本17、API24/36、ARM64、非debuggable及16KB ZIP对齐通过。Flutter166/analyze无问题/JUnit29/浏览器合成回归通过；非真实账号或新包真机验收。
+
+## 1.10.7 输出
+
+`liuliang-buddy-release.apk` 为最新本机正式签名ARM64主包，1.10.7/code24，28,104,528字节（28.10MB），SHA256 `2cc9868d9ee02b1bacf9c113ac9c98deabe3df08fe0ea0fd320676bd45fe34d4`。正式v2证书33b11555，API24/36、16KB ZIP对齐通过，构建37.8秒。Flutter286项/Android本项目33项/analyze通过。移动余额本地Chrome17类结果在 `mobile-balance-browser.json`，均拦截网络，无实际账号；Node生产JS合成亦通过。本版包含1.10.6未上传的电信名称分类/同名合并，以及移动话费与安卓紧凑卡片。发布回执另补，iOS桌面话费本版未接入。

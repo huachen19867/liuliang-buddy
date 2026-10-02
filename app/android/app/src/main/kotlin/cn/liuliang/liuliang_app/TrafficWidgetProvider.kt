@@ -521,6 +521,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             }
             val valid = WidgetAccountDetails.validQuery(card, now)
             val partialPanel = WidgetAccountDetails.usePartialPanel(card, now)
+            val compactBalance = WidgetAccountDetails.compactBalance(card, now)
             views.setViewVisibility(ids[13], if (partialPanel) View.GONE else View.VISIBLE)
             views.setViewVisibility(ids[12], if (partialPanel) View.VISIBLE else View.GONE)
             views.setTextViewText(ids[12], if (partialPanel) WidgetAccountDetails.partialPanel(card) else "")
@@ -534,7 +535,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             if (compact) {
                 optionalText(ids[3], null)
                 optionalText(ids[4], null)
-                optionalText(ids[5], null)
+                optionalText(ids[5], compactBalance)
                 optionalText(ids[6], if (partialPanel) WidgetAccountDetails.secondaryStatus(card, now) else WidgetAccountLayout.compactDetail(card, now, display.low))
             } else {
                 optionalText(ids[3], WidgetAccountDetails.secondaryStatus(card, now) ?: if (display.low) "余量偏低" else null)
@@ -542,7 +543,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
                 optionalText(ids[5], WidgetAccountDetails.balance(card, now))
                 optionalText(ids[6], if (partialPanel) null else WidgetAccountDetails.primarySummary(card, now))
             }
-            optionalText(ids[7], if (valid) display.time.removePrefix("上次查询 ") else null)
+            optionalText(ids[7], if (valid && (!compact || compactBalance.isEmpty())) display.time.removePrefix("上次查询 ") else null)
             views.setTextViewText(ids[8], WidgetAccountDetails.traffic(card.generalState, card.generalRemainingBytes, card.trafficEstimated, valid))
             views.setTextViewText(ids[9], WidgetAccountDetails.traffic(card.directedState, card.directedRemainingBytes, card.trafficEstimated, valid))
             views.setTextViewText(ids[10], WidgetAccountDetails.traffic(card.otherState, card.otherRemainingBytes, card.trafficEstimated, valid))

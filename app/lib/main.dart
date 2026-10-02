@@ -18,6 +18,7 @@ import 'data/traffic_classification.dart';
 import 'ui/carrier_selection_screen.dart';
 import 'data/parsers.dart';
 import 'services/page_probe.dart';
+import 'services/mobile_query_assembly.dart';
 import 'services/unicom_official_query.dart';
 import 'services/unicom_app_client.dart';
 import 'services/carrier_web.dart';
@@ -113,6 +114,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   final Map<String, InAppWebViewController> _controllers = {};
   final Set<String> _connected = {};
   final Map<String, Timer> _timeouts = {};
+  final Map<String, MobileQueryAssembly> _mobileQueries = {};
   final RefreshThrottle _refreshThrottle = RefreshThrottle();
   final Map<String, bool> _warnedLow = {};
   final Set<String> _inFlight = {};
@@ -1032,6 +1034,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   }) {
     final accountId = account.id;
     _timeouts[accountId]?.cancel();
+    _mobileQueries.remove(accountId)?.cancel();
     _timeouts[accountId] = Timer(const Duration(seconds: 35), () {
       if (!_current(generation)) return;
       final pending = openingLogin
@@ -1238,10 +1241,18 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       }
     }
     if (decoded == null) return;
+    final mobileQuery = carrier == Carrier.mobile
+        ? _mobileQueries.putIfAbsent(accountId, MobileQueryAssembly.new)
+        : null;
+    if (carrier == Carrier.mobile && stage == 'mobileBalanceRendered') {
+      mobileQuery!.acceptBalance(parseMobileBalanceRendered(decoded));
+      return;
+    }
+    if (mobileQuery != null && !mobileQuery.claimFlow()) return;
     final status = payload['status'] is int ? payload['status'] as int : null;
     final unicomSession = carrier == Carrier.unicom && stage == 'unicomSession';
     if (unicomSession && !isUnicomSessionExpired(decoded, status)) return;
-    final snapshot = unicomSession
+    var snapshot = unicomSession
         ? const CarrierSnapshot(
             carrier: Carrier.unicom,
             status: QueryStatus.authExpired,
@@ -1268,6 +1279,36 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               queriedAt: DateTime.now(),
             ),
           };
+    if (mobileQuery != null && snapshot.status == QueryStatus.success) {
+      // A confirmed allowance response has met the original query deadline.
+      // Only the short independent money wait remains.
+      _timeouts[accountId]?.cancel();
+      try {
+        await controller
+            .evaluateJavascript(source: mobileBalanceCaptureScript)
+            .timeout(const Duration(seconds: 1));
+      } on Exception {
+        // Missing money must not discard a successful allowance response.
+      }
+      snapshot = await mobileQuery.assemble(snapshot);
+      if (!_current(generation) ||
+          !identical(_mobileQueries[accountId], mobileQuery)) {
+        return;
+      }
+      try {
+        final latestUrl = await controller.getUrl();
+        if (latestUrl == null ||
+            !isCarrierResponsePageCurrent(
+              carrier,
+              page,
+              Uri.tryParse(latestUrl.toString()) ?? Uri(),
+            )) {
+          return;
+        }
+      } on Exception {
+        return;
+      }
+    }
     if (carrier == Carrier.broadnet &&
         !shouldApplyBroadnetResponse(
           stage: payload['stage'] is String ? payload['stage'] as String : null,
@@ -1280,6 +1321,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       return;
     }
     if (!_current(generation) ||
+        (mobileQuery != null &&
+            !identical(_mobileQueries[accountId], mobileQuery)) ||
         (!_inFlight.contains(accountId) &&
             !_awaitingLoginReturn.contains(accountId))) {
       return;
@@ -1288,6 +1331,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     _timeouts[accountId]?.cancel();
     _inFlight.remove(accountId);
     _awaitingLoginReturn.remove(accountId);
+    _mobileQueries.remove(accountId)?.cancel();
     final displayed = snapshot.status == QueryStatus.success
         ? snapshot
         : _snapshot(
@@ -1433,6 +1477,11 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                 source: responseCaptureScript,
                 injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
               ),
+              if (carrier == Carrier.mobile)
+                UserScript(
+                  source: mobileBalanceCaptureScript,
+                  injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+                ),
               if (carrier == Carrier.telecom)
                 UserScript(
                   source: telecomRenderedCaptureScript,
@@ -1529,6 +1578,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                 _openingLogin.remove(accountId);
                 _inFlight.remove(accountId);
                 _refreshThrottle.loginOrLoadFailed(accountId);
+                _mobileQueries.remove(accountId)?.cancel();
                 _awaitingLoginReturn.add(accountId);
                 setState(
                   () => _putSnapshot(
@@ -1568,6 +1618,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               final finishedOpeningLogin = _openingLogin.remove(accountId);
               if (finishedOpeningLogin) _timeouts[accountId]?.cancel();
               if (isCarrierLoginPage(Uri.parse(url.toString()))) {
+                _mobileQueries.remove(accountId)?.cancel();
                 _awaitingLoginReturn.add(accountId);
                 if (carrier == Carrier.broadnet) {
                   _broadnetSessions.remove(accountId);
@@ -1735,6 +1786,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
             )
             .map((a) => a.id),
       );
+      for (final query in _mobileQueries.values) {
+        query.cancel();
+      }
+      _mobileQueries.clear();
       _inFlight.clear();
       _awaitingLoginReturn.clear();
       _openingLogin.clear();
@@ -1848,6 +1903,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         );
         final phoneChanged = account.phoneNumber != next.find(id)?.phoneNumber;
         if (phoneChanged) {
+          _mobileQueries.remove(id)?.cancel();
+          _awaitingLoginReturn.remove(id);
           final classifications = _trafficClassifications.withoutAccount(id);
           if (await _prefs?.setString(
                 TrafficClassificationOverrides.storageKey,
@@ -1907,6 +1964,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _accounts = _accounts.removeSecond(id);
       _controllers.clear();
       _visibleAccountId = null;
+      for (final query in _mobileQueries.values) {
+        query.cancel();
+      }
+      _mobileQueries.clear();
       _inFlight.clear();
       _awaitingLoginReturn.clear();
       _openingLogin.clear();
@@ -2202,6 +2263,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _broadnetSessions.clear();
       _unicomAppAccounts.clear();
       _appQueryTickets.clear();
+      for (final query in _mobileQueries.values) {
+        query.cancel();
+      }
+      _mobileQueries.clear();
       _inFlight.clear();
       _awaitingLoginReturn.clear();
       _openingLogin.clear();
@@ -2470,6 +2535,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     if (_nativeMobile && !demoMode) _widgetBridge.onOpen(null);
     WidgetsBinding.instance.removeObserver(this);
     _foregroundTimer?.cancel();
+    for (final query in _mobileQueries.values) {
+      query.cancel();
+    }
+    _mobileQueries.clear();
     for (final timer in _timeouts.values) {
       timer.cancel();
     }

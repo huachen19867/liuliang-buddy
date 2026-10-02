@@ -417,3 +417,14 @@ Swift回归复核发现9e18+1的NSNumber转doubleValue后与9e18相同，不能�
 正式Release36.1秒成功，APK28,038,996字节/SHA256 88f93678dad92b84b468259abdd08e7082788a43233f5a11d6039a070e6a6fff；1.10.6/code23、v2正式证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐通过，wrapper官方配置无diff。只准备push public并发布唯一APK，名称规则是应用归类，合并是用户指定的数学估算，不冒称运营商认定共享/独立。
 
 1.10.6发布尚未完成：源码提交800b34a已本机提交，push public依次schannel TLS失败、proxy/direct curl000、OpenSSL EOF、gh API EOF以及最后直连HTTP1.1连接重置，所有push脚本均在失败后exit，没有进入gh releasecreate，APK没有上传。本机正式签名APK及hash不变，发布正文已备在ignored .tools/release-1.10.6-body.md；README下载暂指实际公开1.10.5，1.10.6标本机待发布，不虚构远端回执。网络恢复后应先恢复README/RELEASE正式链接，push public main，再以完整实现提交发布v1.10.6唯一APK并核对远端hash；不得push origin，不能把旧iOSCI结果当本版已通过。应用改造与本机验收完成，真实电信/桌面仍待设备。
+
+## 2026-10-02：移动话费余额 APP 与桌面缺失
+
+老板确认移动在 APP 和小组件均不显示话费。先定位本日志并复用已下载 ChinaMobileMonitor MIT 参考与既有官方归档，不重复下载业务项目、不照搬无许可证实现。按要求轻量分工 Astra中等只读协议/时序，GPT6.1 SOL高实现严格DOM捕获与解析，GPT6 Luna极高核对系统展示并补紧凑多卡；根实现共享本轮收集器、前后台接线、串行验证和正式分发。
+
+根因是只捕获getNewMarginInfo且parseMobile不写balanceYuan；现有金额字段curFeeTotal仅上游拼元，官方完整契约仍未验证，realFee/shouldPay/oweFee不能替代余额。采用精确wx.10086.cn newHome、可见余额标签和元单位的局部渲染值。金额先到/后到均合并本轮流量，五秒缺失回退不丢流量、不用旧金额冒充新查询；重注入限时一秒。审查发现原35/40秒总timeout可在余额等待期间吞掉截止前的流量，已取消前台原timeout并在后台保留本轮已确认flow供deadline回退。最终提交核对assembly身份，换号码/登录/账号清理取消，避免异步旧结果复活。iOS Widget尚无余额字段，此次安卓反馈范围不冒称补齐。
+
+初轮Flutter286项通过，随后补总deadline边界与取消竞态；analyze无问题。真实Chrome首轮发现yuan案例未送出，正在保留断言排查，不以Node mock通过替代浏览器验收。没有USB或移动真实登录账号，兼容性需真实官网页面复核。
+
+最终Flutter286项/14秒通过，analyze无问题；生产JS Node与真实Chrome17类本地合成通过，首轮中文乱码因夹具缺UTF-8，修正contentType后保持严格断言。原生 :app:testDebugUnitTest --rerun 14秒成功，四份XML时间2026-10-02T12:57:33Z共33项0失败0错误。三/四卡余额利用原独立金额行保留，时间并入以维持50dp，状态和流量摘要仍在原位。测试生成的无关选择/原生预览恢复本轮前文件；未删除用户素材。正式1.10.7/code24构建中，包含尚未公开1.10.6范围，仅准备public发布一个APK。
+正式1.10.7构建37.8秒成功，APK28104528字节/SHA256 2cc9868d9ee02b1bacf9c113ac9c98deabe3df08fe0ea0fd320676bd45fe34d4；code24/v2正式证书33b11555/API24-36/16KB ZIP对齐通过。仅准备public main和一个APK，网络恢复代理200；公开回执另补。

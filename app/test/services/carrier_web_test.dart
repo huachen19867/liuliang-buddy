@@ -4,6 +4,78 @@ import 'package:liuliang_app/services/carrier_web.dart';
 
 void main() {
   test(
+    'mobile rendered balance requires current official homepage identity',
+    () {
+      final home = Uri.parse(carrierQueryUrl(Carrier.mobile));
+      expect(
+        isCarrierResponseAllowed(
+          Carrier.mobile,
+          home,
+          home,
+          'mobileBalanceRendered',
+        ),
+        isTrue,
+      );
+      for (final invalid in [
+        Uri.parse(carrierLoginUrl(Carrier.mobile)),
+        home.replace(scheme: 'http'),
+        home.replace(port: 444),
+        home.replace(host: 'wx.10086.cn.evil.test'),
+        home.replace(path: '/website/spa/main/newHomeExtra'),
+        home.replace(fragment: '/login'),
+      ]) {
+        expect(
+          isCarrierResponseAllowed(
+            Carrier.mobile,
+            invalid,
+            invalid,
+            'mobileBalanceRendered',
+          ),
+          isFalse,
+        );
+      }
+      expect(
+        isCarrierResponseAllowed(
+          Carrier.mobile,
+          home.replace(query: 'old=1'),
+          home,
+          'mobileBalanceRendered',
+        ),
+        isFalse,
+      );
+      expect(
+        isCarrierResponseAllowed(Carrier.mobile, home, home, 'raw'),
+        isFalse,
+      );
+      final flow = Uri.parse(
+        'https://wx.10086.cn/website/serviceMargin/getNewMarginInfo',
+      );
+      expect(
+        isCarrierResponseAllowed(Carrier.mobile, flow, home, 'raw'),
+        isTrue,
+      );
+      expect(
+        isCarrierResponseAllowed(
+          Carrier.mobile,
+          flow,
+          Uri.parse(carrierLoginUrl(Carrier.mobile)),
+          'raw',
+        ),
+        isFalse,
+      );
+      expect(
+        isCarrierResponseAllowed(
+          Carrier.mobile,
+          flow,
+          home,
+          'mobileBalanceRendered',
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  test(
     'Unicom session signal requires its exact minimized response identity',
     () {
       final page = Uri.parse(carrierQueryUrl(Carrier.unicom));

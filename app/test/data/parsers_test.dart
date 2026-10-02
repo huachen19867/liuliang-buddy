@@ -6,6 +6,60 @@ import 'package:liuliang_app/data/traffic_summary.dart';
 void main() {
   final queriedAt = DateTime.utc(2026, 9, 30, 3, 4, 5);
 
+  test('mobile rendered balance preserves yuan, zero and debt only', () {
+    for (final (text, expected) in [
+      ('12.34 元', 12.34),
+      ('0元', 0),
+      ('-2.50元', -2.5),
+      (' 1000000000元 ', 1000000000),
+    ]) {
+      expect(
+        parseMobileBalanceRendered({
+          'source': 'officialRendered',
+          'balanceText': text,
+        }),
+        expected,
+      );
+    }
+    for (final raw in <Object?>[
+      null,
+      12.34,
+      '12.34',
+      '12.34分',
+      '12.34KB',
+      '本月费用12.34元',
+      '余额12.34元',
+      '1 2.34元',
+      '1e3元',
+      'NaN元',
+      'Infinity元',
+      '12.345元',
+      '1000000001元',
+      '-1000000001元',
+      '￥12.34',
+    ]) {
+      expect(
+        parseMobileBalanceRendered({
+          'source': 'officialRendered',
+          'balanceText': raw,
+        }),
+        isNull,
+        reason: '$raw',
+      );
+    }
+    expect(parseMobileBalanceRendered({'balanceText': '12.34元'}), isNull);
+    expect(
+      parseMobileBalanceRendered({
+        'source': 'raw',
+        'balanceText': '12.34元',
+        'data': {
+          'realFeeQryRsp': {'curFeeTotal': '12.34'},
+        },
+      }),
+      isNull,
+    );
+  });
+
   test('mobile voice-only success explicitly reports absent traffic', () {
     final snapshot = parseMobile({
       'data': {

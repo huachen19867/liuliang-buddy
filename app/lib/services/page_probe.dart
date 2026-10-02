@@ -11,6 +11,107 @@ const unicomQueryUrl = 'https://iservice.10010.com/e5/index.html';
 const unicomLoginUrl =
     'https://uac.10010.com/portal/mallLogin.jsp?redirectURL=https://iservice.10010.com/e5/index.html';
 
+/// Reads only a visible labelled balance on the current official homepage.
+/// It does not issue requests or infer currency from unlabelled fee fields.
+/// A second injection reads the current DOM and restarts the bounded scan.
+const mobileBalanceCaptureScript = r'''
+(() => {
+  'use strict';
+  const onHome = () => window.top === window &&
+    location.origin === 'https://wx.10086.cn' &&
+    location.pathname === '/website/spa/main/newHome' &&
+    !/login/i.test(location.hash || '');
+  if (!onHome()) return;
+  if (window.__liuliangMobileBalanceProbe) {
+    window.__liuliangMobileBalanceProbe.restart();
+    return;
+  }
+  const labels = new Set(['话费余额', '账户余额']);
+  const normalize = text => String(text || '').replace(/\s+/g, '');
+  const visible = node => {
+    if (!node || node.nodeType !== 1 || !node.getClientRects().length) return false;
+    for (let parent = node; parent; parent = parent.parentElement) {
+      const style = getComputedStyle(parent);
+      if (style.display === 'none' || style.visibility === 'hidden' ||
+          style.visibility === 'collapse' || style.opacity === '0' || parent.hidden ||
+          parent.getAttribute('aria-hidden') === 'true') return false;
+    }
+    return true;
+  };
+  let timer, observer, deadline;
+  let lastSent = '';
+  let dirty = false;
+  const stop = () => {
+    clearInterval(timer);
+    if (observer) observer.disconnect();
+    observer = null;
+  };
+  const scan = () => {
+    if (!onHome()) { stop(); return; }
+    if (Date.now() > deadline) { stop(); return; }
+    const values = new Set();
+    const nodes = document.querySelectorAll('body *');
+    // Bound work on unexpectedly large pages rather than scanning forever.
+    if (nodes.length > 10000) return;
+    for (const label of nodes) {
+      if (!labels.has(normalize(label.textContent)) || !visible(label)) continue;
+      // Support a tile with nested or separately rendered amount/unit.
+      // Its complete visible text must contain only the label and yuan amount.
+      let parent = label.parentElement;
+      for (let depth = 0; parent && depth < 3; depth++, parent = parent.parentElement) {
+        if (!visible(parent)) continue;
+        const text = String(parent.innerText || '').trim();
+        const match = /^(?:话费余额|账户余额)\s*(-?\d+(?:\.\d{1,2})?)\s*元$/.exec(text) ||
+          /^(-?\d+(?:\.\d{1,2})?)\s*元\s*(?:话费余额|账户余额)$/.exec(text);
+        if (match) values.add(match[1] + '元');
+      }
+    }
+    // Conflicting labelled tiles are not sufficient evidence for one balance.
+    if (values.size !== 1) return;
+    const text = values.values().next().value;
+    if (text === lastSent) return;
+    const bridge = window.flutter_inappwebview;
+    if (!bridge || typeof bridge.callHandler !== 'function') return;
+    try {
+      Promise.resolve(bridge.callHandler('trafficResponse', {
+        url: location.href, pageUrl: location.href, status: 200,
+        stage: 'mobileBalanceRendered',
+        body: JSON.stringify({source: 'officialRendered', balanceText: text})
+      })).catch(() => {});
+      lastSent = text;
+    } catch (_) {}
+  };
+  const restart = () => {
+    stop();
+    // Early bridge events can arrive before a native query begins. A new
+    // injection explicitly requests the current DOM, never stored old text.
+    lastSent = '';
+    dirty = false;
+    deadline = Date.now() + 6000;
+    scan();
+    if (!onHome()) return;
+    const observe = () => {
+      if (!observer && document.documentElement) {
+        // Document-start can precede the first element. Attach when it exists.
+        // Coalesce changes to at most one full DOM scan per 300ms.
+        observer = new MutationObserver(() => { dirty = true; });
+        observer.observe(document.documentElement, {childList: true,
+          subtree: true, characterData: true, attributes: true,
+          attributeFilter: ['class', 'style', 'hidden', 'aria-hidden']});
+      }
+    };
+    observe();
+    timer = setInterval(() => {
+      if (!observer) { observe(); dirty = true; }
+      if (dirty || Date.now() > deadline) { dirty = false; scan(); }
+    }, 300);
+  };
+  window.__liuliangMobileBalanceProbe = {restart};
+  window.addEventListener('flutterInAppWebViewPlatformReady', scan);
+  restart();
+})();
+''';
+
 /// Decodes transport JSON only; the carrier parser validates business fields.
 Map<String, dynamic>? decodeMobileResponse(String raw) {
   var text = raw.trim();

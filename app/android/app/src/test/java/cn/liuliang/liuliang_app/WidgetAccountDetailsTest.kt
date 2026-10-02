@@ -116,9 +116,30 @@ class WidgetAccountDetailsTest {
         assertEquals("套餐余量 1.00 GB", WidgetAccountLayout.compactDetail(parsed, now, false))
         assertEquals("查询失败 · 套餐余量 1.00 GB", WidgetAccountLayout.compactDetail(parsed.copy(status = "error"), now, false))
         val detailed = parsed.copy(generalState = "provided", generalRemainingBytes = gib)
-        assertEquals("话费 0.00 元", WidgetAccountLayout.compactDetail(detailed, now, false))
+        assertEquals("138****5678", WidgetAccountLayout.compactDetail(detailed, now, false))
         assertEquals("138****5678", WidgetAccountLayout.compactDetail(detailed.copy(balanceYuan = null), now, false))
         assertEquals("余量偏低", WidgetAccountLayout.compactDetail(detailed, now, true))
+    }
+
+    @Test fun compactThreeAndFourAccountRowsKeepBalanceSeparateFromTrafficAndStatus() {
+        val parsed = card(mapOf(
+            "primaryValue" to gib,
+            "primaryLabel" to "套餐余量",
+            "balanceYuan" to 26.5,
+        ))
+        assertTrue(WidgetAccountLayout.isCompact(3))
+        assertTrue(WidgetAccountLayout.isCompact(4))
+        assertEquals("套餐余量 1.00 GB", WidgetAccountLayout.compactDetail(parsed, now, false))
+        assertTrue(WidgetAccountDetails.compactBalance(parsed, now).startsWith("¥26.50 · "))
+
+        val failed = parsed.copy(status = "error")
+        assertEquals("查询失败 · 套餐余量 1.00 GB", WidgetAccountLayout.compactDetail(failed, now, false))
+        assertTrue(WidgetAccountDetails.compactBalance(failed, now).startsWith("¥26.50 · "))
+        assertTrue(WidgetAccountDetails.compactBalance(parsed.copy(balanceYuan = 0.0), now).startsWith("¥0.00 · "))
+        assertTrue(WidgetAccountDetails.compactBalance(parsed.copy(balanceYuan = -3.25), now).startsWith("¥-3.25 · "))
+        assertEquals("", WidgetAccountDetails.compactBalance(parsed.copy(balanceYuan = null), now))
+        assertEquals("", WidgetAccountDetails.compactBalance(parsed.copy(queriedAt = null), now))
+        assertEquals("", WidgetAccountDetails.compactBalance(parsed.copy(status = "notConnected"), now))
     }
 
     @Test fun legacySnapshotKeepsPrimarySummaryWithUnavailableNewDetails() {
