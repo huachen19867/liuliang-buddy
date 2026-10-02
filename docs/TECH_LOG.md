@@ -415,3 +415,5 @@ Swift回归复核发现9e18+1的NSNumber转doubleValue后与9e18相同，不能�
 原生本项目 :app:testDebugUnitTest --rerun 13秒成功，四份新XML时间2026-10-02T12:16:49Z，共32项0失败0错误。验证后没有再改生产Dart，SDK均串行；Release构建正在执行。
 
 正式Release36.1秒成功，APK28,038,996字节/SHA256 88f93678dad92b84b468259abdd08e7082788a43233f5a11d6039a070e6a6fff；1.10.6/code23、v2正式证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐通过，wrapper官方配置无diff。只准备push public并发布唯一APK，名称规则是应用归类，合并是用户指定的数学估算，不冒称运营商认定共享/独立。
+
+1.10.6发布尚未完成：源码提交800b34a已本机提交，push public依次schannel TLS失败、proxy/direct curl000、OpenSSL EOF、gh API EOF以及最后直连HTTP1.1连接重置，所有push脚本均在失败后exit，没有进入gh releasecreate，APK没有上传。本机正式签名APK及hash不变，发布正文已备在ignored .tools/release-1.10.6-body.md；README下载暂指实际公开1.10.5，1.10.6标本机待发布，不虚构远端回执。网络恢复后应先恢复README/RELEASE正式链接，push public main，再以完整实现提交发布v1.10.6唯一APK并核对远端hash；不得push origin，不能把旧iOSCI结果当本版已通过。应用改造与本机验收完成，真实电信/桌面仍待设备。
