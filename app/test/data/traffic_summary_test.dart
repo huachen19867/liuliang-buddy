@@ -6,6 +6,48 @@ void main() {
   final queriedAt = DateTime.utc(2026, 9, 30, 9, 10);
   const gib = 1024 * 1024 * 1024;
 
+  test('one App unknown package is visible without becoming general', () {
+    final snapshot = CarrierSnapshot(
+      carrier: Carrier.unicom,
+      status: QueryStatus.success,
+      queriedAt: queriedAt,
+      buckets: const [
+        TrafficBucket(
+          name: '国内流量包',
+          kind: BucketKind.unknown,
+          remainingBytes: 0,
+          totalBytes: gib,
+          rawUnit: 'MB',
+        ),
+      ],
+    );
+    expect(summarizeTraffic(snapshot)?.remainingBytes, 0);
+    expect(summarizeTraffic(snapshot)?.label, '套餐余量');
+    expect(snapshot.generalRemainingBytes, isNull);
+    expect(summarizeTraffic(snapshot)?.detailNotice, contains('国内流量包'));
+    expect(
+      summarizeTraffic(
+        snapshot.copyWith(
+          buckets: const [
+            TrafficBucket(
+              name: '国内流量包',
+              kind: BucketKind.unknown,
+              remainingBytes: gib,
+              rawUnit: 'MB',
+            ),
+            TrafficBucket(
+              name: '视频包',
+              kind: BucketKind.directed,
+              remainingBytes: gib,
+              rawUnit: 'MB',
+            ),
+          ],
+        ),
+      ),
+      isNull,
+    );
+  });
+
   test('Broadnet shows an honest sum of three verified package rows', () {
     final snapshot = CarrierSnapshot(
       carrier: Carrier.broadnet,

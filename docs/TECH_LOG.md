@@ -319,3 +319,31 @@ Flutter ResortCarrierMark与安卓badge ImageView统一128px资源，添加无�
 1.10.0正式公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.0 ，仓库isPrivate=false，最新Release draft=false/prerelease=false，target/tag均4271666711457903714c7783c94848e31329632c。Assets唯一liuliang-buddy-release.apk，uploaded/27,447,596字节，远端完整digest 46a37628054f377a3e640a3a1b5dc78c715dce249fa9161f3d2750a7c0663606 与本机一致。源码只push public；截图在正文与源码、不占Assets。移动话费未接入、三家真实登录和新Launcher未新增验收的边界保留。公开回执另作docs提交，不更换APK或tag。
 
 iOS对应源码云端run36956057050（4271666）回读为in_progress：https://github.com/huachen19867/liuliang-buddy/actions/runs/36956057050 。此前1.9.3 run36888993985成功，本轮不借用旧结果声称三四账号Swift/Xcode已通过。安卓正式交付已完成，iOS暂无签名安装包。
+
+## 2026-10-02：联通互联网方案核查
+
+老板追问互联网是否已有解决联通失败的方案。先读本日志与已有联通进展、参考索引，复用 ChinaUnicomMonitor/FlowLite 不重复下载；本轮范围是研究，无认证改造或发布授权扩张。GitHub 搜索后核对 Newxin394 的 App token/密码续期与套餐请求、aichuguang 的 radomLogin 验证码提交与前端、CHU-Widget 的小程序 stoken 查询。新精选源码/许可证/blob SHA 存 references/unicom-solutions-20261002/，维护参考索引与 README；完整结论在 docs/UNICOM_INTERNET_SOLUTIONS.md。
+
+关键发现：aichuguang 宣称验证码登录，但实际让用户去官方 App 获取验证码，不能误报为应用内完整短信登录；App Cookie/token 与 E5 网页 Cookie 不保证互通，替换 URL 或 UA 不足以修复。Newxin 有实际实现但自述 AI 生成，MIT 与 README 使用限制冲突，不直接复制；CHU-Widget 停更2019，仅保留小程序方向。摄像头 GO_UnicomMonitor 和资费目录 monitor 排除。未输入手机号/验证码、未运行上游程序或下载二进制，也未实测真实余量。建议 App 查询链路作为下一轮验证方向，当前版本不能据此标记联通已修复。
+
+## 2026-10-02：参考方案改进联通 App 查询
+
+老板授权参考后改进，先定位本日志并复用已有下载，未重复下载项目。按老板指定模型分工，Astra中等做协议与整合审查/测试，GPT6.1 SOL高实现独立解析与client fake测试，GPT6 Luna极高实现高级导入页与widget回归，根实现Dart IO请求、secure会话、前后台接线与交付。无完整短信发送证据，因此保留官网默认并增加可选App查询试验，不能宣传一键登录。完整索引与实现见UNICOM_APP_QUERY_PROGRESS及三份子任务记录。
+
+使用独立账号secure key，Cookie逐号用户确认，token续期必须完整desmobile匹配及新Set-Cookie；只一次续期且不伪造设备号码。流量/余额独立请求，缺话费保流量，零值和不限量谨慎识别，原snapshot/widget复用。App模式排除E5 WebView，后台按mode dispatch并检查会话版本。审查发现改号码在途响应和无新Cookie续期问题，根补当前号码/ticket门禁、新Set-Cookie必需以及Max-Age<=0删除。有效续期即使后续查询失败仍保存轮换token。
+
+初轮分析6条lint已修；解析/client合成测试通过，UI测试初漏打开宿主页按钮，后又漏输入setState pump和取消按钮滚动，全部按真实点击补回归，不关断言。旧官网35秒超时测试需先选新增连接方式，保留其旧余额/旧时间断言。最终测试与正式包待本轮后续回执，不把失败运行计为通过。无USB/真实账号，未请求运营商验证码，待设备验证边界保留。
+
+老板确认暂时没有联通卡，追加授权参考互联网实现全面优化。继续复用四家现有参考与Google后台资料，不重复下载；Astra复核查询/前后台、SOL复核数据与缓存，Luna核对交互并精简高级页。落实后台第二次session读取的异常隔离、续期保存失败只影响本卡、前后台复用合法页面判断、headless dispose三秒期限与广电备份读取三秒期限。未给native secure写入强加会制造迟到写入的Dart超时，其最终执行仍由系统和Worker期限管理。模型合计拒绝负数/溢出，异常缓存保留未知行；界面unknown从其他流量改用途未知。认证失效暂停自动重试，手动保留；App会话启动即刷新，每次后续网络请求前检查当前票据/任务，取消后不继续查话费或续期。
+
+完整210项曾通过一次，随后按新增启动刷新/全面优化补回归；初始App整合测试须在case结束恢复debug平台值，未关闭Flutter不变量检查。通用官方页35秒超时测试改用移动路径，仍验证同一个_ armOfficialTimeout及保留旧余额/时间，联通独立流程另有真实client+fake transport测试。最终新测试数量、静态分析和构建回执待后续，不复用修改前通过次数。
+
+### 高级会话页与用途未知展示收敛
+
+依据官网网页登录/App 会话能力边界，入口说明改为手动导入本人 App 会话、不是一键登录、不会自动读取官方 App；没有资料仍能返回官网。已有会话提示强调只有新资料验证成功后才替换，安全说明保留验证后本机系统安全存储、必要信息发往联通接口及勿截图转发，移除重复的页尾解释。首页 `BucketKind.unknown` 的芯片由“其他流量”改为“用途未知”，不改解析、归类或合计逻辑。
+
+新增 `test/ui/unicom_app_session_screen_test.dart` 预览截图测试，使用系统中文字体和 Resort 配色，输出 `artifacts/unicom-app-session-preview.png`，并同步更新 `docs/UNICOM_APP_SESSION_UI_PROGRESS.md`。此项仅准备测试，没有运行 Flutter/Dart SDK；集成验证与生成截图由根任务统一执行。
+
+最终完整Flutter220项通过、analyze无问题，更新后的高级页和用途未知首页预览已生成且目视检查中文/图标/提交按钮正常，合成资料非实机。与本轮无关的选择页自动重渲染恢复原图，其余用途未知的首页截图更新。Release正常构建42.8秒成功，APK27,907,248字节/SHA256 30869ed0cfcf9ffeb40a1d8c6411acf2269f6807489ec58eedf8db8291905a56；1.10.1/code18、v2正式证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐通过。生产代码检验完成后未再改Dart实现；原生JUnit和公开发布回执另补。没有联通真实卡或USB，不能声称实号联通或新Launcher已验收。
+
+原生全模块 testDebugUnitTest 首轮失败定位到第三方 shared_preferences_android 的 Robolectric SDK36 需Java21，本机Java17不满足；项目 :app:testDebugUnitTest 原为UP-TO-DATE，不能凭旧XML记通过。改用 :app:testDebugUnitTest --rerun 仅强制重跑本项目任务，BUILD SUCCESSFUL 10秒，四份新JUnit XML时间2026-10-02T12:28:26，合计29项/0失败/0错误。明确不把依赖库全模块失败记为通过，不修改依赖或生产代码以绕过环境要求。签名APK再核SHA256不变，README更新最新验证链接、旧iOS回执版本边界和新增文件索引。

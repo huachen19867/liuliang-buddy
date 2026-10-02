@@ -18,6 +18,7 @@ import 'ui/carrier_selection_screen.dart';
 import 'data/parsers.dart';
 import 'services/page_probe.dart';
 import 'services/unicom_official_query.dart';
+import 'services/unicom_app_client.dart';
 import 'services/carrier_web.dart';
 import 'services/background_refresh.dart';
 import 'ui/system_surfaces_settings.dart';
@@ -32,6 +33,7 @@ import 'ui/dashboard_screen.dart';
 import 'ui/resort_theme.dart';
 import 'ui/account_identity_dialog.dart';
 import 'ui/carrier_browser_shell.dart';
+import 'ui/unicom_app_session_screen.dart';
 
 const demoMode = bool.fromEnvironment('DEMO');
 const _notifications = MethodChannel('cn.liuliang/notifications');
@@ -92,7 +94,8 @@ class FlowBuddyApp extends StatelessWidget {
 }
 
 class FlowHome extends StatefulWidget {
-  const FlowHome({super.key});
+  const FlowHome({super.key, this.unicomAppClient});
+  final UnicomAppClient? unicomAppClient;
   @override
   State<FlowHome> createState() => _FlowHomeState();
 }
@@ -124,6 +127,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   bool _restoring = true;
   bool _savingSelection = false;
   final Map<String, Map<String, dynamic>> _broadnetSessions = {};
+  final Set<String> _unicomAppAccounts = {};
+  final Map<String, Object> _appQueryTickets = {};
   String? _visibleAccountId;
   double _thresholdGb = 5;
   BackgroundRefreshInterval _backgroundRefresh = BackgroundRefreshInterval.off;
@@ -408,7 +413,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     _foregroundTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
           _visibleAccountId == null) {
-        _refreshAll();
+        _refreshAll(automatic: true);
       }
     });
   }
@@ -492,6 +497,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
             );
       _reminders = prefs.getBool('reminders') ?? false;
       for (final account in restoredAccounts.accounts) {
+        if (account.carrier == Carrier.unicom &&
+            prefs.getString('unicom_query_method_${account.id}') == 'app') {
+          _unicomAppAccounts.add(account.id);
+        }
         final raw = prefs.getString(account.snapshotKey);
         if (raw != null) {
           try {
@@ -524,6 +533,13 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     await _publishWidget();
     if (_nativeMobile && !demoMode && _current(generation)) {
       if (await _widgetBridge.consumeLaunchRefresh()) await _openFromWidget();
+    }
+    if (_current(generation)) {
+      for (final account in _visibleAccounts.where(
+        (a) => _unicomAppAccounts.contains(a.id) && _connected.contains(a.id),
+      )) {
+        unawaited(_refreshAccount(account.id, automatic: true));
+      }
     }
   }
 
@@ -585,7 +601,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         }
       });
     }
-    _refreshAll();
+    _refreshAll(automatic: true);
   }
 
   Future<bool> _syncBackgroundSchedule() async {
@@ -631,6 +647,231 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   void _connect(Carrier carrier) => _connectAccount(carrier.name);
 
   void _connectAccount(String accountId) {
+    if (_account(accountId)?.carrier == Carrier.unicom &&
+        _nativeMobile &&
+        !demoMode &&
+        !_profileClearPending &&
+        !_clearing) {
+      unawaited(_chooseUnicomConnection(accountId));
+      return;
+    }
+    _connectOfficialAccount(accountId);
+  }
+
+  Future<void> _chooseUnicomConnection(String accountId) async {
+    final account = _account(accountId);
+    if (account == null || !account.enabled || _clearing) return;
+    final generation = _generation;
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text('${account.displayName} · 连接方式'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'web'),
+            child: const ListTile(
+              leading: Icon(Icons.language_rounded),
+              title: Text('官方网站验证'),
+              subtitle: Text('通过官网短信登录查询'),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'app'),
+            child: const ListTile(
+              leading: Icon(Icons.link_rounded),
+              title: Text('联通 App 查询（试验）'),
+              subtitle: Text('官网查询失败时，可手动导入自己的 App 会话'),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (!_current(generation) || choice == null) return;
+    if (choice == 'app') {
+      await _configureUnicomApp(accountId);
+      return;
+    }
+    _appQueryTickets.remove(accountId);
+    _inFlight.remove(accountId);
+    if (!_unicomAppAccounts.contains(accountId)) {
+      _connectOfficialAccount(accountId);
+      return;
+    }
+    try {
+      await _store(() async {
+        if (!_current(generation)) return;
+        await _secure.delete(key: UnicomAppSession.storageKey(accountId));
+        await _prefs?.remove('unicom_query_method_$accountId');
+        await _prefs?.setBool('background_auth_required_$accountId', false);
+      });
+      if (!_current(generation)) return;
+      setState(() => _unicomAppAccounts.remove(accountId));
+      _connectOfficialAccount(accountId);
+    } catch (_) {
+      if (_current(generation)) _showInfo('连接方式暂未切换', '本机会话存储暂时不可用，请稍后重试。');
+    }
+  }
+
+  Future<void> _configureUnicomApp(String accountId) async {
+    final account = _account(accountId);
+    if (account == null ||
+        !account.enabled ||
+        _clearing ||
+        _profileClearPending) {
+      return;
+    }
+    if (demoMode || !_nativeMobile) {
+      _showInfo('这是界面预览', '请安装正式手机包后连接自己的联通会话。');
+      return;
+    }
+    final generation = _generation;
+    final candidate = await showUnicomAppSessionScreen(
+      context,
+      account: account,
+      hasSession: _unicomAppAccounts.contains(accountId),
+    );
+    if (candidate == null || !_current(generation)) return;
+    final current = _account(accountId);
+    if (current == null || !current.enabled) return;
+    if (current.phoneNumber != null &&
+        current.phoneNumber != candidate.phoneNumber) {
+      _showInfo('号码不一致', '导入号码与这张卡已备注的号码不同，请先确认或修改卡片号码。');
+      return;
+    }
+    _timeouts[accountId]?.cancel();
+    _openingLogin.remove(accountId);
+    _awaitingLoginReturn.remove(accountId);
+    _inFlight.remove(accountId);
+    final controller = _controllers.remove(accountId);
+    if (controller != null) {
+      try {
+        await controller.stopLoading();
+      } catch (_) {
+        /* Already disposed. */
+      }
+    }
+    if (!_current(generation)) return;
+    await _refreshUnicomAppAccount(current, candidate: candidate);
+  }
+
+  Future<void> _refreshUnicomAppAccount(
+    CarrierAccount account, {
+    UnicomAppSession? candidate,
+  }) async {
+    final generation = _generation;
+    final id = account.id;
+    final ticket = Object();
+    _appQueryTickets[id] = ticket;
+    _inFlight.add(id);
+    _refreshThrottle.started(id, DateTime.now());
+    bool current() =>
+        _current(generation) &&
+        identical(_appQueryTickets[id], ticket) &&
+        _account(id)?.enabled == true &&
+        _account(id)?.phoneNumber == account.phoneNumber &&
+        _selection.allows(Carrier.unicom);
+    final previous = _snapshot(account);
+    setState(() {
+      if (_visibleAccountId == id) _visibleAccountId = null;
+      _putSnapshot(
+        account,
+        previous.copyWith(
+          status: QueryStatus.loading,
+          message: '正在通过联通 App 接口查询',
+        ),
+      );
+    });
+    unawaited(_publishWidget());
+    try {
+      final stored = candidate == null
+          ? await _secure
+                .read(key: UnicomAppSession.storageKey(id))
+                .timeout(const Duration(seconds: 3))
+          : null;
+      if (!current()) return;
+      final session =
+          candidate ??
+          (stored == null ? null : UnicomAppSession.restore(stored));
+      if (session == null) {
+        throw const FormatException('会话不存在');
+      }
+      if (account.phoneNumber != null &&
+          account.phoneNumber != session.phoneNumber) {
+        throw const FormatException('会话号码不匹配');
+      }
+      final result = await (widget.unicomAppClient ?? UnicomAppClient()).query(
+        session,
+        isCurrent: current,
+      );
+      if (!current()) return;
+      final success = result.snapshot.status == QueryStatus.success;
+      final accepted = success || !identical(result.session, session);
+      final displayed = success
+          ? result.snapshot
+          : previous.copyWith(
+              status: result.snapshot.status,
+              message: result.snapshot.message,
+            );
+      await _store(() async {
+        if (!current()) return;
+        // A verified renewal can rotate the token even if a later query fails.
+        // Preserve that session; an unauthenticated failed import never replaces it.
+        if (accepted) {
+          await _secure.write(
+            key: UnicomAppSession.storageKey(id),
+            value: jsonEncode(result.session.toJson()),
+          );
+        }
+        if (!current()) return;
+        if (accepted) {
+          await _prefs?.setString('unicom_query_method_$id', 'app');
+          await _prefs?.setBool(account.connectedKey, true);
+        }
+        if (!current()) return;
+        await _prefs?.setString(
+          account.snapshotKey,
+          jsonEncode(displayed.toJson()),
+        );
+        await _prefs?.setBool(
+          'background_auth_required_$id',
+          result.snapshot.status == QueryStatus.authExpired,
+        );
+      });
+      if (!current()) return;
+      setState(() {
+        if (accepted) {
+          _unicomAppAccounts.add(id);
+          _connected.add(id);
+        }
+        _putSnapshot(account, displayed);
+      });
+      await _publishWidget();
+      if (current() && success) {
+        await _syncBackgroundSchedule();
+        if (current()) await _notifyLowTraffic(account, result.snapshot);
+      }
+    } catch (_) {
+      if (current()) {
+        setState(
+          () => _putSnapshot(
+            account,
+            previous.copyWith(
+              status: QueryStatus.error,
+              message: '联通 App 会话暂不可用，请重新连接或使用官方网站验证',
+            ),
+          ),
+        );
+        await _publishWidget();
+      }
+    } finally {
+      if (identical(_appQueryTickets[id], ticket)) {
+        _appQueryTickets.remove(id);
+        _inFlight.remove(id);
+      }
+    }
+  }
+
+  void _connectOfficialAccount(String accountId) {
     final account = _account(accountId);
     if (account == null || !account.enabled) return;
     if (_profileClearPending) {
@@ -768,12 +1009,12 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     }
   }
 
-  void _refreshAll() {
+  void _refreshAll({bool automatic = false}) {
     if (demoMode || _clearing) return;
     for (final account in _visibleAccounts.where(
       (a) => _connected.contains(a.id),
     )) {
-      _refreshAccount(account.id, automatic: true);
+      _refreshAccount(account.id, automatic: automatic);
     }
   }
 
@@ -794,6 +1035,11 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     }
     final carrier = account.carrier;
     if (_clearing || !_selection.allows(carrier)) return;
+    if (automatic &&
+        (_snapshot(account).status == QueryStatus.authExpired ||
+            _prefs?.getBool('background_auth_required_$accountId') == true)) {
+      return;
+    }
     if (!_connected.contains(accountId)) {
       if (!automatic) _connectAccount(accountId);
       return;
@@ -802,6 +1048,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       return;
     }
     if (_refreshThrottle.blocks(accountId, DateTime.now())) return;
+    if (carrier == Carrier.unicom && _unicomAppAccounts.contains(accountId)) {
+      await _refreshUnicomAppAccount(account);
+      return;
+    }
     final controller = _controllers[accountId];
     if (controller == null) return;
     final generation = _generation;
@@ -853,6 +1103,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   ) async {
     final carrier = account.carrier;
     final accountId = account.id;
+    if (_unicomAppAccounts.contains(accountId) ||
+        _appQueryTickets.containsKey(accountId)) {
+      return;
+    }
     if (!_current(generation) || !_selection.allows(carrier)) return;
     if (args.isEmpty || args.first is! Map) return;
     final payload = Map<String, dynamic>.from(args.first as Map);
@@ -977,25 +1231,32 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     if (snapshot.status == QueryStatus.success) {
       if (!hadPreviousQuery) await _syncBackgroundSchedule();
       if (!_current(generation)) return;
-      final remaining = snapshot.generalRemainingBytes;
-      final low = remaining != null && remaining / 1073741824 <= _thresholdGb;
-      if (low &&
-          !(_warnedLow[accountId] ?? false) &&
-          _reminders &&
-          _nativeMobile) {
-        try {
-          await _notifications.invokeMethod('notify', {
-            'id': accountLowTrafficNotificationId(account),
-            'title': '${account.label}流量快见底了',
-            'body':
-                '通用流量剩余 ${(remaining / 1073741824).toStringAsFixed(2)} GB，数据以运营商查询为准。',
-          });
-        } on PlatformException {
-          /* Dashboard retains the actual result. */
-        }
-      }
-      _warnedLow[accountId] = low;
+      await _notifyLowTraffic(account, snapshot);
     }
+  }
+
+  Future<void> _notifyLowTraffic(
+    CarrierAccount account,
+    CarrierSnapshot snapshot,
+  ) async {
+    final remaining = snapshot.generalRemainingBytes;
+    final low = remaining != null && remaining / 1073741824 <= _thresholdGb;
+    if (low &&
+        !(_warnedLow[account.id] ?? false) &&
+        _reminders &&
+        _nativeMobile) {
+      try {
+        await _notifications.invokeMethod('notify', {
+          'id': accountLowTrafficNotificationId(account),
+          'title': '${account.label}流量快见底了',
+          'body':
+              '通用流量剩余 ${(remaining / 1073741824).toStringAsFixed(2)} GB，数据以运营商查询为准。',
+        });
+      } on PlatformException {
+        /* Dashboard retains the actual result. */
+      }
+    }
+    _warnedLow[account.id] = low;
   }
 
   Future<void> _saveSession(
@@ -1375,6 +1636,16 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _controllers.clear();
       _visibleAccountId = null;
       _refreshThrottle.clear();
+      _appQueryTickets.clear();
+      _unicomAppAccounts.addAll(
+        nextAccounts.accounts
+            .where(
+              (a) =>
+                  a.carrier == Carrier.unicom &&
+                  _prefs?.getString('unicom_query_method_${a.id}') == 'app',
+            )
+            .map((a) => a.id),
+      );
       _inFlight.clear();
       _awaitingLoginReturn.clear();
       _openingLogin.clear();
@@ -1493,7 +1764,25 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
             true) {
           throw StateError('Identity save failed');
         }
-        if (_current(generation)) setState(() => _accounts = next);
+        if (_current(generation)) {
+          setState(() {
+            _accounts = next;
+            if (account.phoneNumber != identity.$2.trim()) {
+              _appQueryTickets.remove(id);
+              _inFlight.remove(id);
+              _refreshThrottle.loginOrLoadFailed(id);
+              if (_unicomAppAccounts.contains(id)) {
+                _putSnapshot(
+                  account,
+                  _snapshot(account).copyWith(
+                    status: QueryStatus.authExpired,
+                    message: '卡片号码已修改，请重新连接此号码的联通 App 会话',
+                  ),
+                );
+              }
+            }
+          });
+        }
       });
       if (_current(generation)) await _publishWidget();
     } catch (_) {
@@ -1590,6 +1879,23 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                         unawaited(_manageCarriers());
                       },
                     ),
+                    for (final account in _visibleAccounts.where(
+                      (a) => a.carrier == Carrier.unicom,
+                    ))
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('${account.displayName} · 查询方式'),
+                        subtitle: Text(
+                          _unicomAppAccounts.contains(account.id)
+                              ? '联通 App 查询 · 本机独立会话'
+                              : '官方网站 · 可切换 App 查询试验',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          Navigator.pop(context);
+                          unawaited(_chooseUnicomConnection(account.id));
+                        },
+                      ),
                     for (final account in _visibleAccounts.where(
                       (a) => !a.isPrimary,
                     ))
@@ -1788,6 +2094,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _controllers.clear();
       _visibleAccountId = null;
       _broadnetSessions.clear();
+      _unicomAppAccounts.clear();
+      _appQueryTickets.clear();
       _inFlight.clear();
       _awaitingLoginReturn.clear();
       _openingLogin.clear();
@@ -1879,6 +2187,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   : 'broadnet_session_$id',
             );
           }
+          if (carrier == Carrier.unicom) {
+            await _secure.delete(key: UnicomAppSession.storageKey(id));
+            await _prefs?.remove('unicom_query_method_$id');
+          }
           for (final key in [
             'snapshot_$id',
             'connected_$id',
@@ -1929,6 +2241,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _refreshThrottle.clear();
       _warnedLow.clear();
       _broadnetSessions.clear();
+      _unicomAppAccounts.clear();
+      _appQueryTickets.clear();
       _visibleAccountId = null;
       _accountSnapshots.clear();
       for (final carrier in Carrier.values) {
@@ -2007,14 +2321,17 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               widgetSupported: _nativeMobile && !demoMode,
               onAbout: () => _showInfo(
                 kReleaseMode ? '流量小伙伴' : '流量小伙伴 · 开发版',
-                '可选择移动、联通、电信、广电，至少一家。数据来自您登录官方网页后的查询结果，通用、定向和用途未知的流量分开展示。\n\n联通展示官网套餐余量；电信按官网已用量和总量的舍入显示值估算，主位标「约」，均不当作已确认通用额度或触发提醒。真实号码登录和余额准确性仍需手机验证，无法识别时请在官方查询页查看。\n\n会话保存在手机本地，广电会话备份使用系统安全存储；不上传第三方服务器，不读取短信或服务密码。Android 可选择桌面卡片后台刷新间隔，但系统可能延迟任务；iPhone 桌面卡片显示上次查询结果，打开 APP 后刷新。电信需要打开 APP 查询。',
+                '可选择移动、联通、电信、广电，至少一家。数据来自官方查询，通用、定向和用途未知的流量分开展示。\n\n联通默认查询官网，也可在连接方式中选择 App 查询试验；该方式需要主动导入自己的会话，不能自动读取官方 App 或一键获取验证码。电信按官网已用量和总量的舍入显示值估算，主位标「约」。真实号码和余额准确性仍需手机验证。\n\n会话保存在手机本地，广电备份与联通 App 会话使用系统安全存储；不上传第三方服务器，不读取短信或服务密码。Android 可选择桌面卡片后台刷新间隔，但系统可能延迟任务；iPhone 桌面卡片显示上次查询结果，打开 APP 后刷新。电信需要打开 APP 查询。',
               ),
               demo: demoMode,
             ),
           if (_nativeMobile && !demoMode)
             if (!_restoring && !_savingSelection)
               for (final account in _visibleAccounts.where(
-                (a) => _connected.contains(a.id) && !_profileClearPending,
+                (a) =>
+                    _connected.contains(a.id) &&
+                    !_profileClearPending &&
+                    !_unicomAppAccounts.contains(a.id),
               ))
                 _webView(account),
         ],

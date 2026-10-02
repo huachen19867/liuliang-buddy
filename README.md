@@ -1,16 +1,16 @@
 # 流量小伙伴
 
-**安卓下载：**[下载正式版（27.45 MB）](https://github.com/huachen19867/liuliang-buddy/releases/download/v1.10.0/liuliang-buddy-release.apk)。适用 Android 7.0 及以上 ARM64 手机。旧测试版需自行卸载后安装并重新登录，卸载会清除应用本地记录。iPhone 暂无可安装的签名包。
+**安卓下载：**[下载正式版（27.91 MB）](https://github.com/huachen19867/liuliang-buddy/releases/download/v1.10.1/liuliang-buddy-release.apk)。适用 Android 7.0 及以上 ARM64 手机。iPhone 暂无可安装的签名包。
 
 一个可自行选择运营商的流量查询应用。首次选择移动、联通、电信、广电，至少一家；每家直接选择一至四个号码，合计最多四张，各自在官网登录。额外号码需要系统 WebView 支持独立 Profile，不支持时明确阻止添加。设置可调整数量或收起卡片，保留备注、登录资料和历史本地记录。联通读取官网套餐余量，电信按官网已用/总量显示值估算并标「约」，均不混入已确认通用额度或提醒。首页采用奶油背景、圆润卡片与水滴插画，展示每个账号的余量、时间、状态和明细；官网明确标记不限量时结束加载并显示不限量，不生成零或无限 GB。
 
-当前版本 1.10.0+17：安卓设置新增“通知栏显示余额”和“快捷设置查询入口”两个开关，默认关闭。通知显示最近余额与查询时间，快捷设置点击打开应用刷新，启用后还需要添加到系统面板。[GitHub 正式发布页](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.0)提供独立发布证书签名的 Release ARM64 主包，约27.45MB。签名与安装说明见[安卓分发说明](docs/ANDROID_RELEASE.md)。首页保留每账号通话与短信余量，不读取短信和通话记录；字段边界见[通话短信研究](docs/VOICE_SMS_RESEARCH.md)。iOS 17 源码包含持久化多账号会话和 WidgetKit 工程，尚无签名的 iPhone 安装包。
+当前版本 1.10.1+18：联通新增可选 App 查询试验，手动导入自己的 Cookie 或 token 会话后查询套餐和独立话费；不是一键登录，没有自动获取验证码。网页登录继续保留。已有 App 会话启动时刷新，并接入原有 Android 后台周期与桌面卡片。四家认证失效后暂停自动重试，后台复用前台页面判断，缓存异常不会生成负流量或错误低量提醒；用途不明的套餐标“用途未知”。完整范围见[联通接入与限制](docs/UNICOM_APP_QUERY_PROGRESS.md)。[GitHub 正式发布页](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.1)只提供独立发布证书签名的 Release ARM64 主包。签名与安装说明见[安卓分发说明](docs/ANDROID_RELEASE.md)。通知栏余额和快捷设置入口默认关闭；通话短信不读取手机记录，字段边界见[通话短信研究](docs/VOICE_SMS_RESEARCH.md)。iOS 17 源码包含持久化多账号会话和 WidgetKit 工程，尚无签名的 iPhone 安装包。
 
 没有 Mac 也可通过 [GitHub Actions](https://github.com/huachen19867/liuliang-buddy/actions/workflows/ios.yml)执行 macOS 编译、模拟器启动与截图。操作和签名说明见 [iOS 构建说明](docs/IOS_BUILD.md)，实现边界见 [会话隔离](docs/IOS_SESSIONS.md)与 [iOS 小组件](docs/IOS_WIDGET.md)。模拟器应用不适用于 iPhone；iOS 初版前台查询，组件展示最近结果，点击打开应用更新，设置不提供安卓后台周期选项。
 
-[iOS 云端验收](https://github.com/huachen19867/liuliang-buddy/actions/runs/36826003180)已通过 Flutter/Swift 检查、应用与组件编译、独立冷启动和界面流程。四张真实模拟器空账号截图见输出索引，不代表真实运营商余额或真机小组件验收。
+[此前 iOS 云端验收](https://github.com/huachen19867/liuliang-buddy/actions/runs/36826003180)已通过 Flutter/Swift 检查、应用与组件编译、独立冷启动和界面流程。四张真实模拟器空账号截图见输出索引，不代表真实运营商余额或真机小组件验收，也不代表 1.10.1 已完成 iOS 云端验收。
 
-主安装包路径为 artifacts/liuliang-buddy-release.apk，适用 Android 7.0 及以上 ARM64 手机。构建、测试、签名和哈希结果见 [1.10.0 版本说明](docs/RELEASE_1.10.0.md)。1.8.1 启动热修曾在荣耀真机通过；本轮尚未连接真机，官网余额、多账号 Profile 会话、S25 Ultra / One UI 添加弹窗及长期后台调度仍待设备验证，完整边界见 [后台刷新说明](docs/WIDGET_BACKGROUND_REFRESH.md)。
+主安装包路径为 artifacts/liuliang-buddy-release.apk，适用 Android 7.0 及以上 ARM64 手机。构建、测试、签名和哈希结果见 [1.10.1 版本说明](docs/RELEASE_1.10.1.md)。1.8.1 启动热修曾在荣耀真机通过；本轮尚未连接真机，官网余额、多账号 Profile 会话、S25 Ultra / One UI 添加弹窗及长期后台调度仍待设备验证，完整边界见 [后台刷新说明](docs/WIDGET_BACKGROUND_REFRESH.md)。
 
 联通依据公开官网 E5 查询页自然发出的 userinfoE5query 响应，套餐余量单位 MB；不限量已用字段不当成剩余。电信当前天翼账号首页返回加密账务结果，应用读取首页已渲染的指定账务明细（含隐藏的官网明细弹窗），不复制其加解密代码、不自动点击或发送登录请求。每项按已用/总量的 MB/GB 显示值换算后估算差值；缺项、无单位、超额或无限哨兵不算合计。它有官网显示值舍入误差，共享/重叠额度以套餐规则为准。
 
@@ -68,6 +68,19 @@
 | docs/RELEASE_1.9.3.md | 桌面留白、官方网页兼容和联通查询候选 |
 | docs/LOGIN_TOUCH_PROGRESS.md | 移动验证码触摸排查与键盘布局边界 |
 | docs/UNICOM_QUERY_PROGRESS.md | 联通官网新旧初始化兼容及匿名验证 |
+| docs/UNICOM_INTERNET_SOLUTIONS.md | 联通 App / 小程序开源方案、登录限制与接入方向 |
+| docs/UNICOM_APP_QUERY_PROGRESS.md | 联通可选 App 查询、会话隔离、首页与后台接线 |
+| docs/UNICOM_APP_PROTOCOL_REVIEW.md | 开源接口与认证可行性审查 |
+| docs/UNICOM_APP_PARSER_PROGRESS.md | App 套餐解析、零值、不限量与余额边界 |
+| docs/UNICOM_APP_SESSION_UI_PROGRESS.md | 高级会话导入页和键盘布局回归 |
+| docs/PRODUCT_QUERY_REVIEW_1.10.1.md | 四家前后台、多卡状态与清除复核 |
+| docs/PRODUCT_DATA_REVIEW_1.10.1.md | 四家单位、缓存异常及余额复核 |
+| docs/RELEASE_1.10.1.md | 联通可选 App 通道及查询稳定性正式发布 |
+| app/lib/data/unicom_app_parser.dart | 联通 App 套餐与独立话费的单位及错误边界 |
+| artifacts/unicom-app-session-preview.png | 实际 Flutter 高级导入页的合成预览 |
+| app/test/unicom_app_flow_test.dart | 双会话、认证失效保留旧值及修改号码的主流程回归 |
+| app/lib/services/unicom_app_client.dart | 精确 App 请求、一次续期、完整号码与本机会话 |
+| app/lib/ui/unicom_app_session_screen.dart | 联通 App 会话输入与逐号确认 |
 | app/lib/ui/carrier_browser_shell.dart | 官方页窄屏工具栏、键盘与导航区布局 |
 | app/lib/services/unicom_official_query.dart | 每文档一次官网原查询初始化 |
 | docs/RELEASE_1.9.2.md | 四家官网原版Logo与正式包 |

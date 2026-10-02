@@ -49,3 +49,5 @@ carrier-brand/记录2026-10-01四家官网Logo下载调查与公开HTML/CSS，�
 unicom-query-20261001/记录当前联通公开E5/头部JS及无账号会话形态；匿名只验证正常官网函数调用，无登录/验证码或真实余额，观察JSON脱敏为URL、状态、键名和真假标志。研究见docs/UNICOM_QUERY_PROGRESS.md。最小兼容通过官网原函数，不复制认证或令牌生成。
 
 carrier-compatibility-20261002/记录三家官方登录入口的移动视口匿名观察，以及联通异步原函数查询的脱敏负例验证。电信登录iframe临时参数不保留在索引中；公开页面归档仅研究，不当作真实登录或余量验收。结论、有限修复与接线要求见docs/CARRIER_COMPATIBILITY_1.10.md。
+
+unicom-solutions-20261002/ 保存 Newxin394/unicom-monitor 的 App 登录/续期/套餐查询摘录、aichuguang/unicom-monitor-v3 的验证码提交和前端官方 App 获取验证码说明，以及 Paladinfeng/CHU-Widget 的小程序查询源码。index.json 记录原文件 URL、blob SHA 和摘录行号；许可证分别为 MIT（Newxin README 有额外限制，未复制到应用）、未发现、MIT。只下载公开研究文件，不运行上游二进制或取得真实凭证；既有 ChinaUnicomMonitor 不重复下载。研究结论见 docs/UNICOM_INTERNET_SOLUTIONS.md。

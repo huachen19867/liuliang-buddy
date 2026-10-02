@@ -55,17 +55,17 @@ void main() {
       messenger.setMockMethodCallHandler(widgets, null);
       messenger.setMockMethodCallHandler(secure, null);
     });
-    final selection = CarrierSelection.complete([Carrier.unicom]);
+    final selection = CarrierSelection.complete([Carrier.mobile]);
     final at = DateTime(2026, 10, 2, 8);
     final old = CarrierSnapshot(
-      carrier: Carrier.unicom,
+      carrier: Carrier.mobile,
       status: QueryStatus.success,
       queriedAt: at,
       balanceYuan: 12.30,
     );
     SharedPreferences.setMockInitialValues({
       'carrier_selection': selection.toStorageString(),
-      'snapshot_unicom': jsonEncode(old.toJson()),
+      'snapshot_mobile': jsonEncode(old.toJson()),
     });
     await tester.pumpWidget(const FlowBuddyApp());
     await tester.pumpAndSettle();
@@ -75,7 +75,7 @@ void main() {
     // Exercise the real connection state and deadline, with no platform view
     // load callback. Platform rendering itself is outside this unit test.
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    dashboard.onConnectAccount!('unicom');
+    dashboard.onConnectAccount!('mobile');
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     await tester.pump();
     expect(

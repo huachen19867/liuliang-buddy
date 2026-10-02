@@ -147,22 +147,38 @@ class TrafficBucket {
     'isUnlimited': isUnlimited,
   };
 
-  factory TrafficBucket.fromJson(Map<String, dynamic> json) => TrafficBucket(
-    name: json['name'] is String ? json['name'] as String : '',
-    kind: BucketKind.values.firstWhere(
-      (value) => value.name == json['kind'],
-      orElse: () => BucketKind.unknown,
-    ),
-    remainingBytes: json['remainingBytes'] is int
-        ? json['remainingBytes'] as int
-        : null,
-    totalBytes: json['totalBytes'] is int ? json['totalBytes'] as int : null,
-    rawUnit: json['rawUnit'] is String ? json['rawUnit'] as String : null,
-    rawRemaining: json['rawRemaining'] is String
-        ? json['rawRemaining'] as String
-        : null,
-    isUnlimited: json['isUnlimited'] == true,
-  );
+  factory TrafficBucket.fromJson(Map<String, dynamic> json) {
+    int? bytes(String key) {
+      final value = json[key];
+      return value is int && value >= 0 && value <= 9223372036854775807
+          ? value
+          : null;
+    }
+
+    final unlimited = json['isUnlimited'] == true;
+    var remaining = unlimited ? null : bytes('remainingBytes');
+    var total = unlimited ? null : bytes('totalBytes');
+    if (remaining != null && total != null && remaining > total) {
+      remaining = null;
+      total = null;
+    }
+    // Keep an invalid row with unknown amounts: removing it would let the
+    // other rows produce an apparently complete but partial category balance.
+    return TrafficBucket(
+      name: json['name'] is String ? json['name'] as String : '',
+      kind: BucketKind.values.firstWhere(
+        (value) => value.name == json['kind'],
+        orElse: () => BucketKind.unknown,
+      ),
+      remainingBytes: remaining,
+      totalBytes: total,
+      rawUnit: json['rawUnit'] is String ? json['rawUnit'] as String : null,
+      rawRemaining: json['rawRemaining'] is String
+          ? json['rawRemaining'] as String
+          : null,
+      isUnlimited: unlimited,
+    );
+  }
 }
 
 const _unset = Object();
@@ -205,7 +221,9 @@ class CarrierSnapshot {
     for (final bucket in values) {
       if (bucket.isUnlimited) return null;
       final value = select(bucket);
-      if (value == null) return null;
+      if (value == null || value < 0 || value > 9223372036854775807 - sum) {
+        return null;
+      }
       sum += value;
     }
     return sum;

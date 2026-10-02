@@ -17,6 +17,7 @@ import '../data/parsers.dart';
 import 'carrier_web.dart';
 import 'page_probe.dart';
 import 'unicom_official_query.dart';
+import 'unicom_app_client.dart';
 import 'response_policy.dart';
 import 'widget_bridge.dart';
 
@@ -101,9 +102,82 @@ Future<Map<String, Object?>?> _runScheduledRefresh() async {
 
     final previous = snapshots[account.id]!;
     attempted++;
-    final result = await _queryInHeadlessWebView(account);
+    final appMode =
+        carrier == Carrier.unicom &&
+        prefs.getString('unicom_query_method_${account.id}') == 'app';
+    final appSessionRaw = appMode
+        ? await _readUnicomAppSession(account.id)
+        : null;
+    if (!await _isTaskCurrent()) return null;
+    UnicomAppQueryResult? appResult;
+    _HeadlessResult result;
+    if (appMode) {
+      try {
+        if (appSessionRaw == null) throw const FormatException();
+        final session = UnicomAppSession.restore(appSessionRaw);
+        if (account.phoneNumber != null &&
+            account.phoneNumber != session.phoneNumber) {
+          throw const FormatException();
+        }
+        appResult = await UnicomAppClient().query(
+          session,
+          isCurrent: _isTaskCurrent,
+        );
+        result = _HeadlessResult(appResult.snapshot);
+      } catch (_) {
+        result = const _HeadlessResult(
+          CarrierSnapshot(
+            carrier: Carrier.unicom,
+            status: QueryStatus.authExpired,
+            message: '联通 App 会话不可用，请打开应用重新连接',
+          ),
+        );
+      }
+    } else {
+      result = await _queryInHeadlessWebView(account);
+    }
     await prefs.reload();
     if (!await _isTaskCurrent()) return null;
+    final latestAccounts = CarrierAccounts.restore(
+      savedJson: prefs.getString(CarrierAccounts.storageKey),
+      selection: selection,
+    );
+    final latestAccount = latestAccounts.find(account.id);
+    if (latestAccount == null ||
+        !latestAccount.enabled ||
+        latestAccount.phoneNumber != account.phoneNumber) {
+      continue;
+    }
+    if (carrier == Carrier.unicom) {
+      final stillApp =
+          prefs.getString('unicom_query_method_${account.id}') == 'app';
+      if (stillApp != appMode) continue;
+      if (appMode) {
+        final currentRaw = await _readUnicomAppSession(account.id);
+        if (!await _isTaskCurrent()) return null;
+        // A foreground import, logout or renewal supersedes this task's copy.
+        if (currentRaw != appSessionRaw) continue;
+        if (appResult != null &&
+            jsonEncode(appResult.session.toJson()) != appSessionRaw) {
+          try {
+            await _secureStorage.write(
+              key: UnicomAppSession.storageKey(account.id),
+              value: jsonEncode(appResult.session.toJson()),
+            );
+          } catch (_) {
+            // A failed renewal save must not block the following accounts.
+            result = const _HeadlessResult(
+              CarrierSnapshot(
+                carrier: Carrier.unicom,
+                status: QueryStatus.authExpired,
+                message: '联通新会话暂未保存，请打开应用重新连接',
+              ),
+            );
+          }
+          if (!await _isTaskCurrent()) return null;
+        }
+      }
+    }
     if (result.status == QueryStatus.success) {
       succeeded++;
       snapshots[account.id] = result.snapshot;
@@ -156,6 +230,16 @@ Future<Map<String, Object?>?> _runScheduledRefresh() async {
       accountSnapshots: snapshots,
     ),
   };
+}
+
+Future<String?> _readUnicomAppSession(String accountId) async {
+  try {
+    return await _secureStorage
+        .read(key: UnicomAppSession.storageKey(accountId))
+        .timeout(const Duration(seconds: 3));
+  } catch (_) {
+    return null;
+  }
 }
 
 Future<bool> _isTaskCurrent() async {
@@ -228,10 +312,17 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
             final payload = Map<String, dynamic>.from(args.first as Map);
             final currentUrl = await created.getUrl();
             final currentPage = Uri.tryParse(currentUrl?.toString() ?? '');
+            final capturedPage = Uri.tryParse(
+              payload['pageUrl'] as String? ?? '',
+            );
             if (!acceptingResponses ||
                 currentPage == null ||
-                currentPage !=
-                    Uri.tryParse(payload['pageUrl'] as String? ?? '') ||
+                capturedPage == null ||
+                !isCarrierResponsePageCurrent(
+                  carrier,
+                  capturedPage,
+                  currentPage,
+                ) ||
                 isCarrierLoginPage(currentPage) ||
                 !isCarrierNavigationAllowed(carrier, currentPage)) {
               return false;
@@ -355,7 +446,7 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
   } finally {
     acceptingResponses = false;
     try {
-      await webView?.dispose();
+      await webView?.dispose().timeout(const Duration(seconds: 3));
     } catch (_) {
       // A disposed engine can already have released this headless view.
     }
@@ -429,7 +520,9 @@ Future<Map<String, dynamic>?> _readBroadnetSession(
   CarrierAccount account,
 ) async {
   try {
-    final raw = await _secureStorage.read(key: account.broadnetSessionKey);
+    final raw = await _secureStorage
+        .read(key: account.broadnetSessionKey)
+        .timeout(const Duration(seconds: 3));
     if (raw == null) return null;
     final candidate = jsonDecode(raw);
     if (candidate is! Map) return null;

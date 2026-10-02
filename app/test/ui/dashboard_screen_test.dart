@@ -355,7 +355,7 @@ void main() {
     expect(find.text('¥26.50'), findsOneWidget);
     expect(find.text('话费余额'), findsOneWidget);
     expect(find.text('定向流量'), findsOneWidget);
-    expect(find.text('其他流量'), findsOneWidget);
+    expect(find.text('用途未知'), findsOneWidget);
     expect(find.text('国内通话'), findsOneWidget);
     expect(find.text('国内短信'), findsOneWidget);
     expect(

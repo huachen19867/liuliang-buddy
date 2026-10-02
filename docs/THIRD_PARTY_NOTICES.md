@@ -61,3 +61,5 @@ SOFTWARE.
 联通/电信研究新增 ChinaUnicomMonitor 与 FlowLite（未发现许可证）、ChinaTelecomMonitor（AGPL-3.0）。均只作为本地协议线索，没有复制代码或参考下载文件到发布范围；网页登录接入边界见 UNICOM_TELECOM_RESEARCH.md。
 
 1.3.0联通协议来自iservice公开查询页与commonBase脚本的字段/单位事实，电信DOM结构及单位来自当前天翼账号公开业务组件。不复制运营商JS、签名或加解密实现。dompling/Scriptable历史网页登录方案无LICENSE，仅为本地调研线索；更多历史参考及当前替代证据见UNICOM_TELECOM_RESEARCH.md，参考下载文件不进入发布范围。
+
+1.10.1 联通 App 查询仅根据公开协议线索独立实现，参考 ChinaUnicomMonitor、Newxin394/unicom-monitor、aichuguang/unicom-monitor-v3 与旧 CHU-Widget。没有复制其业务源码、固定设备编号或上游日志实现；Newxin MIT 与 README 表述冲突、无许可证项目仅作本地研究，旧小程序代码未接入。公开参考、文件 SHA 和许可边界见 UNICOM_INTERNET_SOLUTIONS.md、UNICOM_APP_PROTOCOL_REVIEW.md 与 references/README.md。

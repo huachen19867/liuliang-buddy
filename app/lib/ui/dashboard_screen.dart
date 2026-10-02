@@ -1048,7 +1048,7 @@ class _TrafficCategoryRow extends StatelessWidget {
         ResortPalette.lavender,
         ResortPalette.lavenderWash,
       ),
-      ('其他流量', BucketKind.unknown, ResortPalette.pink, ResortPalette.pinkWash),
+      ('用途未知', BucketKind.unknown, ResortPalette.pink, ResortPalette.pinkWash),
     ];
     final scale = MediaQuery.textScalerOf(context).scale(12);
     return LayoutBuilder(

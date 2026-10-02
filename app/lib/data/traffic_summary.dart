@@ -125,6 +125,18 @@ TrafficSummary? summarizeTraffic(CarrierSnapshot snapshot) {
         detailNotice: '官网套餐剩余额，适用范围以套餐规则为准',
       );
     }
+    if (bucket.kind == BucketKind.unknown &&
+        !bucket.isUnlimited &&
+        bucket.remainingBytes != null &&
+        bucket.remainingBytes! >= 0 &&
+        _hasVerifiedUnit(bucket.rawUnit)) {
+      return TrafficSummary(
+        remainingBytes: bucket.remainingBytes!,
+        totalBytes: bucket.totalBytes,
+        label: '套餐余量',
+        detailNotice: '${bucket.name}；适用范围与共享关系以联通 App 为准',
+      );
+    }
   }
 
   // H5 qryUserRes returns flow-package rows, not a verified general bucket.
