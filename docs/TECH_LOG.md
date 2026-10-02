@@ -351,3 +351,5 @@ iOS对应源码云端run36956057050（4271666）回读为in_progress：https://g
 1.10.1 正式公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.1 ，仓库isPrivate=false，draft=false/prerelease=false，target与tag均a0ac8e839d3225edb36e25955b85780ce1a13866。Assets唯一liuliang-buddy-release.apk，uploaded/27,907,248字节，远端digest 30869ed0cfcf9ffeb40a1d8c6411acf2269f6807489ec58eedf8db8291905a56与本机一致。仅push public，研究参考/本机签名凭证未公开；发布正文含三张合成Flutter预览和实号边界。回执另文档提交，不移动tag或替换APK。
 
 iOS旧run36956057050回读failure，编译与冷启动已执行，失败发生在smoke仍等待旧“1 家已选择”文案，当前三四卡选择页为“1 / 4 张已选择”。同步修正integration_test的断言与过时双击注释，不改生产界面，也不删除断言。a0ac8e8触发run36964950810仍in_progress，但同旧断言，不能预告通过；修正后将触发新云端验收。Windows的python命令为WindowsApps空桩，不执行文档脚本，已经改用apply_patch并回读确认，不再依赖该命令。
+
+修正后的公开main为05b0e224af2a99b4b77f6f7ed99e47b09b37617c，新的iOS云端验收run36965455032已触发，交付回读pending：https://github.com/huachen19867/liuliang-buddy/actions/runs/36965455032 。不得标为已通过。最终GitHub latest再次回读v1.10.1，非草稿/非预发布、仍唯一APK且digest一致；个别API EOF通过只读重试排除，未重复发布或增加Assets。
