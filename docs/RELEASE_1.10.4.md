@@ -13,3 +13,5 @@
 [压缩后的首页预览](../artifacts/telecom-partial-preview.png) 为实际 Flutter 渲染，使用24项合成明细并标记非真实数据。
 
 正式 Release 构建163.4秒成功，版本1.10.4/code21，APK28,038,456字节（28.04MB），SHA256 `ca4a847f6fdfedd5e4d986627a2b0586f18b034a65d8a69b83938ea8271bc00f`。v2正式证书 `33b115558027fdfa667a3f14a9351fbdb29901948c085daf739e16a9055a497e`，非debuggable、ARM64、API24/36及16KB ZIP对齐通过。公开Release仅放一个APK。
+
+公开发布回读确认非草稿/非预发布，tag与target为5b306ec2c8378507b2d753034a696c97eaf2fea7，唯一APKuploaded且远端digest与本机一致。iOS本版云端验收 [run36999305137](https://github.com/huachen19867/liuliang-buddy/actions/runs/36999305137) 仍在运行，不标为通过。

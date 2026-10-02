@@ -385,3 +385,5 @@ iOS旧run36956057050回读failure，编译与冷启动已执行，失败发生�
 集成先跑首页/分类37项通过并目视检查telecom-partial-preview.png，随后审查收紧partial必须同时有confirmed和unresolved、拒绝空名，并禁止电信单条fallback绕过summary。新增仅通话有效、流量全待确认回归；最终全量Flutter251项/26秒通过，analyze无问题，浏览器13合成场景通过。24条合成明细首屏三组、空占位隐藏，320宽1.4字体组弹窗及分页/分类验证通过。仅恢复本轮测试生成的无关选择截图，保留号码占位变化的首页截图。未改native业务，不重复JUnit；无实际电信账号/USB。
 
 正式Release163.4秒成功，APK28,038,456字节/SHA256 ca4a847f6fdfedd5e4d986627a2b0586f18b034a65d8a69b83938ea8271bc00f；1.10.4/code21、v2正式证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐通过。wrapper自动还原官方配置。准备仅push public并发布唯一APK，源码/截图和技术索引同步，没有实号或USB新验证。
+
+1.10.4公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.4 ，draft=false/prerelease=false，target/tag均5b306ec2c8378507b2d753034a696c97eaf2fea7。唯一APKuploaded/28038456字节、远端digest ca4a847f6fdfedd5e4d986627a2b0586f18b034a65d8a69b83938ea8271bc00f与本机一致。源码仅push public，当前工作树clean。新iOS云端run36999305137仍in_progress，不标本版通过；旧1.10.3 run36977121920回读success，不能代替本版。回执另docs提交，不移动tag/替换APK。真实电信缺项原因仍待该官网原始明细确认，本版是诚实部分状态与明细压缩修正。
