@@ -38,6 +38,10 @@ data class WidgetCardData(
     val voiceState: String = "unavailable",
     val voiceRemainingMinutes: Double? = null,
     val voiceEstimated: Boolean = false,
+    val trafficReadableCount: Int = 0,
+    val trafficPendingCount: Int = 0,
+    val previewRemainingBytes: Long? = null,
+    val previewUnlimited: Boolean = false,
 )
 
 data class WidgetCardPresentation(
@@ -164,16 +168,19 @@ object WidgetPresentation {
             validAmount.toDouble() <= thresholdGb * GIB
         val knownStatus = card.status in setOf("notConnected", "loading", "success", "authExpired", "error")
         val unlimited = card.unlimited && knownStatus && validTime != null
+        val partial = WidgetAccountDetails.hasPartialPreview(card, nowMillis)
         val rawAmount = when {
+            partial -> WidgetAccountDetails.previewAmount(card)
             unlimited -> "不限量"
             knownStatus && validAmount != null -> formatBytes(validAmount)
             else -> "—"
         }
-        val amount = if (card.label == "套餐估算余量" && rawAmount != "—") "约 $rawAmount" else rawAmount
+        val amount = if (!partial && card.label == "套餐估算余量" && rawAmount != "—") "约 $rawAmount" else rawAmount
         val state = when (card.status) {
             "success" -> when {
                 validTime == null -> "待确认"
                 stale -> "已过期"
+                partial -> "${card.trafficReadableCount}项可读 · ${card.trafficPendingCount}项待确认"
                 unlimited -> "上次记录"
                 validAmount == null -> "待确认"
                 low -> "余量偏低"
@@ -184,7 +191,7 @@ object WidgetPresentation {
             "error" -> "查询失败"
             else -> "未连接"
         }
-        val label = if (card.label == "通用剩余" || card.label == "套餐余量" || card.label == "含不限量套餐" ||
+        val label = if (partial) "单项套餐余量" else if (card.label == "通用剩余" || card.label == "套餐余量" || card.label == "含不限量套餐" ||
             card.label == "套餐明细合计" || card.label == "套餐估算余量" || card.label == "余额待确认" ||
             card.label == "套餐余量·用途待确认") card.label else "套餐余量·用途待确认"
         val time = validTime?.let {
@@ -238,7 +245,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
                 putBoolean("selectionPresent", true)
                 WidgetCarrierSelection.order.forEach { carrier ->
                     putBoolean("${carrier}Selected", carrier in selected)
-                    if (carrier in selected) writeCard(carrier, parseCard(root[carrier]))
+                    if (carrier in selected) writeCard(carrier, parseCard(root[carrier], carrier))
                 }
                 putInt("instanceCount", instances.size)
                 instances.forEachIndexed { index, card -> writeInstance(index, card) }
@@ -368,7 +375,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             updateAll(context)
         }
 
-        private fun parseCard(raw: Any?): WidgetCardData {
+        private fun parseCard(raw: Any?, carrier: String): WidgetCardData {
             val map = raw as? Map<*, *> ?: return WidgetCardData()
             val status = (map["status"] as? String)?.takeIf {
                 it in setOf("notConnected", "loading", "success", "authExpired", "error")
@@ -376,11 +383,12 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             val amount = WidgetAccountDetails.safeBytes(map["remainingBytes"])
             val queriedAt = WidgetAccountDetails.safeBytes(map["queriedAt"])?.takeIf { it > 0L }
             val label = WidgetAccountDetails.safeLabel(map["label"])
-            return WidgetCardData(status = status, remainingBytes = amount, label = label, queriedAt = queriedAt,
-                unlimited = map["unlimited"] == true || map["isUnlimited"] == true)
+            return WidgetAccountDetails.attach(WidgetCardData(carrier = carrier, status = status, remainingBytes = amount, label = label, queriedAt = queriedAt,
+                unlimited = map["unlimited"] == true || map["isUnlimited"] == true), map)
         }
 
         private fun android.content.SharedPreferences.Editor.writeInstance(index: Int, card: WidgetCardData) {
+            writePartial("instance_${index}", card)
             putString("instance_${index}_id", card.accountId)
             putString("instance_${index}_carrier", card.carrier)
             putString("instance_${index}_accountLabel", card.accountLabel)
@@ -405,6 +413,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
         }
 
         private fun android.content.SharedPreferences.Editor.writeCard(prefix: String, card: WidgetCardData) {
+            writePartial(prefix, card)
             putString("${prefix}_status", card.status)
             putString("${prefix}_label", card.label)
             putBoolean("${prefix}_unlimited", card.unlimited)
@@ -412,16 +421,30 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             card.queriedAt?.let { putLong("${prefix}_queriedAt", it) }
         }
 
+        private fun android.content.SharedPreferences.Editor.writePartial(prefix: String, card: WidgetCardData) {
+            putInt("${prefix}_trafficReadableCount", card.trafficReadableCount)
+            putInt("${prefix}_trafficPendingCount", card.trafficPendingCount)
+            card.previewRemainingBytes?.let { putLong("${prefix}_previewRemainingBytes", it) }
+            putBoolean("${prefix}_previewUnlimited", card.previewUnlimited)
+        }
+
+        private fun readPartial(prefs: android.content.SharedPreferences, prefix: String): Map<String, Any?> = mapOf(
+            "trafficReadableCount" to prefs.getInt("${prefix}_trafficReadableCount", 0),
+            "trafficPendingCount" to prefs.getInt("${prefix}_trafficPendingCount", 0),
+            "previewRemainingBytes" to if (prefs.contains("${prefix}_previewRemainingBytes")) prefs.getLong("${prefix}_previewRemainingBytes", -1L) else null,
+            "previewUnlimited" to prefs.getBoolean("${prefix}_previewUnlimited", false),
+        )
+
         private fun readCard(context: Context, prefix: String): WidgetCardData {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            return WidgetCardData(
+            return WidgetAccountDetails.attach(WidgetCardData(
                 carrier = prefix,
                 status = prefs.getString("${prefix}_status", "notConnected") ?: "notConnected",
                 remainingBytes = if (prefs.contains("${prefix}_remainingBytes")) prefs.getLong("${prefix}_remainingBytes", -1L) else null,
                 label = WidgetAccountDetails.safeLabel(prefs.getString("${prefix}_label", "通用剩余")),
                 queriedAt = if (prefs.contains("${prefix}_queriedAt")) prefs.getLong("${prefix}_queriedAt", 0L) else null,
                 unlimited = prefs.getBoolean("${prefix}_unlimited", false),
-            )
+            ), readPartial(prefs, prefix))
         }
 
         private fun readInstance(context: Context, index: Int): WidgetCardData {
@@ -436,7 +459,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
                 queriedAt = if (prefs.contains("instance_${index}_queriedAt")) prefs.getLong("instance_${index}_queriedAt", 0L) else null,
                 unlimited = prefs.getBoolean("instance_${index}_unlimited", false),
             )
-            return WidgetAccountDetails.attach(card, mapOf(
+            return WidgetAccountDetails.attach(card, readPartial(prefs, "instance_${index}") + mapOf(
                 "name" to prefs.getString("instance_${index}_name", null),
                 "phoneHint" to prefs.getString("instance_${index}_phoneHint", null),
                 "balanceYuan" to prefs.getString("instance_${index}_balanceYuan", null)?.toDoubleOrNull(),
@@ -460,10 +483,10 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             val now = System.currentTimeMillis()
             val visible = WidgetAccountLayout.visibleCount(cards.size, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 280))
             val slots = listOf(
-                intArrayOf(R.id.slot_1, R.id.slot_1_badge, R.id.slot_1_name, R.id.slot_1_state, R.id.slot_1_phone, R.id.slot_1_balance, R.id.slot_1_summary, R.id.slot_1_time, R.id.slot_1_general, R.id.slot_1_directed, R.id.slot_1_other, R.id.slot_1_voice),
-                intArrayOf(R.id.slot_2, R.id.slot_2_badge, R.id.slot_2_name, R.id.slot_2_state, R.id.slot_2_phone, R.id.slot_2_balance, R.id.slot_2_summary, R.id.slot_2_time, R.id.slot_2_general, R.id.slot_2_directed, R.id.slot_2_other, R.id.slot_2_voice),
-                intArrayOf(R.id.slot_3, R.id.slot_3_badge, R.id.slot_3_name, R.id.slot_3_state, R.id.slot_3_phone, R.id.slot_3_balance, R.id.slot_3_summary, R.id.slot_3_time, R.id.slot_3_general, R.id.slot_3_directed, R.id.slot_3_other, R.id.slot_3_voice),
-                intArrayOf(R.id.slot_4, R.id.slot_4_badge, R.id.slot_4_name, R.id.slot_4_state, R.id.slot_4_phone, R.id.slot_4_balance, R.id.slot_4_summary, R.id.slot_4_time, R.id.slot_4_general, R.id.slot_4_directed, R.id.slot_4_other, R.id.slot_4_voice),
+                intArrayOf(R.id.slot_1, R.id.slot_1_badge, R.id.slot_1_name, R.id.slot_1_state, R.id.slot_1_phone, R.id.slot_1_balance, R.id.slot_1_summary, R.id.slot_1_time, R.id.slot_1_general, R.id.slot_1_directed, R.id.slot_1_other, R.id.slot_1_voice, R.id.slot_1_partial, R.id.slot_1_details),
+                intArrayOf(R.id.slot_2, R.id.slot_2_badge, R.id.slot_2_name, R.id.slot_2_state, R.id.slot_2_phone, R.id.slot_2_balance, R.id.slot_2_summary, R.id.slot_2_time, R.id.slot_2_general, R.id.slot_2_directed, R.id.slot_2_other, R.id.slot_2_voice, R.id.slot_2_partial, R.id.slot_2_details),
+                intArrayOf(R.id.slot_3, R.id.slot_3_badge, R.id.slot_3_name, R.id.slot_3_state, R.id.slot_3_phone, R.id.slot_3_balance, R.id.slot_3_summary, R.id.slot_3_time, R.id.slot_3_general, R.id.slot_3_directed, R.id.slot_3_other, R.id.slot_3_voice, R.id.slot_3_partial, R.id.slot_3_details),
+                intArrayOf(R.id.slot_4, R.id.slot_4_badge, R.id.slot_4_name, R.id.slot_4_state, R.id.slot_4_phone, R.id.slot_4_balance, R.id.slot_4_summary, R.id.slot_4_time, R.id.slot_4_general, R.id.slot_4_directed, R.id.slot_4_other, R.id.slot_4_voice, R.id.slot_4_partial, R.id.slot_4_details),
             )
             slots.forEachIndexed { index, ids ->
                 val card = cards.getOrNull(index)
@@ -497,6 +520,10 @@ class TrafficWidgetProvider : AppWidgetProvider() {
                 else -> "中国电信" to R.drawable.carrier_telecom
             }
             val valid = WidgetAccountDetails.validQuery(card, now)
+            val partialPanel = WidgetAccountDetails.usePartialPanel(card, now)
+            views.setViewVisibility(ids[13], if (partialPanel) View.GONE else View.VISIBLE)
+            views.setViewVisibility(ids[12], if (partialPanel) View.VISIBLE else View.GONE)
+            views.setTextViewText(ids[12], if (partialPanel) WidgetAccountDetails.partialPanel(card) else "")
             views.setImageViewResource(ids[1], logo)
             views.setContentDescription(ids[1], "${defaultName}标识")
             views.setTextViewText(ids[2], WidgetAccountDetails.safeName(card.name) ?: card.accountLabel ?: defaultName)
@@ -508,12 +535,12 @@ class TrafficWidgetProvider : AppWidgetProvider() {
                 optionalText(ids[3], null)
                 optionalText(ids[4], null)
                 optionalText(ids[5], null)
-                optionalText(ids[6], WidgetAccountLayout.compactDetail(card, now, display.low))
+                optionalText(ids[6], if (partialPanel) WidgetAccountDetails.secondaryStatus(card, now) else WidgetAccountLayout.compactDetail(card, now, display.low))
             } else {
                 optionalText(ids[3], WidgetAccountDetails.secondaryStatus(card, now) ?: if (display.low) "余量偏低" else null)
                 optionalText(ids[4], WidgetAccountDetails.safePhoneHint(card.phoneHint))
                 optionalText(ids[5], WidgetAccountDetails.balance(card, now))
-                optionalText(ids[6], WidgetAccountDetails.primarySummary(card, now))
+                optionalText(ids[6], if (partialPanel) null else WidgetAccountDetails.primarySummary(card, now))
             }
             optionalText(ids[7], if (valid) display.time.removePrefix("上次查询 ") else null)
             views.setTextViewText(ids[8], WidgetAccountDetails.traffic(card.generalState, card.generalRemainingBytes, card.trafficEstimated, valid))

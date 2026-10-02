@@ -47,7 +47,27 @@ object WidgetAccountDetails {
         voiceState = state(raw["voiceState"]),
         voiceRemainingMinutes = if (state(raw["voiceState"]) == "provided") safeDecimal(raw["voiceRemainingMinutes"], false) else null,
         voiceEstimated = raw["voiceEstimated"] == true,
+        trafficReadableCount = safeCount(raw["trafficReadableCount"]),
+        trafficPendingCount = safeCount(raw["trafficPendingCount"]),
+        previewRemainingBytes = safeBytes(raw["previewRemainingBytes"]),
+        previewUnlimited = raw["previewUnlimited"] == true,
     )
+
+    private fun safeCount(raw: Any?): Int = safeBytes(raw)?.takeIf { it <= 200L }?.toInt() ?: 0
+
+    fun hasPartialPreview(card: WidgetCardData, now: Long): Boolean =
+        card.carrier == "telecom" && validQuery(card, now) && card.remainingBytes == null &&
+            card.trafficReadableCount in 1..200 && card.trafficPendingCount in 1..200 &&
+            card.trafficReadableCount + card.trafficPendingCount <= 200 &&
+            ((card.previewRemainingBytes?.let { it >= 0L } == true) != card.previewUnlimited)
+
+    fun previewAmount(card: WidgetCardData): String = if (card.previewUnlimited) "不限量"
+        else "约 ${WidgetPresentation.formatBytes(card.previewRemainingBytes!!)}"
+
+    fun usePartialPanel(card: WidgetCardData, now: Long): Boolean = hasPartialPreview(card, now) &&
+        listOf(card.generalState, card.directedState, card.otherState, card.voiceState).all { it == "unavailable" }
+
+    fun partialPanel(card: WidgetCardData): String = "单项${previewAmount(card)}\n${card.trafficPendingCount}项待确认"
 
     fun validQuery(card: WidgetCardData, now: Long): Boolean =
         card.status in setOf("success", "loading", "authExpired", "error") &&
@@ -64,6 +84,7 @@ object WidgetAccountDetails {
         "success" -> when {
             !validQuery(card, now) -> "待确认"
             now - card.queriedAt!! > 24L * 60L * 60L * 1000L -> "记录较早"
+            hasPartialPreview(card, now) -> "${card.trafficReadableCount}项可读 · ${card.trafficPendingCount}项待确认"
             else -> null
         }
         else -> "未连接"
@@ -71,6 +92,7 @@ object WidgetAccountDetails {
 
     fun primarySummary(card: WidgetCardData, now: Long): String? {
         if (!validQuery(card, now)) return null
+        if (hasPartialPreview(card, now)) return "单项${previewAmount(card)}"
         val hasCategory = listOf(
             card.generalState to card.generalRemainingBytes,
             card.directedState to card.directedRemainingBytes,
@@ -117,6 +139,11 @@ object WidgetAccountLayout {
     }
 
     fun compactDetail(card: WidgetCardData, now: Long, low: Boolean): String? {
+        if (WidgetAccountDetails.hasPartialPreview(card, now)) {
+            val status = if (card.status == "success" && now - card.queriedAt!! <= 24L * 60L * 60L * 1000L) "${card.trafficPendingCount}项待确认"
+                else WidgetAccountDetails.secondaryStatus(card, now)
+            return "单项${WidgetAccountDetails.previewAmount(card)} · $status"
+        }
         val status = WidgetAccountDetails.secondaryStatus(card, now) ?: if (low) "余量偏低" else null
         val summary = WidgetAccountDetails.primarySummary(card, now)
         if (summary != null) return listOfNotNull(status, summary).joinToString(" · ")

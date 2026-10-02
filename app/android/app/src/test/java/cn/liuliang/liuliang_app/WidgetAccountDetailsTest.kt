@@ -6,6 +6,49 @@ import org.junit.Test
 class WidgetAccountDetailsTest {
     private val now = 1_790_744_400_000L
     private val gib = 1024L * 1024L * 1024L
+    private fun partial(extra: Map<String, Any?> = emptyMap()): WidgetCardData = WidgetInstances.fromPayload(
+        listOf(mapOf("accountId" to "telecom", "carrier" to "telecom", "accountLabel" to "中国电信 1", "status" to "success", "queriedAt" to now,
+            "trafficReadableCount" to 9, "trafficPendingCount" to 1, "previewRemainingBytes" to gib) + extra), setOf("telecom"),
+    ).single()
+
+    @Test fun partialPreviewIsSingleItemNotTotalAndNeverLow() {
+        val card = partial(mapOf("generalState" to "provided", "generalRemainingBytes" to gib))
+        assertNull(card.remainingBytes)
+        assertEquals("单项约 1.00 GB", WidgetAccountDetails.primarySummary(card, now))
+        val display = WidgetPresentation.present(card, 100.0, now)
+        assertEquals("约 1.00 GB", display.amount)
+        assertEquals("单项套餐余量", display.label)
+        assertEquals("9项可读 · 1项待确认", display.state)
+        assertFalse(display.low)
+        assertFalse(WidgetAccountDetails.usePartialPanel(card, now))
+        assertTrue(WidgetAccountDetails.usePartialPanel(partial(), now))
+        assertEquals("单项约 1.00 GB\n1项待确认", WidgetAccountDetails.partialPanel(partial()))
+        assertEquals("单项约 1.00 GB · 1项待确认", WidgetAccountLayout.compactDetail(card, now, false))
+        assertTrue(SystemSurfacePresentation.lines(listOf(card), 100.0, now).single().contains("单项套餐余量"))
+    }
+
+    @Test fun partialZeroUnlimitedAndCachedFailureKeepMeaning() {
+        assertEquals("单项约 0 MB", WidgetAccountDetails.primarySummary(partial(mapOf("previewRemainingBytes" to 0L)), now))
+        val unlimited = partial(mapOf("previewRemainingBytes" to null, "previewUnlimited" to true, "isUnlimited" to true))
+        assertEquals("单项不限量", WidgetAccountDetails.primarySummary(unlimited, now))
+        for (status in listOf("loading", "authExpired", "error")) {
+            val cached = partial(mapOf("status" to status, "queriedAt" to now - 90_000L))
+            assertEquals("单项约 1.00 GB", WidgetAccountDetails.primarySummary(cached, now))
+            assertEquals(now - 90_000L, cached.queriedAt)
+            assertFalse(WidgetPresentation.present(cached, 100.0, now).low)
+        }
+        assertFalse(WidgetAccountDetails.hasPartialPreview(partial(mapOf("status" to "notConnected")), now))
+        assertFalse(WidgetAccountDetails.hasPartialPreview(partial(mapOf("queriedAt" to now + 600_000L)), now))
+    }
+
+    @Test fun partialMalformedCountsAndCanonicalAmountSuppressPreview() {
+        for (value in listOf(-1, 201, 1.5, Double.NaN, "9")) {
+            assertFalse(WidgetAccountDetails.hasPartialPreview(partial(mapOf("trafficReadableCount" to value)), now))
+        }
+        assertFalse(WidgetAccountDetails.hasPartialPreview(partial(mapOf("trafficReadableCount" to 200, "trafficPendingCount" to 1)), now))
+        assertFalse(WidgetAccountDetails.hasPartialPreview(partial(mapOf("previewUnlimited" to true)), now))
+        assertFalse(WidgetAccountDetails.hasPartialPreview(partial(mapOf("primaryValue" to 3L * gib)), now))
+    }
     private fun card(extra: Map<String, Any?> = emptyMap()): WidgetCardData = WidgetInstances.fromPayload(
         listOf(mapOf("accountId" to "mobile", "carrier" to "mobile", "accountLabel" to "中国移动 1", "name" to "主卡", "status" to "success", "queriedAt" to now) + extra),
         setOf("mobile"),

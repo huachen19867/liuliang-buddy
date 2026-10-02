@@ -212,7 +212,7 @@ class TrafficQuickSettingsTileService : TileService() {
                     WidgetPresentation.present(it, threshold, System.currentTimeMillis()).amount != "—"
                 } ?: cards.firstOrNull()
                 val display = card?.let { WidgetPresentation.present(it, threshold, System.currentTimeMillis()) }
-                subtitle = if (display == null) "暂无缓存" else "缓存 ${display.amount} · ${display.state}"
+                subtitle = if (display == null) "暂无缓存" else "缓存 ${display.label} ${display.amount} · ${display.state}"
             }
             state = Tile.STATE_ACTIVE
             updateTile()

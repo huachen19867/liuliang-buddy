@@ -6,6 +6,292 @@ import 'package:liuliang_app/services/widget_bridge.dart';
 
 void main() {
   final time = DateTime.utc(2026, 9, 30, 6, 30);
+  const previewBytes = 29527900160; // One package: 27.5 GiB.
+  const confirmedPackage = TrafficBucket(
+    name: '官网套餐 A',
+    kind: BucketKind.unknown,
+    remainingBytes: previewBytes,
+    rawUnit: 'GB',
+  );
+  const pendingPackage = TrafficBucket(
+    name: '官网套餐 B',
+    kind: BucketKind.unknown,
+    rawRemaining: '待确认',
+  );
+
+  Map<String, Object?> accountPayload(CarrierSnapshot snapshot) {
+    final selection = CarrierSelection.complete([snapshot.carrier]);
+    return buildWidgetPayload(
+      [snapshot],
+      thresholdGb: 5,
+      selection: selection,
+      accounts: CarrierAccounts.fromSelection(selection),
+      accountSnapshots: {snapshot.carrier.name: snapshot},
+    );
+  }
+
+  test(
+    'partial Telecom carries one package preview without any partial sum',
+    () {
+      final snapshot = CarrierSnapshot(
+        carrier: Carrier.telecom,
+        status: QueryStatus.success,
+        queriedAt: time,
+        phoneMasked: 'private phone hint',
+        buckets: const [
+          confirmedPackage,
+          TrafficBucket(
+            name: '另一条可读套餐',
+            kind: BucketKind.unknown,
+            remainingBytes: 10737418240,
+            rawUnit: 'GB',
+          ),
+          pendingPackage,
+        ],
+      );
+      final legacy = buildWidgetPayload([snapshot], thresholdGb: 5);
+      final accounts = accountPayload(snapshot);
+      final instance = (accounts['instances'] as List).single as Map;
+      for (final row in [
+        legacy['telecom'] as Map,
+        accounts['telecom'] as Map,
+        instance,
+      ]) {
+        expect(row['trafficReadableCount'], 2);
+        expect(row['trafficPendingCount'], 1);
+        expect(row['previewRemainingBytes'], previewBytes);
+        expect(row['previewUnlimited'], isFalse);
+        expect(row.keys, isNot(contains('phoneMasked')));
+        expect(row.keys, isNot(contains('trafficPreview')));
+      }
+      expect((legacy['telecom'] as Map)['remainingBytes'], isNull);
+      expect(instance['primaryValue'], isNull);
+      expect(instance['otherRemainingBytes'], isNull);
+      expect(instance['otherState'], 'unavailable');
+      expect(instance['generalRemainingBytes'], isNull);
+    },
+  );
+
+  test(
+    'manual partial group stays unavailable beside a single package preview',
+    () {
+      final payload = accountPayload(
+        CarrierSnapshot(
+          carrier: Carrier.telecom,
+          status: QueryStatus.success,
+          queriedAt: time,
+          buckets: [
+            confirmedPackage.copyWith(manualKind: BucketKind.general),
+            pendingPackage.copyWith(manualKind: BucketKind.general),
+          ],
+        ),
+      );
+      final row = (payload['instances'] as List).single as Map;
+      expect(row['primaryValue'], isNull);
+      expect(row['generalRemainingBytes'], isNull);
+      expect(row['generalState'], 'unavailable');
+      expect(row['previewRemainingBytes'], previewBytes);
+    },
+  );
+
+  test(
+    'missing units, invalid bytes, unnamed and conflicting rows stay pending',
+    () {
+      final payload = accountPayload(
+        CarrierSnapshot(
+          carrier: Carrier.telecom,
+          status: QueryStatus.success,
+          queriedAt: time,
+          buckets: [
+            const TrafficBucket(
+              name: '仅有数字',
+              kind: BucketKind.unknown,
+              remainingBytes: 42,
+            ),
+            confirmedPackage.copyWith(rawUnit: '分钟'),
+            confirmedPackage.copyWith(name: '   '),
+            confirmedPackage.copyWith(remainingBytes: -1),
+            confirmedPackage.copyWith(totalBytes: -1),
+            confirmedPackage.copyWith(totalBytes: previewBytes - 1),
+            confirmedPackage.copyWith(isUnlimited: true),
+            pendingPackage,
+          ],
+        ),
+      );
+      final row = (payload['instances'] as List).single as Map;
+      expect(row['trafficReadableCount'], 0);
+      expect(row['trafficPendingCount'], 8);
+      expect(row['previewRemainingBytes'], isNull);
+      expect(row['previewUnlimited'], isFalse);
+      expect(row['primaryValue'], isNull);
+    },
+  );
+
+  test('zero remains a confirmed individual package amount', () {
+    final payload = accountPayload(
+      CarrierSnapshot(
+        carrier: Carrier.telecom,
+        status: QueryStatus.success,
+        queriedAt: time,
+        buckets: [confirmedPackage.copyWith(remainingBytes: 0), pendingPackage],
+      ),
+    );
+    final row = (payload['instances'] as List).single as Map;
+    expect(row['previewRemainingBytes'], 0);
+    expect(row['trafficReadableCount'], 1);
+    expect(row['trafficPendingCount'], 1);
+    expect(row['primaryValue'], isNull);
+  });
+
+  test(
+    'explicit unlimited preview is a single package with no numeric amount',
+    () {
+      final payload = accountPayload(
+        CarrierSnapshot(
+          carrier: Carrier.telecom,
+          status: QueryStatus.success,
+          queriedAt: time,
+          buckets: const [
+            TrafficBucket(
+              name: '官网明确不限量',
+              kind: BucketKind.unknown,
+              isUnlimited: true,
+            ),
+            pendingPackage,
+          ],
+        ),
+      );
+      final row = (payload['instances'] as List).single as Map;
+      expect(row['trafficReadableCount'], 1);
+      expect(row['trafficPendingCount'], 1);
+      expect(row['previewUnlimited'], isTrue);
+      expect(row['previewRemainingBytes'], isNull);
+      expect(row['primaryValue'], isNull);
+    },
+  );
+
+  test(
+    'partial preview cache preserves loading, error and expired query metadata',
+    () {
+      for (final status in [
+        QueryStatus.loading,
+        QueryStatus.error,
+        QueryStatus.authExpired,
+      ]) {
+        final payload = accountPayload(
+          CarrierSnapshot(
+            carrier: Carrier.telecom,
+            status: status,
+            queriedAt: time,
+            buckets: const [confirmedPackage, pendingPackage],
+          ),
+        );
+        for (final row in [
+          payload['telecom'] as Map,
+          (payload['instances'] as List).single as Map,
+        ]) {
+          expect(row['status'], status.name);
+          expect(row['queriedAt'], time.millisecondsSinceEpoch);
+          expect(row['previewRemainingBytes'], previewBytes);
+          expect(row['trafficReadableCount'], 1);
+          expect(row['trafficPendingCount'], 1);
+        }
+      }
+    },
+  );
+
+  test('untimed and disconnected rows cannot become partial previews', () {
+    for (final snapshot in [
+      const CarrierSnapshot(
+        carrier: Carrier.telecom,
+        status: QueryStatus.loading,
+        buckets: [confirmedPackage, pendingPackage],
+      ),
+      CarrierSnapshot(
+        carrier: Carrier.telecom,
+        status: QueryStatus.notConnected,
+        queriedAt: time,
+        buckets: const [confirmedPackage, pendingPackage],
+      ),
+    ]) {
+      final payload = accountPayload(snapshot);
+      for (final row in [
+        payload['telecom'] as Map,
+        (payload['instances'] as List).single as Map,
+      ]) {
+        expect(row['trafficReadableCount'], 0);
+        expect(row['trafficPendingCount'], 0);
+        expect(row['previewRemainingBytes'], isNull);
+        expect(row['previewUnlimited'], isFalse);
+      }
+    }
+  });
+
+  test(
+    'complete headline or no pending package does not request a preview',
+    () {
+      for (final buckets in [
+        [confirmedPackage],
+        [pendingPackage],
+        [
+          confirmedPackage.copyWith(manualKind: BucketKind.general),
+          pendingPackage,
+        ],
+      ]) {
+        final payload = accountPayload(
+          CarrierSnapshot(
+            carrier: Carrier.telecom,
+            status: QueryStatus.success,
+            queriedAt: time,
+            buckets: buckets,
+          ),
+        );
+        final row = (payload['instances'] as List).single as Map;
+        expect(row['previewRemainingBytes'], isNull);
+        expect(row['previewUnlimited'], isFalse);
+      }
+    },
+  );
+
+  test('other carriers cannot use the Telecom partial preview fallback', () {
+    for (final carrier in [Carrier.mobile, Carrier.broadnet, Carrier.unicom]) {
+      final payload = accountPayload(
+        CarrierSnapshot(
+          carrier: carrier,
+          status: QueryStatus.success,
+          queriedAt: time,
+          buckets: const [confirmedPackage, pendingPackage],
+        ),
+      );
+      final row = (payload['instances'] as List).single as Map;
+      expect(row['trafficReadableCount'], 0);
+      expect(row['trafficPendingCount'], 0);
+      expect(row['previewRemainingBytes'], isNull);
+      expect(row['previewUnlimited'], isFalse);
+    }
+  });
+
+  test(
+    'partial widget counts stay bounded while retaining the first package',
+    () {
+      final payload = accountPayload(
+        CarrierSnapshot(
+          carrier: Carrier.telecom,
+          status: QueryStatus.success,
+          queriedAt: time,
+          buckets: [
+            for (var index = 0; index < 250; index++) confirmedPackage,
+            for (var index = 0; index < 250; index++) pendingPackage,
+          ],
+        ),
+      );
+      final row = (payload['instances'] as List).single as Map;
+      expect(row['trafficReadableCount'], 200);
+      expect(row['trafficPendingCount'], 200);
+      expect(row['previewRemainingBytes'], previewBytes);
+      expect(row['primaryValue'], isNull);
+    },
+  );
   test(
     'hidden history never occupies a widget slot or displaces selected accounts',
     () {

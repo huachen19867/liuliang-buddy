@@ -36,6 +36,7 @@ Map<String, Object?> buildWidgetPayload(
               : accountSnapshots[carrier.name]);
     final snapshot = candidate?.carrier == carrier ? candidate : null;
     final summary = snapshot == null ? null : summarizeTraffic(snapshot);
+    final partialTraffic = _partialTelecomTraffic(snapshot, summary);
     final unlimited =
         snapshot != null &&
         snapshot.queriedAt != null &&
@@ -47,6 +48,7 @@ Map<String, Object?> buildWidgetPayload(
       'label': summary?.label ?? '余额待确认',
       'queriedAt': snapshot?.queriedAt?.millisecondsSinceEpoch,
       'unlimited': unlimited,
+      ...partialTraffic,
     };
   }
   if (accounts != null) {
@@ -62,6 +64,7 @@ Map<String, Object?> buildWidgetPayload(
       final candidate = accountSnapshots[account.id];
       final snapshot = candidate?.carrier == account.carrier ? candidate : null;
       final summary = snapshot == null ? null : summarizeTraffic(snapshot);
+      final partialTraffic = _partialTelecomTraffic(snapshot, summary);
       final unlimited =
           snapshot != null &&
           snapshot.queriedAt != null &&
@@ -106,11 +109,57 @@ Map<String, Object?> buildWidgetPayload(
         'primaryLabel': unlimited ? '含不限量套餐' : summary?.label ?? '余额待确认',
         'queriedAt': snapshot?.queriedAt?.millisecondsSinceEpoch,
         'isUnlimited': unlimited,
+        ...partialTraffic,
       });
     }
     payload['instances'] = instances;
   }
   return payload;
+}
+
+/// A preview identifies one confirmed package, never an incomplete total.
+/// No package names or raw carrier strings cross the native widget boundary.
+Map<String, Object?> _partialTelecomTraffic(
+  CarrierSnapshot? snapshot,
+  TrafficSummary? summary,
+) {
+  var readable = 0;
+  var pending = 0;
+  TrafficBucket? firstReadable;
+  if (snapshot != null &&
+      snapshot.carrier == Carrier.telecom &&
+      snapshot.queriedAt != null &&
+      snapshot.status != QueryStatus.notConnected) {
+    for (final bucket in snapshot.buckets) {
+      final remaining = bucket.remainingBytes;
+      final total = bucket.totalBytes;
+      final confirmed =
+          bucket.name.trim().isNotEmpty &&
+          (bucket.isUnlimited
+              ? remaining == null && total == null
+              : hasVerifiedTrafficUnit(bucket.rawUnit) &&
+                    remaining != null &&
+                    remaining >= 0 &&
+                    remaining <= 9223372036854775807 &&
+                    (total == null ||
+                        (total >= remaining && total <= 9223372036854775807)));
+      if (confirmed) {
+        if (readable < 200) readable++;
+        firstReadable ??= bucket;
+      } else {
+        if (pending < 200) pending++;
+      }
+    }
+  }
+  final preview = summary == null && readable > 0 && pending > 0
+      ? firstReadable
+      : null;
+  return {
+    'trafficReadableCount': readable,
+    'trafficPendingCount': pending,
+    'previewRemainingBytes': preview?.remainingBytes,
+    'previewUnlimited': preview?.isUnlimited ?? false,
+  };
 }
 
 enum WidgetPinStatus {

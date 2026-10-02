@@ -387,3 +387,13 @@ iOS旧run36956057050回读failure，编译与冷启动已执行，失败发生�
 正式Release163.4秒成功，APK28,038,456字节/SHA256 ca4a847f6fdfedd5e4d986627a2b0586f18b034a65d8a69b83938ea8271bc00f；1.10.4/code21、v2正式证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐通过。wrapper自动还原官方配置。准备仅push public并发布唯一APK，源码/截图和技术索引同步，没有实号或USB新验证。
 
 1.10.4公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.4 ，draft=false/prerelease=false，target/tag均5b306ec2c8378507b2d753034a696c97eaf2fea7。唯一APKuploaded/28038456字节、远端digest ca4a847f6fdfedd5e4d986627a2b0586f18b034a65d8a69b83938ea8271bc00f与本机一致。源码仅push public，当前工作树clean。新iOS云端run36999305137仍in_progress，不标本版通过；旧1.10.3 run36977121920回读success，不能代替本版。回执另docs提交，不移动tag/替换APK。真实电信缺项原因仍待该官网原始明细确认，本版是诚实部分状态与明细压缩修正。
+
+## 2026-10-02：桌面小组件部分套餐与空框压缩
+
+老板追问折叠后桌面组件，承认1.10.4只改APP，继续补齐组件。开始读TECH_LOG并复用已下载home_widget/官方WidgetKit、RemoteViews参考及既有XML预览，不重复下载。轻量分工GPT6.1 SOL高实现Dart展示协议/10项测试，GPT6 Luna极高实现Swift解码/WidgetKit，Astra中等只读缓存/系统入口风险；根实施Android缓存/布局/单测和串行验证。新字段只发布计数和第一项已核余量，不发布套餐名、凭证或局部求和；主合计null保持不变。schema1/2保存还原同字段，partial标签覆盖任一不限量导致的原canonical标记；快捷设置补单项标签。无类别/通话时桌面右侧空格子收起，换成单项与待确认；有有效类别保留原栏。
+
+完整Flutter261项/14秒通过、analyze无问题。初版native新测试通过后补空框右侧面板，再次强制rerun本项目单测BUILD SUCCESSFUL7秒，XML时间/数量回读另补。预览脚本新增换行时嵌套template literal将转义变成JS字面换行，出现null布局；保留校验并修正为双层转义，两卡/四卡真实XML合成预览成功，目视检查无空格子、单项/待确认可读。预览非实拍，未接真卡/USB；Swift尚待macOS云端，Windows不声称已编译。
+
+最终native小修仅防止估算标签重复“约”、保留紧凑摘要的过期提示；强制rerun BUILD SUCCESSFUL9秒，四份新JUnit XML时间2026-10-02T11:33:30Z，共32项0失败0错误，非旧结果。Dart SDK验证后未再改生产Dart。Swift审查补电信/非未连接门禁、计数总和≤200、Codable解码后的时间/数值复核及过期优先，新增回归尚待云端。原生XML两卡、三卡、四卡61个ID与隐藏字段校验通过并生成合成图。正式Release构建接续。
+
+正式Release41.5秒成功，APK28,039,020字节/SHA256 f88a7eadf0cebbee95645bfc93097d8228d0fb3bafff1263d4a5ca60307fa048；1.10.5/code22、正式v2证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐验证通过，wrapper恢复官方无diff。仅准备push public，发布一个APK；同名折叠仍在APP，桌面发布第一条可读单项而非同名组求和。

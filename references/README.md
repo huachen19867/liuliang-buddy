@@ -57,3 +57,5 @@ unicom-solutions-20261002/ 保存 Newxin394/unicom-monitor 的 App 登录/续期
 1.10.3联通双不限反馈复用unicom-query-20261001/0-1.html的官方personalInfo_back与flowTemplate成功门禁，以及既有FlowLite边界资料；不重新下载，不凭套餐名扩大认证或宣称无限GB。有限脚本就绪等待与部分结果保留见docs/RELEASE_1.10.3.md。
 
 2026-10-02 电信明细压缩复用 telecom-public-deep 的 Account 模板及 scripts/test-telecom-rendered-browser.cjs。模板对每个套餐条目渲染一行，无可靠唯一业务ID，完整名称相同只做展示折叠、不去重或求和；本轮未新增外部业务代码。
+
+2026-10-02 桌面部分套餐同步复用 ios-home-widget 官方 WidgetKit/App Group 与已有 RemoteViews 布局参考。仅扩展示字段，不发布运营商原始明细，不引入外部解析或认证代码；组件压缩契约见 docs/WIDGET_PARTIAL_DATA.md。

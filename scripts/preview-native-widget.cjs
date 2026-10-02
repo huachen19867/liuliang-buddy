@@ -9,9 +9,10 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const resourceRoot = path.join(root, 'app/android/app/src/main/res');
 const count = Number(process.argv[2] || 2);
+const partial = process.argv.includes('--partial');
 if (![2, 3, 4].includes(count)) throw new Error('Preview count must be 2, 3 or 4.');
 const layoutPath = path.join(resourceRoot, count >= 3 ? 'layout/traffic_widget_compact.xml' : 'layout/traffic_widget.xml');
-const outputPath = path.join(root, count === 2 ? 'artifacts/widget-glass-preview.png' : `artifacts/widget-${count === 3 ? 'three' : 'four'}-preview.png`);
+const outputPath = path.join(root, partial ? `artifacts/widget-partial-${count}-preview.png` : count === 2 ? 'artifacts/widget-glass-preview.png' : `artifacts/widget-${count === 3 ? 'three' : 'four'}-preview.png`);
 
 const demo = {
   widget_root: { visibility: 'visible' },
@@ -67,6 +68,17 @@ if (count >= 3) {
     demo.slot_4_voice = { text: '约 80 分钟' };
     demo.slot_4_summary = { text: '话费 38.00 元', visibility: 'visible' };
   }
+}
+
+if (partial) {
+  demo[`slot_${count}_name`] = { text: '中国电信 1' };
+  demo[`slot_${count}_badge`] = { src: '@drawable/carrier_telecom' };
+  for (const field of ['general', 'directed', 'other', 'voice']) demo[`slot_${count}_${field}`] = {text: '—'};
+  demo[`slot_${count}_summary`] = {text: count >= 3 ? '单项约 27.50 GB · 1项待确认' : '单项约 27.50 GB', visibility: 'visible'};
+  demo[`slot_${count}_state`] = count >= 3 ? {visibility: 'gone'} : {text: '9项可读 · 1项待确认', visibility: 'visible'};
+  demo[`slot_${count}_details`] = {visibility: 'gone'};
+  demo[`slot_${count}_partial`] = {text: '单项约 27.50 GB\n1项待确认', visibility: 'visible'};
+  demo[`slot_${count}_summary`] = count >= 3 ? {text: '9项可读 · 1项待确认', visibility: 'visible'} : {visibility: 'gone'};
 }
 
 function readRequired(file) {
@@ -261,6 +273,7 @@ async function main() {
           element.style.webkitLineClamp = String(maxLines);
           element.style.whiteSpace = 'normal';
         }
+        if (text.includes('\\n')) element.style.whiteSpace = 'pre-line';
         if (gravity.includes('center')) element.style.textAlign = 'center';
         if (gravity.includes('right')) element.style.textAlign = 'right';
         if (gravity === 'center') {
