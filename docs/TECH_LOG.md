@@ -373,3 +373,15 @@ iOS旧run36956057050回读failure，编译与冷启动已执行，失败发生�
 首轮全量测试发现successFlow失败拒绝的历史约束，已保持失败门禁并更正新增用例，未删除旧断言；最终246项全量/22秒通过、analyze无问题、Node13通过。混用执行目录的文档脚本未成功写文件，已在根目录重新修改回读；根目录静态分析已中断并改app限定运行，避免扫描参考工程。Release169.3秒成功；1.10.3/code20/ARM64/API24-36/非debuggable/v2正式证书33b11555/16KB ZIP对齐通过，APK27907308字节/SHA256 320bc3c9189bea458472692c54a6d0e57ff4f057a8c3f5eb7e43413b721497ea。构建结束发现wrapper仍本机file路径，恢复本轮前官方tracked配置再提交；未更改native业务故不重复JUnit。仅发布一个APK，无实号或USB验证。
 
 1.10.3公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.3 ，draft=false/prerelease=false，target afbb5c690969e6522a52bd037c94e8454bc2cadf，唯一APKuploaded/27907308字节，远端完整digest 320bc3c9189bea458472692c54a6d0e57ff4f057a8c3f5eb7e43413b721497ea一致。首轮gh在最终PATCH EOF，代理连续TLS失败；按返回releaseID和列表直连确认没有残留草稿/重复版本，再用直连重新创建并回读确认。代理只在当前命令环境移除，未修改系统代理或TLS验证；凭证未输出。源码仅push public，回执另docs提交，不改APK/tag。仍不宣称真实双不限卡已经连接成功。
+
+## 2026-10-02：电信部分明细与首页压缩
+
+老板反馈电信已同步却顶部余额待确认、展开长列表，追加要求压缩信息而不只是分页。已定位日志并复用 references/telecom-public-deep 官方 Account 归档、FlowLite 及既有浏览器脚本，不重复下载。轻量分工 Astra中等只读探针/格式研究，GPT6.1 SOL高实现首页及回归，GPT6 Luna极高只读组件与数据边界复核；根串行 SDK 验证和发布。官网模板逐项渲染，现无证据证明同名为重复采集，不删除或相加；完整名称相同折叠成组，逐项余量仍保留。部分读取明确状态/项数，空字段压缩；不改变保守合计和组件协议。
+
+既有电信真实 Chrome 合成回归13组通过，所有网络拦截本地，无真实账号。新 UI 与正式分发尚待集成验证。
+
+只读审查确认 dlife-public/protocol-excerpts.txt 中两层 items 循环本来逐行渲染；探针每次新数组、每个节点一次，_putSnapshot 替换旧快照，不追加。当前regex覆盖归档两位小数MB/GB，未知行可能来自0总量/已用超额/占位或新格式，缺实际原文无法定因。保留200行上限、精确页面门禁、单位和不限量保护，本轮只改展示。后续可单独研究原始用量与失效时间诊断，未混入本次修复。
+
+集成先跑首页/分类37项通过并目视检查telecom-partial-preview.png，随后审查收紧partial必须同时有confirmed和unresolved、拒绝空名，并禁止电信单条fallback绕过summary。新增仅通话有效、流量全待确认回归；最终全量Flutter251项/26秒通过，analyze无问题，浏览器13合成场景通过。24条合成明细首屏三组、空占位隐藏，320宽1.4字体组弹窗及分页/分类验证通过。仅恢复本轮测试生成的无关选择截图，保留号码占位变化的首页截图。未改native业务，不重复JUnit；无实际电信账号/USB。
+
+正式Release163.4秒成功，APK28,038,456字节/SHA256 ca4a847f6fdfedd5e4d986627a2b0586f18b034a65d8a69b83938ea8271bc00f；1.10.4/code21、v2正式证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐通过。wrapper自动还原官方配置。准备仅push public并发布唯一APK，源码/截图和技术索引同步，没有实号或USB新验证。

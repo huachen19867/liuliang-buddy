@@ -143,6 +143,13 @@ void main() {
       ),
     );
     await _openBucket(tester, '同名套餐', first: true);
+    expect(find.text('共 2 项'), findsOneWidget);
+    final groupedBalance = find
+        .descendant(of: find.byType(AlertDialog), matching: find.text('1.0 GB'))
+        .first;
+    await tester.ensureVisible(groupedBalance);
+    await tester.tap(groupedBalance);
+    await tester.pumpAndSettle();
 
     expect(find.text('存在同名套餐，暂时无法准确区分'), findsOneWidget);
     expect(find.text('保存'), findsNothing);

@@ -727,7 +727,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('套餐估算余量'), findsNothing);
-    expect(find.text('余额待确认'), findsOneWidget);
+    expect(find.text('部分同步'), findsOneWidget);
+    expect(find.text('已同步'), findsNothing);
+    expect(find.text('已读取 1 项 · 1 项待确认'), findsOneWidget);
+    expect(find.text('余额待确认'), findsNothing);
+    expect(find.text('通话余量'), findsNothing);
+    expect(find.text('短信余量'), findsNothing);
+    expect(find.text('套餐用途待确认，可点明细设置'), findsOneWidget);
     expect(find.text('部分官网明细无法估算，暂不显示合计；请核对官方查询页'), findsOneWidget);
     expect(find.text('约 18.0 GB'), findsOneWidget);
     expect(find.text('剩余额无法确认（单位待确认）'), findsOneWidget);
@@ -740,6 +746,267 @@ void main() {
     expect(find.textContaining('舍入差异'), findsOneWidget);
     expect(find.textContaining('不展示估算余额'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('电信仅有通话有效时不冒称流量部分同步', (tester) async {
+    _configureViewport(tester, const Size(320, 640));
+    await tester.pumpWidget(
+      _host(
+        snapshots: [
+          CarrierSnapshot(
+            carrier: Carrier.telecom,
+            status: QueryStatus.success,
+            queriedAt: DateTime(2026, 10, 2, 15),
+            buckets: const [
+              TrafficBucket(name: '待确认套餐', kind: BucketKind.unknown),
+            ],
+            allowances: const [
+              ServiceAllowance(
+                kind: AllowanceKind.voice,
+                label: '通话',
+                remaining: 100,
+              ),
+            ],
+          ),
+        ],
+        selectedCarriers: const {Carrier.telecom},
+        demo: false,
+        textScale: 1.4,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('部分同步'), findsNothing);
+    expect(find.textContaining('已读取 0 项'), findsNothing);
+    expect(find.text('余额待确认'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('未备注号码只保留账号标记，已知号码继续脱敏显示', (tester) async {
+    _configureViewport(tester, const Size(320, 640));
+    await tester.pumpWidget(
+      _host(
+        snapshots: [
+          const CarrierSnapshot(
+            carrier: Carrier.telecom,
+            status: QueryStatus.notConnected,
+          ),
+        ],
+        selectedCarriers: const {Carrier.telecom},
+        demo: false,
+        textScale: 1.4,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('号码未备注'), findsNothing);
+    expect(find.text('中国电信'), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(
+      _host(
+        snapshots: [_telecomPartialDemoSnapshot()],
+        selectedCarriers: const {Carrier.telecom},
+        demo: false,
+        textScale: 1.4,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('189****7612'), findsOneWidget);
+    expect(find.text('已读取 1 项 · 1 项待确认'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('套餐每页最多五组，翻页后仍能分类并可收起', (tester) async {
+    _configureViewport(tester, const Size(320, 640));
+    final snapshot = CarrierSnapshot(
+      carrier: Carrier.telecom,
+      status: QueryStatus.success,
+      queriedAt: DateTime(2026, 10, 2, 15),
+      buckets: [
+        for (var index = 1; index <= 12; index++)
+          TrafficBucket(
+            name: '分页套餐 $index',
+            kind: BucketKind.unknown,
+            remainingBytes: index == 12 ? null : index * _gib,
+            totalBytes: 20 * _gib,
+            rawUnit: index == 12 ? null : 'B',
+          ),
+      ],
+    );
+    String? savedName;
+    await tester.pumpWidget(
+      _host(
+        snapshots: [snapshot],
+        selectedCarriers: const {Carrier.telecom},
+        demo: false,
+        textScale: 1.4,
+        onClassifyBucket: (_, bucket, _) async {
+          savedName = bucket.name;
+          return true;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('分页套餐 3'), findsOneWidget);
+    expect(find.text('分页套餐 4'), findsNothing);
+    await tester.ensureVisible(find.text('查看全部 12 项'));
+    await tester.tap(find.text('查看全部 12 项'));
+    await tester.pumpAndSettle();
+    expect(find.text('分页套餐 5'), findsOneWidget);
+    expect(find.text('分页套餐 6'), findsNothing);
+    expect(find.text('第 1 / 3 页'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('下一页'));
+    await tester.tap(find.text('下一页'));
+    await tester.pumpAndSettle();
+    expect(find.text('分页套餐 1'), findsNothing);
+    expect(find.text('分页套餐 6'), findsOneWidget);
+    expect(find.text('分页套餐 10'), findsOneWidget);
+    expect(find.text('分页套餐 11'), findsNothing);
+    await tester.ensureVisible(find.text('分页套餐 6'));
+    await tester.tap(find.text('分页套餐 6'));
+    await tester.pumpAndSettle();
+    expect(find.text('用途分类'), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('bucket-classification-general')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('bucket-classification-general')),
+    );
+    await tester.ensureVisible(find.text('保存'));
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(savedName, '分页套餐 6');
+
+    await tester.ensureVisible(find.text('下一页'));
+    await tester.tap(find.text('下一页'));
+    await tester.pumpAndSettle();
+    expect(find.text('分页套餐 11'), findsOneWidget);
+    expect(find.text('分页套餐 12'), findsOneWidget);
+    expect(find.text('分页套餐 10'), findsNothing);
+    expect(find.text('第 3 / 3 页'), findsOneWidget);
+    await tester.ensureVisible(find.text('上一页'));
+    await tester.tap(find.text('上一页'));
+    await tester.pumpAndSettle();
+    expect(find.text('第 2 / 3 页'), findsOneWidget);
+    await tester.ensureVisible(find.text('收起套餐明细'));
+    await tester.tap(find.text('收起套餐明细'));
+    await tester.pumpAndSettle();
+    expect(find.text('分页套餐 3'), findsOneWidget);
+    expect(find.text('分页套餐 4'), findsNothing);
+    expect(find.text('上一页'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('同名不同余量只折叠展示，组弹窗保留每项及详情', (tester) async {
+    _configureViewport(tester, const Size(320, 640));
+    const longName = '国内基础流量同名赠送套餐完整名称及适用地区说明请逐项核对';
+    final snapshot = CarrierSnapshot(
+      carrier: Carrier.telecom,
+      status: QueryStatus.success,
+      queriedAt: DateTime(2026, 10, 2, 15),
+      buckets: [
+        for (var index = 1; index <= 8; index++)
+          TrafficBucket(
+            name: index == 2 ? ' $longName ' : longName,
+            kind: BucketKind.unknown,
+            remainingBytes: index * _gib,
+            totalBytes: 10 * _gib,
+            rawUnit: 'B',
+          ),
+        const TrafficBucket(
+          name: '$longName（省内）',
+          kind: BucketKind.unknown,
+          rawRemaining: '待确认',
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      _host(
+        snapshots: [snapshot],
+        selectedCarriers: const {Carrier.telecom},
+        demo: false,
+        textScale: 1.4,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('共 8 项'), findsOneWidget);
+    expect(find.text('已读取 8 项 · 1 项待确认'), findsOneWidget);
+    expect(find.text('$longName（省内）'), findsOneWidget);
+    expect(find.text('查看全部 9 项'), findsNothing);
+    expect(find.text('约 1.0 GB'), findsNothing);
+    await tester.ensureVisible(find.text('共 8 项'));
+    await tester.tap(find.text('共 8 项'));
+    await tester.pumpAndSettle();
+    expect(find.text('约 1.0 GB'), findsOneWidget);
+    await tester.tap(find.text('约 1.0 GB'));
+    await tester.pumpAndSettle();
+    expect(find.text('剩余流量（估算）'), findsOneWidget);
+    expect(find.text('约 1.0 GB'), findsNWidgets(2));
+    await tester.ensureVisible(find.text('知道了'));
+    await tester.tap(find.text('知道了'));
+    await tester.pumpAndSettle();
+    final dialogList = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byType(ListView),
+    );
+    await tester.scrollUntilVisible(
+      find.text('第 8 项'),
+      150,
+      scrollable: find.descendant(
+        of: dialogList,
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expect(find.text('约 8.0 GB'), findsOneWidget);
+    await tester.tap(find.text('关闭'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('共 8 项'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('生成电信多项部分同步分组真实组件预览', (tester) async {
+    _configureViewport(tester, const Size(390, 844));
+    final snapshot = CarrierSnapshot(
+      carrier: Carrier.telecom,
+      status: QueryStatus.success,
+      queriedAt: DateTime(2026, 10, 2, 15),
+      message: '部分官网明细无法估算，暂不显示合计；请核对官方查询页',
+      buckets: [
+        for (var index = 0; index < 24; index++)
+          TrafficBucket(
+            name: index < 8
+                ? '基础套餐流量'
+                : index < 16
+                ? '长期赠送流量包'
+                : index < 23
+                ? '专属应用流量'
+                : '待确认套餐',
+            kind: BucketKind.unknown,
+            remainingBytes: index == 23 ? null : (index + 1) * _gib,
+            totalBytes: 30 * _gib,
+            rawUnit: index == 23 ? null : 'B',
+          ),
+      ],
+    );
+    await tester.pumpWidget(
+      _host(
+        snapshots: [snapshot],
+        selectedCarriers: const {Carrier.telecom},
+        demo: true,
+        textScale: 1,
+        previewBoundaryKey: _previewBoundaryKey,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
+    expect(find.text('已读取 23 项 · 1 项待确认'), findsOneWidget);
+    expect(find.text('共 8 项'), findsNWidgets(2));
+    expect(find.text('共 7 项'), findsOneWidget);
+    expect(find.text('已同步'), findsNothing);
+    expect(find.text('号码未备注'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await _writeScreenshot(tester, 'telecom-partial-preview.png');
   });
 
   testWidgets('四家组合在窄屏可滚动显示全部选中运营商', (tester) async {
@@ -1048,6 +1315,7 @@ Widget _host({
   List<DashboardAccountEntry>? accountEntries,
   ValueChanged<String>? onConnectAccount,
   ValueChanged<String>? onRefreshAccount,
+  BucketClassificationCallback? onClassifyBucket,
 }) {
   final callbacks = calls ?? _CallbackCalls();
   final typography = Typography.material2021(platform: TargetPlatform.android);
@@ -1082,6 +1350,7 @@ Widget _host({
       accountEntries: accountEntries,
       onConnectAccount: onConnectAccount,
       onRefreshAccount: onRefreshAccount,
+      onClassifyBucket: onClassifyBucket,
       onManageCarriers: onManageCarriers,
       onAddWidget: onAddWidget,
       widgetSupported: widgetSupported,

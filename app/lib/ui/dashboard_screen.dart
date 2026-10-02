@@ -410,6 +410,10 @@ class _SummaryCard extends StatelessWidget {
     final hasSinglePackageTotal = singleSummary?.label == '套餐明细合计';
     final hasSingleEstimate = singleSummary?.isEstimate == true;
     final hasSingleBalance = hasSinglePackageTotal || hasSingleEstimate;
+    final singlePartial = _hasPartialTelecomTraffic(
+      single?.snapshot,
+      singleSummary,
+    );
     final singleMessage = single?.snapshot?.message?.trim();
     final singleStatusMessage =
         single != null &&
@@ -453,6 +457,8 @@ class _SummaryCard extends StatelessWidget {
               : '所选运营商的通用流量剩余合计'
         : hasSingleBalance
         ? singleSummary!.detailNotice ?? '已查询套餐余额'
+        : singlePartial
+        ? '${_trafficReadProgress(single!.snapshot!)}；合计待确认，详见下方套餐。'
         : hasUnlimited
         ? '官网标注不限量，达量后的使用规则请查看下方套餐说明。'
         : singleStatusMessage ??
@@ -650,6 +656,28 @@ class _ThresholdHint extends StatelessWidget {
   }
 }
 
+bool _hasPartialTelecomTraffic(
+  CarrierSnapshot? snapshot,
+  TrafficSummary? summary,
+) =>
+    snapshot?.carrier == Carrier.telecom &&
+    snapshot?.status == QueryStatus.success &&
+    summary == null &&
+    snapshot!.buckets.any(_isConfirmedTrafficBucket) &&
+    snapshot.buckets.any((bucket) => !_isConfirmedTrafficBucket(bucket));
+
+bool _isConfirmedTrafficBucket(TrafficBucket bucket) =>
+    bucket.name.trim().isNotEmpty &&
+    (bucket.isUnlimited ||
+        (bucket.remainingBytes != null &&
+            bucket.remainingBytes! >= 0 &&
+            hasVerifiedTrafficUnit(bucket.rawUnit)));
+
+String _trafficReadProgress(CarrierSnapshot snapshot) {
+  final confirmed = snapshot.buckets.where(_isConfirmedTrafficBucket).length;
+  return '已读取 $confirmed 项 · ${snapshot.buckets.length - confirmed} 项待确认';
+}
+
 class _CarrierCard extends StatelessWidget {
   const _CarrierCard({
     super.key,
@@ -686,11 +714,24 @@ class _CarrierCard extends StatelessWidget {
     final trafficSummary = snapshot == null
         ? null
         : summarizeTraffic(snapshot!);
+    final partialSync = _hasPartialTelecomTraffic(snapshot, trafficSummary);
+    final showServices =
+        !partialSync ||
+        snapshot!.allowances.any(
+          (item) =>
+              item.remaining != null ||
+              item.total != null ||
+              item.overage != null ||
+              item.isUnlimited ||
+              (item.rawRemaining?.trim().isNotEmpty ?? false),
+        );
     final singleUnknownBucket = snapshot?.buckets.length == 1
         ? snapshot!.buckets.single
         : null;
     final canShowUnknownBucket =
         carrier != Carrier.mobile &&
+        carrier != Carrier.telecom &&
+        !partialSync &&
         singleUnknownBucket?.kind == BucketKind.unknown &&
         singleUnknownBucket?.remainingBytes != null &&
         (singleUnknownBucket?.rawUnit?.trim().isNotEmpty ?? false);
@@ -702,7 +743,9 @@ class _CarrierCard extends StatelessWidget {
         (canShowUnknownBucket ? singleUnknownBucket!.totalBytes : null);
     final remainingLabel =
         trafficSummary?.label ??
-        (canShowUnknownBucket
+        (partialSync
+            ? '套餐明细'
+            : canShowUnknownBucket
             ? '套餐余量'
             : status == QueryStatus.success &&
                   snapshot?.hasUnlimitedAllowance == true
@@ -765,15 +808,16 @@ class _CarrierCard extends StatelessWidget {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         _SlotTag(label: slotLabel, accent: accent),
-                        Text(
-                          phoneHint ?? '号码未备注',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: ResortPalette.muted,
-                            fontSize: 10,
+                        if (phoneHint?.trim().isNotEmpty ?? false)
+                          Text(
+                            phoneHint!.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: ResortPalette.muted,
+                              fontSize: 10,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ],
@@ -784,7 +828,7 @@ class _CarrierCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  _StatusBadge(status: status),
+                  _StatusBadge(status: status, partial: partialSync),
                   if (onEdit != null) ...[
                     const SizedBox(height: 2),
                     SizedBox(
@@ -806,7 +850,7 @@ class _CarrierCard extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: compact ? 9 : 15),
+          SizedBox(height: compact || partialSync ? 9 : 15),
           Container(
             padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
             decoration: BoxDecoration(
@@ -865,7 +909,18 @@ class _CarrierCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          if (remainingBytes != null)
+                          if (partialSync)
+                            Text(
+                              _trafficReadProgress(snapshot!),
+                              key: ValueKey('traffic-read-progress-$accountId'),
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: ResortPalette.ink,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                                height: 1.3,
+                              ),
+                            )
+                          else if (remainingBytes != null)
                             _BigUsageValue(
                               bytes: remainingBytes,
                               isEstimate: trafficSummary?.isEstimate ?? false,
@@ -913,7 +968,11 @@ class _CarrierCard extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 9),
-                _DataFootnote(snapshot: snapshot, status: status),
+                _DataFootnote(
+                  snapshot: snapshot,
+                  status: status,
+                  partial: partialSync,
+                ),
                 if (detailNotice != null && detailNotice.isNotEmpty) ...[
                   const SizedBox(height: 7),
                   Text(
@@ -929,7 +988,18 @@ class _CarrierCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 9),
-          _TrafficCategoryRow(snapshot: snapshot, status: status),
+          if (partialSync &&
+              BucketKind.values.every(
+                (kind) =>
+                    !summarizeTrafficGroup(snapshot!, kind).isComplete &&
+                    !summarizeTrafficGroup(snapshot!, kind).isUnlimited,
+              ))
+            const Text(
+              '套餐用途待确认，可点明细设置',
+              style: TextStyle(color: ResortPalette.muted, fontSize: 11),
+            )
+          else
+            _TrafficCategoryRow(snapshot: snapshot, status: status),
           if (remainingBytes == null && status == QueryStatus.notConnected) ...[
             const SizedBox(height: 9),
             const Text(
@@ -944,9 +1014,13 @@ class _CarrierCard extends StatelessWidget {
                 key: ValueKey('account-details-$accountId'),
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: const EdgeInsets.only(bottom: 8),
-                title: const Text('套餐与通话明细', style: TextStyle(fontSize: 12)),
+                title: Text(
+                  showServices ? '套餐与通话明细' : '套餐明细',
+                  style: const TextStyle(fontSize: 12),
+                ),
                 children: [
-                  _ServiceAllowances(snapshot: snapshot, status: status),
+                  if (showServices)
+                    _ServiceAllowances(snapshot: snapshot, status: status),
                   if (_detailBuckets.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     _TrafficBucketList(
@@ -962,10 +1036,12 @@ class _CarrierCard extends StatelessWidget {
               ),
             )
           else ...[
-            const SizedBox(height: 12),
-            _ServiceAllowances(snapshot: snapshot, status: status),
-            if (_detailBuckets.isNotEmpty) ...[
+            if (showServices) ...[
               const SizedBox(height: 12),
+              _ServiceAllowances(snapshot: snapshot, status: status),
+            ],
+            if (_detailBuckets.isNotEmpty) ...[
+              SizedBox(height: partialSync ? 8 : 12),
               _TrafficBucketList(
                 accountId: accountId,
                 snapshot: snapshot,
@@ -1358,10 +1434,15 @@ class _BigUsageValue extends StatelessWidget {
 }
 
 class _DataFootnote extends StatelessWidget {
-  const _DataFootnote({required this.snapshot, required this.status});
+  const _DataFootnote({
+    required this.snapshot,
+    required this.status,
+    this.partial = false,
+  });
 
   final CarrierSnapshot? snapshot;
   final QueryStatus status;
+  final bool partial;
 
   @override
   Widget build(BuildContext context) {
@@ -1401,11 +1482,11 @@ class _DataFootnote extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(
-          status == QueryStatus.success
+          status == QueryStatus.success && !partial
               ? Icons.verified_outlined
               : Icons.info_outline_rounded,
           size: 14,
-          color: status == QueryStatus.success
+          color: status == QueryStatus.success && !partial
               ? const Color(0xFF70A58A)
               : color,
         ),
@@ -1444,32 +1525,66 @@ class _TrafficBucketList extends StatefulWidget {
 
 class _TrafficBucketListState extends State<_TrafficBucketList> {
   bool _expanded = false;
+  int _pageIndex = 0;
 
   @override
   Widget build(BuildContext context) {
-    final visibleBuckets = _expanded
-        ? widget.buckets
-        : widget.buckets.take(3).toList(growable: false);
+    final groups = _groupTrafficBuckets(widget.buckets);
+    final pageCount = groups.isEmpty ? 1 : (groups.length + 4) ~/ 5;
+    final currentPage = _pageIndex.clamp(0, pageCount - 1);
+    final visibleGroups = _expanded
+        ? groups.skip(currentPage * 5).take(5)
+        : groups.take(3);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final bucket in visibleBuckets)
+        for (final group in visibleGroups)
           Padding(
             padding: const EdgeInsets.only(bottom: 5),
-            child: _TrafficBucketRow(
+            child: _TrafficBucketGroupRow(
               accountId: widget.accountId,
               snapshot: widget.snapshot,
-              bucket: bucket,
+              group: group,
               accent: widget.accent,
               estimated: widget.estimated,
               onClassifyBucket: widget.onClassifyBucket,
             ),
           ),
-        if (widget.buckets.length > 3)
+        if (_expanded && pageCount > 1)
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              TextButton(
+                onPressed: currentPage == 0
+                    ? null
+                    : () => setState(() => _pageIndex = currentPage - 1),
+                child: const Text('上一页'),
+              ),
+              Text(
+                '第 ${currentPage + 1} / $pageCount 页',
+                style: const TextStyle(
+                  color: ResortPalette.muted,
+                  fontSize: 11,
+                ),
+              ),
+              TextButton(
+                onPressed: currentPage == pageCount - 1
+                    ? null
+                    : () => setState(() => _pageIndex = currentPage + 1),
+                child: const Text('下一页'),
+              ),
+            ],
+          ),
+        if (groups.length > 3)
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
-              onPressed: () => setState(() => _expanded = !_expanded),
+              onPressed: () => setState(() {
+                _expanded = !_expanded;
+                _pageIndex = 0;
+              }),
               style: TextButton.styleFrom(
                 foregroundColor: widget.accent,
                 minimumSize: const Size(48, 48),
@@ -1490,6 +1605,176 @@ class _TrafficBucketListState extends State<_TrafficBucketList> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _TrafficBucketGroup {
+  const _TrafficBucketGroup(this.name, this.buckets);
+
+  final String name;
+  final List<TrafficBucket> buckets;
+}
+
+List<_TrafficBucketGroup> _groupTrafficBuckets(List<TrafficBucket> buckets) {
+  final groups = <_TrafficBucketGroup>[];
+  final namedGroups = <String, List<TrafficBucket>>{};
+  for (final bucket in buckets) {
+    final name = bucket.name.trim();
+    if (name.isEmpty) {
+      groups.add(_TrafficBucketGroup(_bucketName(bucket), [bucket]));
+      continue;
+    }
+    final existing = namedGroups[name];
+    if (existing != null) {
+      existing.add(bucket);
+    } else {
+      final rows = [bucket];
+      namedGroups[name] = rows;
+      groups.add(_TrafficBucketGroup(name, rows));
+    }
+  }
+  return groups;
+}
+
+class _TrafficBucketGroupRow extends StatelessWidget {
+  const _TrafficBucketGroupRow({
+    required this.accountId,
+    required this.snapshot,
+    required this.group,
+    required this.accent,
+    required this.estimated,
+    required this.onClassifyBucket,
+  });
+
+  final String accountId;
+  final CarrierSnapshot? snapshot;
+  final _TrafficBucketGroup group;
+  final Color accent;
+  final bool estimated;
+  final BucketClassificationCallback? onClassifyBucket;
+
+  @override
+  Widget build(BuildContext context) {
+    if (group.buckets.length == 1) {
+      return _TrafficBucketRow(
+        accountId: accountId,
+        snapshot: snapshot,
+        bucket: group.buckets.single,
+        accent: accent,
+        estimated: estimated,
+        onClassifyBucket: onClassifyBucket,
+      );
+    }
+    return Material(
+      color: Colors.transparent,
+      child: Semantics(
+        button: true,
+        label: '查看 ${group.name} 的全部 ${group.buckets.length} 项明细',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => showDialog<void>(
+            context: context,
+            builder: (context) => AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 18,
+              ),
+              title: Text(
+                group.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              content: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * .55,
+                  maxWidth: 430,
+                ),
+                child: SizedBox(
+                  width: 430,
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: group.buckets.length + 1,
+                    separatorBuilder: (_, _) => const Divider(height: 13),
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return Text(
+                          '${group.name}\n共 ${group.buckets.length} 项，点明细查看各项余额与分类',
+                          style: const TextStyle(
+                            color: ResortPalette.muted,
+                            fontSize: 11,
+                            height: 1.35,
+                          ),
+                        );
+                      }
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '第 $index 项',
+                            style: const TextStyle(
+                              color: ResortPalette.muted,
+                              fontSize: 11,
+                            ),
+                          ),
+                          _TrafficBucketRow(
+                            accountId: accountId,
+                            snapshot: snapshot,
+                            bucket: group.buckets[index - 1],
+                            accent: accent,
+                            estimated: estimated,
+                            onClassifyBucket: onClassifyBucket,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('关闭'),
+                ),
+              ],
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+            child: Row(
+              children: [
+                Icon(Icons.layers_outlined, size: 14, color: accent),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    group.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF717783),
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '共 ${group.buckets.length} 项',
+                  style: const TextStyle(
+                    color: Color(0xFF4C5563),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: Color(0xFF9AA1AA),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -2054,9 +2339,10 @@ class _RemainingBar extends StatelessWidget {
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
+  const _StatusBadge({required this.status, this.partial = false});
 
   final QueryStatus status;
+  final bool partial;
 
   @override
   Widget build(BuildContext context) {
@@ -2073,9 +2359,13 @@ class _StatusBadge extends StatelessWidget {
         foreground = const Color(0xFF4D78BB);
         background = const Color(0xFFEAF1FB);
       case QueryStatus.success:
-        label = '已同步';
-        foreground = const Color(0xFF53866D);
-        background = const Color(0xFFE9F4EC);
+        label = partial ? '部分同步' : '已同步';
+        foreground = partial
+            ? const Color(0xFF92765F)
+            : const Color(0xFF53866D);
+        background = partial
+            ? const Color(0xFFFFF0E4)
+            : const Color(0xFFE9F4EC);
       case QueryStatus.authExpired:
         label = '待登录';
         foreground = const Color(0xFFAB7657);
