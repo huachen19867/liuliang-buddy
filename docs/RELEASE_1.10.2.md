@@ -14,6 +14,8 @@
 
 正式签名 Release 构建91.0秒完成，版本1.10.2/code19，Android API24/36，仅ARM64、非debuggable，apksigner v2和16KB ZIP对齐通过，使用既有正式证书。唯一APK为27,907,308字节（27.91 MB），SHA-256 `6184e1a6efd977d32be82bfd7fad89186991014913d17b738e93934d78a030e0`。正式证书 SHA-256 `33b115558027fdfa667a3f14a9351fbdb29901948c085daf739e16a9055a497e`，未使用演示数据构建。公开发布回执见技术日志。
 
+正式 Release 已公开，非草稿、非预发布，tag 指向 `8baf3191fb615116de742f4030d256b3be3ae9bd`；唯一 APK asset 为 uploaded，远端字节数与 digest 核对一致。[本版本 iOS 云端验证](https://github.com/huachen19867/liuliang-buddy/actions/runs/36969764815)交付回读进行中，暂无新版本通过回执。
+
 实现与复用说明见 [数据契约](TRAFFIC_CLASSIFICATION_DATA.md)、[界面记录](TRAFFIC_CLASSIFICATION_UI.md)、[前后台审查](TRAFFIC_CLASSIFICATION_REVIEW.md)和 [技术日志](TECH_LOG.md)。
 
 ![套餐用途分类弹窗](../artifacts/traffic-classification-preview.png)
