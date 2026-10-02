@@ -23,6 +23,30 @@ enum QueryStatus { notConnected, loading, success, authExpired, error }
 
 enum BucketKind { general, directed, unknown }
 
+/// Recognized units describe bytes already converted by an official parser.
+/// A purpose correction never supplies a conversion for an unknown unit.
+bool hasVerifiedTrafficUnit(String? rawUnit) =>
+    switch (rawUnit?.trim().toUpperCase()) {
+      'B' ||
+      'BYTE' ||
+      'BYTES' ||
+      'KB' ||
+      'K' ||
+      'MB' ||
+      'M' ||
+      'GB' ||
+      'G' ||
+      '03' ||
+      '04' => true,
+      _ => false,
+    };
+
+bool isUnclassifiableTrafficAggregate(Carrier carrier, TrafficBucket bucket) {
+  final name = bucket.name.trim();
+  return (carrier == Carrier.mobile && name == '流量总览') ||
+      (carrier == Carrier.unicom && (name == '官网套餐余量' || name == '官网不限量套餐'));
+}
+
 enum AllowanceKind { voice, sms }
 
 /// Voice values are minutes; SMS values retain the official count unit (条 or
@@ -120,6 +144,7 @@ class TrafficBucket {
   const TrafficBucket({
     required this.name,
     required this.kind,
+    this.manualKind,
     this.remainingBytes,
     this.totalBytes,
     this.rawUnit,
@@ -128,7 +153,11 @@ class TrafficBucket {
   });
 
   final String name;
+
+  /// The carrier/parser classification, retained when the user corrects it.
   final BucketKind kind;
+  final BucketKind? manualKind;
+  BucketKind get effectiveKind => manualKind ?? kind;
   final int? remainingBytes;
   final int? totalBytes;
   final String? rawUnit;
@@ -137,9 +166,38 @@ class TrafficBucket {
   /// An explicit official unlimited marker, never inferred from a large number.
   final bool isUnlimited;
 
+  TrafficBucket copyWith({
+    String? name,
+    BucketKind? kind,
+    Object? manualKind = _unset,
+    Object? remainingBytes = _unset,
+    Object? totalBytes = _unset,
+    Object? rawUnit = _unset,
+    Object? rawRemaining = _unset,
+    bool? isUnlimited,
+  }) => TrafficBucket(
+    name: name ?? this.name,
+    kind: kind ?? this.kind,
+    manualKind: identical(manualKind, _unset)
+        ? this.manualKind
+        : manualKind as BucketKind?,
+    remainingBytes: identical(remainingBytes, _unset)
+        ? this.remainingBytes
+        : remainingBytes as int?,
+    totalBytes: identical(totalBytes, _unset)
+        ? this.totalBytes
+        : totalBytes as int?,
+    rawUnit: identical(rawUnit, _unset) ? this.rawUnit : rawUnit as String?,
+    rawRemaining: identical(rawRemaining, _unset)
+        ? this.rawRemaining
+        : rawRemaining as String?,
+    isUnlimited: isUnlimited ?? this.isUnlimited,
+  );
+
   Map<String, dynamic> toJson() => {
     'name': name,
     'kind': kind.name,
+    if (manualKind != null) 'manualKind': manualKind!.name,
     'remainingBytes': remainingBytes,
     'totalBytes': totalBytes,
     'rawUnit': rawUnit,
@@ -170,6 +228,11 @@ class TrafficBucket {
         (value) => value.name == json['kind'],
         orElse: () => BucketKind.unknown,
       ),
+      manualKind: switch (json['manualKind']) {
+        'general' => BucketKind.general,
+        'directed' => BucketKind.directed,
+        _ => null,
+      },
       remainingBytes: remaining,
       totalBytes: total,
       rawUnit: json['rawUnit'] is String ? json['rawUnit'] as String : null,
@@ -215,11 +278,19 @@ class CarrierSnapshot {
 
   int? _sumGeneral(int? Function(TrafficBucket) select) {
     if (status != QueryStatus.success) return null;
-    final values = buckets.where((bucket) => bucket.kind == BucketKind.general);
+    final values = buckets.where(
+      (bucket) =>
+          bucket.effectiveKind == BucketKind.general &&
+          !isUnclassifiableTrafficAggregate(carrier, bucket),
+    );
     if (values.isEmpty) return null;
     var sum = 0;
     for (final bucket in values) {
       if (bucket.isUnlimited) return null;
+      if (bucket.manualKind != null &&
+          !hasVerifiedTrafficUnit(bucket.rawUnit)) {
+        return null;
+      }
       final value = select(bucket);
       if (value == null || value < 0 || value > 9223372036854775807 - sum) {
         return null;

@@ -32,23 +32,15 @@ TrafficGroupSummary summarizeTrafficGroup(
   final rows = snapshot.buckets
       .where(
         (bucket) =>
-            bucket.kind == kind &&
-            !(snapshot.carrier == Carrier.mobile && bucket.name == '流量总览'),
+            bucket.effectiveKind == kind &&
+            !isUnclassifiableTrafficAggregate(snapshot.carrier, bucket),
       )
       .toList();
   if (rows.isEmpty) return const TrafficGroupSummary();
-  // The single Unicom unknown row is explicitly an official package aggregate.
-  // It may include the general and directed portions and cannot mean "other".
-  if (snapshot.carrier == Carrier.unicom &&
-      rows.any(
-        (bucket) => bucket.name == '官网套餐余量' || bucket.name == '官网不限量套餐',
-      )) {
-    return const TrafficGroupSummary();
-  }
   if (rows.any((bucket) => bucket.isUnlimited)) {
     return const TrafficGroupSummary(isUnlimited: true);
   }
-  if (rows.any((bucket) => !_hasVerifiedUnit(bucket.rawUnit))) {
+  if (rows.any((bucket) => !hasVerifiedTrafficUnit(bucket.rawUnit))) {
     return const TrafficGroupSummary();
   }
   final sum = _completeSum(rows, (bucket) => bucket.remainingBytes);
@@ -99,7 +91,11 @@ TrafficSummary? summarizeTraffic(CarrierSnapshot snapshot) {
   }
 
   final general = snapshot.buckets
-      .where((bucket) => bucket.kind == BucketKind.general)
+      .where(
+        (bucket) =>
+            bucket.effectiveKind == BucketKind.general &&
+            !isUnclassifiableTrafficAggregate(snapshot.carrier, bucket),
+      )
       .toList();
   if (general.isNotEmpty) {
     final remaining = _completeSum(general, (bucket) => bucket.remainingBytes);
@@ -115,21 +111,21 @@ TrafficSummary? summarizeTraffic(CarrierSnapshot snapshot) {
   if (snapshot.carrier == Carrier.unicom && snapshot.buckets.length == 1) {
     final bucket = snapshot.buckets.single;
     if (bucket.name == '官网套餐余量' &&
-        bucket.kind == BucketKind.unknown &&
+        bucket.effectiveKind == BucketKind.unknown &&
         bucket.remainingBytes != null &&
         bucket.remainingBytes! >= 0 &&
-        _hasVerifiedUnit(bucket.rawUnit)) {
+        hasVerifiedTrafficUnit(bucket.rawUnit)) {
       return TrafficSummary(
         remainingBytes: bucket.remainingBytes!,
         label: '套餐余量',
         detailNotice: '官网套餐剩余额，适用范围以套餐规则为准',
       );
     }
-    if (bucket.kind == BucketKind.unknown &&
+    if (bucket.effectiveKind == BucketKind.unknown &&
         !bucket.isUnlimited &&
         bucket.remainingBytes != null &&
         bucket.remainingBytes! >= 0 &&
-        _hasVerifiedUnit(bucket.rawUnit)) {
+        hasVerifiedTrafficUnit(bucket.rawUnit)) {
       return TrafficSummary(
         remainingBytes: bucket.remainingBytes!,
         totalBytes: bucket.totalBytes,
@@ -148,7 +144,8 @@ TrafficSummary? summarizeTraffic(CarrierSnapshot snapshot) {
     return null;
   }
   if (snapshot.buckets.any(
-    (bucket) => bucket.name.trim().isEmpty || !_hasVerifiedUnit(bucket.rawUnit),
+    (bucket) =>
+        bucket.name.trim().isEmpty || !hasVerifiedTrafficUnit(bucket.rawUnit),
   )) {
     return null;
   }
@@ -175,6 +172,9 @@ int? _completeSum(
   var sum = 0;
   for (final bucket in buckets) {
     if (bucket.isUnlimited) return null;
+    if (bucket.manualKind != null && !hasVerifiedTrafficUnit(bucket.rawUnit)) {
+      return null;
+    }
     final value = select(bucket);
     if (value == null || value < 0) return null;
     if (value > 9223372036854775807 - sum) return null;
@@ -182,19 +182,3 @@ int? _completeSum(
   }
   return sum;
 }
-
-bool _hasVerifiedUnit(String? rawUnit) =>
-    switch (rawUnit?.trim().toUpperCase()) {
-      'B' ||
-      'BYTE' ||
-      'BYTES' ||
-      'KB' ||
-      'K' ||
-      'MB' ||
-      'M' ||
-      'GB' ||
-      'G' ||
-      '03' ||
-      '04' => true,
-      _ => false,
-    };

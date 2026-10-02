@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/carrier_selection.dart';
 import '../data/carrier_accounts.dart';
+import '../data/traffic_classification.dart';
 import '../data/models.dart';
 import '../data/parsers.dart';
 import 'carrier_web.dart';
@@ -210,6 +211,17 @@ Future<Map<String, Object?>?> _runScheduledRefresh() async {
     savedJson: prefs.getString(CarrierAccounts.storageKey),
     selection: selection,
   );
+  // Only the foreground editor writes this key. An in-flight network response
+  // must use the latest choices rather than the task's earlier cached copy.
+  final classifications = TrafficClassificationOverrides.restore(
+    prefs.getString(TrafficClassificationOverrides.storageKey),
+  );
+  for (final account in displayAccounts.accounts) {
+    final snapshot = snapshots[account.id];
+    if (snapshot != null) {
+      snapshots[account.id] = classifications.apply(account.id, snapshot);
+    }
+  }
   final current = <CarrierSnapshot>[
     for (final account in visibleAccounts)
       if (snapshots[account.id] != null) snapshots[account.id]!,

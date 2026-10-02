@@ -2,9 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../data/models.dart';
 import '../data/carrier_accounts.dart';
+import '../data/traffic_classification.dart';
 import '../data/traffic_summary.dart';
 import 'widget_preview_card.dart';
 import 'resort_theme.dart';
+
+typedef BucketClassificationCallback =
+    Future<bool> Function(
+      String accountId,
+      TrafficBucket bucket,
+      BucketKind? kind,
+    );
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({
@@ -24,6 +32,7 @@ class DashboardScreen extends StatelessWidget {
     this.onEditAccount,
     this.onManageCarriers,
     this.onAddWidget,
+    this.onClassifyBucket,
     this.widgetSupported = true,
     this.demo = false,
   });
@@ -43,6 +52,7 @@ class DashboardScreen extends StatelessWidget {
   final ValueChanged<String>? onEditAccount;
   final VoidCallback? onManageCarriers;
   final VoidCallback? onAddWidget;
+  final BucketClassificationCallback? onClassifyBucket;
   final bool widgetSupported;
   final bool demo;
 
@@ -173,6 +183,7 @@ class DashboardScreen extends StatelessWidget {
                       onRefresh: () => onRefreshAccount == null
                           ? onRefresh(entries[index].carrier)
                           : onRefreshAccount!(entries[index].accountId),
+                      onClassifyBucket: onClassifyBucket,
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -653,6 +664,7 @@ class _CarrierCard extends StatelessWidget {
     required this.onEdit,
     required this.onConnect,
     required this.onRefresh,
+    required this.onClassifyBucket,
   });
 
   final Carrier carrier;
@@ -666,6 +678,7 @@ class _CarrierCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback onConnect;
   final VoidCallback onRefresh;
+  final BucketClassificationCallback? onClassifyBucket;
 
   @override
   Widget build(BuildContext context) {
@@ -937,9 +950,12 @@ class _CarrierCard extends StatelessWidget {
                   if (_detailBuckets.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     _TrafficBucketList(
+                      accountId: accountId,
+                      snapshot: snapshot,
                       buckets: _detailBuckets,
                       accent: accent,
                       estimated: carrier == Carrier.telecom,
+                      onClassifyBucket: onClassifyBucket,
                     ),
                   ],
                 ],
@@ -951,9 +967,12 @@ class _CarrierCard extends StatelessWidget {
             if (_detailBuckets.isNotEmpty) ...[
               const SizedBox(height: 12),
               _TrafficBucketList(
+                accountId: accountId,
+                snapshot: snapshot,
                 buckets: _detailBuckets,
                 accent: accent,
                 estimated: carrier == Carrier.telecom,
+                onClassifyBucket: onClassifyBucket,
               ),
             ],
           ],
@@ -1021,14 +1040,7 @@ class _CarrierCard extends StatelessWidget {
   }
 
   List<TrafficBucket> get _detailBuckets {
-    return snapshot?.buckets
-            .where(
-              (bucket) =>
-                  bucket.kind != BucketKind.general ||
-                  bucket.remainingBytes == null,
-            )
-            .toList(growable: false) ??
-        const [];
+    return snapshot?.buckets.toList(growable: false) ?? const [];
   }
 }
 
@@ -1411,14 +1423,20 @@ class _DataFootnote extends StatelessWidget {
 
 class _TrafficBucketList extends StatefulWidget {
   const _TrafficBucketList({
+    required this.accountId,
+    required this.snapshot,
     required this.buckets,
     required this.accent,
     required this.estimated,
+    required this.onClassifyBucket,
   });
 
+  final String accountId;
+  final CarrierSnapshot? snapshot;
   final List<TrafficBucket> buckets;
   final Color accent;
   final bool estimated;
+  final BucketClassificationCallback? onClassifyBucket;
 
   @override
   State<_TrafficBucketList> createState() => _TrafficBucketListState();
@@ -1439,9 +1457,12 @@ class _TrafficBucketListState extends State<_TrafficBucketList> {
           Padding(
             padding: const EdgeInsets.only(bottom: 5),
             child: _TrafficBucketRow(
+              accountId: widget.accountId,
+              snapshot: widget.snapshot,
               bucket: bucket,
               accent: widget.accent,
               estimated: widget.estimated,
+              onClassifyBucket: widget.onClassifyBucket,
             ),
           ),
         if (widget.buckets.length > 3)
@@ -1475,14 +1496,20 @@ class _TrafficBucketListState extends State<_TrafficBucketList> {
 
 class _TrafficBucketRow extends StatelessWidget {
   const _TrafficBucketRow({
+    required this.accountId,
+    required this.snapshot,
     required this.bucket,
     required this.accent,
     required this.estimated,
+    required this.onClassifyBucket,
   });
 
+  final String accountId;
+  final CarrierSnapshot? snapshot;
   final TrafficBucket bucket;
   final Color accent;
   final bool estimated;
+  final BucketClassificationCallback? onClassifyBucket;
 
   @override
   Widget build(BuildContext context) {
@@ -1494,8 +1521,14 @@ class _TrafficBucketRow extends StatelessWidget {
         label: '查看 $bucketLabel 的完整套餐名称和${estimated ? '估算余额' : '余额'}详情',
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
-          onTap: () =>
-              _showBucketDetails(context, bucket, estimated: estimated),
+          onTap: () => _showBucketDetails(
+            context,
+            accountId: accountId,
+            snapshot: snapshot,
+            bucket: bucket,
+            estimated: estimated,
+            onClassifyBucket: onClassifyBucket,
+          ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
             child: Row(
@@ -1576,64 +1609,392 @@ String _bucketTotalText(TrafficBucket bucket) {
 }
 
 void _showBucketDetails(
-  BuildContext context,
-  TrafficBucket bucket, {
-  bool estimated = false,
+  BuildContext context, {
+  required String accountId,
+  required CarrierSnapshot? snapshot,
+  required TrafficBucket bucket,
+  required bool estimated,
+  required BucketClassificationCallback? onClassifyBucket,
 }) {
-  final name = _bucketName(bucket);
   showDialog<void>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: Text(name),
-      content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _BucketDetailValue(
-              label: estimated ? '剩余流量（估算）' : '剩余流量',
-              value: _bucketRemainingText(bucket, estimated: estimated),
-            ),
-            const SizedBox(height: 12),
-            _BucketDetailValue(label: '套餐总量', value: _bucketTotalText(bucket)),
-            if (estimated) ...[
-              const SizedBox(height: 12),
-              const Text(
-                '剩余值按官网已用量与总量的显示值估算，可能有舍入差异；套餐适用范围以官网规则为准。',
-                style: TextStyle(color: Color(0xFF777D87), fontSize: 12),
-              ),
-            ],
-            if (bucket.isUnlimited) ...[
-              const SizedBox(height: 12),
-              const Text(
-                '官网标注不限量；达量后可能限速，具体规则以官网为准。',
-                style: TextStyle(color: Color(0xFF777D87), fontSize: 12),
-              ),
-            ] else if (bucket.remainingBytes == null && estimated) ...[
-              const SizedBox(height: 8),
-              const Text(
-                '此项已用量或总量无法确认，因此不展示估算余额。',
-                style: TextStyle(color: Color(0xFF777D87), fontSize: 12),
-              ),
-            ] else if (bucket.remainingBytes == null) ...[
-              const SizedBox(height: 12),
-              const Text(
-                '此项余额或单位尚未确认，请对照官方页面。',
-                style: TextStyle(color: Color(0xFF777D87), fontSize: 12),
-              ),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('知道了'),
-        ),
-      ],
+    builder: (context) => _BucketDetailsDialog(
+      accountId: accountId,
+      snapshot: snapshot,
+      bucket: bucket,
+      estimated: estimated,
+      onClassifyBucket: onClassifyBucket,
     ),
   );
 }
+
+class _BucketDetailsDialog extends StatefulWidget {
+  const _BucketDetailsDialog({
+    required this.accountId,
+    required this.snapshot,
+    required this.bucket,
+    required this.estimated,
+    required this.onClassifyBucket,
+  });
+
+  final String accountId;
+  final CarrierSnapshot? snapshot;
+  final TrafficBucket bucket;
+  final bool estimated;
+  final BucketClassificationCallback? onClassifyBucket;
+
+  @override
+  State<_BucketDetailsDialog> createState() => _BucketDetailsDialogState();
+}
+
+class _BucketDetailsDialogState extends State<_BucketDetailsDialog> {
+  late BucketKind? _selectedKind;
+  bool _saving = false;
+  bool _saveFailed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedKind = widget.bucket.manualKind;
+  }
+
+  bool get _canEdit {
+    final snapshot = widget.snapshot;
+    return widget.onClassifyBucket != null &&
+        snapshot != null &&
+        TrafficClassificationOverrides.canOverride(snapshot, widget.bucket);
+  }
+
+  String? get _unavailableReason {
+    if (widget.onClassifyBucket == null || widget.snapshot == null) return null;
+    return TrafficClassificationOverrides.unavailableReason(
+      widget.snapshot!,
+      widget.bucket,
+    );
+  }
+
+  Future<void> _save() async {
+    final callback = widget.onClassifyBucket;
+    if (!_canEdit || callback == null || _saving) return;
+    setState(() {
+      _saving = true;
+      _saveFailed = false;
+    });
+    var saved = false;
+    try {
+      saved = await callback(widget.accountId, widget.bucket, _selectedKind);
+    } catch (_) {
+      saved = false;
+    }
+    if (!mounted) return;
+    if (saved) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() {
+        _saving = false;
+        _saveFailed = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bucket = widget.bucket;
+    final estimated = widget.estimated;
+    if (widget.onClassifyBucket == null) {
+      return AlertDialog(
+        title: Text(_bucketName(bucket)),
+        content: SingleChildScrollView(
+          child: _bucketValueDetails(bucket, estimated: estimated),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('知道了'),
+          ),
+        ],
+      );
+    }
+    final currentKind = bucket.effectiveKind;
+    return PopScope(
+      canPop: !_saving,
+      child: AlertDialog(
+        scrollable: true,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        title: Text(_bucketName(bucket)),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 430),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _bucketValueDetails(bucket, estimated: estimated),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      '用途分类',
+                      style: TextStyle(
+                        color: ResortPalette.ink,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  if (bucket.manualKind != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: ResortPalette.mintWash,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        '手动分类',
+                        style: TextStyle(
+                          color: ResortPalette.mint,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '当前：${_bucketKindLabel(currentKind)}',
+                style: const TextStyle(
+                  color: ResortPalette.muted,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (_canEdit) ...[
+                _ClassificationChoice(
+                  label: '自动识别',
+                  value: null,
+                  selected: _selectedKind == null,
+                  accent: ResortPalette.mint,
+                  enabled: !_saving,
+                  onTap: () => setState(() {
+                    _selectedKind = null;
+                    _saveFailed = false;
+                  }),
+                ),
+                const SizedBox(height: 7),
+                _ClassificationChoice(
+                  label: '通用流量',
+                  value: BucketKind.general,
+                  selected: _selectedKind == BucketKind.general,
+                  accent: ResortPalette.mint,
+                  enabled: !_saving,
+                  onTap: () => setState(() {
+                    _selectedKind = BucketKind.general;
+                    _saveFailed = false;
+                  }),
+                ),
+                const SizedBox(height: 7),
+                _ClassificationChoice(
+                  label: '定向流量',
+                  value: BucketKind.directed,
+                  selected: _selectedKind == BucketKind.directed,
+                  accent: ResortPalette.lavender,
+                  enabled: !_saving,
+                  onTap: () => setState(() {
+                    _selectedKind = BucketKind.directed;
+                    _saveFailed = false;
+                  }),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '仅影响本应用的统计，不会改动官网数据。',
+                  style: TextStyle(
+                    color: ResortPalette.muted,
+                    fontSize: 11,
+                    height: 1.35,
+                  ),
+                ),
+                if (_saveFailed) ...[
+                  const SizedBox(height: 7),
+                  const Text(
+                    '保存失败，请重试。',
+                    key: ValueKey('classification-save-error'),
+                    style: TextStyle(
+                      color: Color(0xFFB65151),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    color: ResortPalette.cream.withValues(alpha: .35),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Text(
+                    _unavailableReason ?? '此项暂时不能手动分类。',
+                    style: const TextStyle(
+                      color: Color(0xFF775C50),
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          if (_canEdit)
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              style: FilledButton.styleFrom(
+                backgroundColor: ResortPalette.mint,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(80, 44),
+              ),
+              child: _saving
+                  ? const SizedBox(
+                      width: 17,
+                      height: 17,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('保存'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClassificationChoice extends StatelessWidget {
+  const _ClassificationChoice({
+    required this.label,
+    required this.value,
+    required this.selected,
+    required this.accent,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String label;
+  final BucketKind? value;
+  final bool selected;
+  final Color accent;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      key: ValueKey('bucket-classification-${value?.name ?? 'automatic'}'),
+      button: true,
+      selected: selected,
+      label: label,
+      child: Material(
+        color: selected ? accent.withValues(alpha: .10) : ResortPalette.paper,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 52),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected ? accent : ResortPalette.border,
+                width: selected ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  selected
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_off_rounded,
+                  color: selected ? accent : ResortPalette.muted,
+                  size: 21,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: ResortPalette.ink,
+                      fontSize: 14,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (selected)
+                  Icon(Icons.check_rounded, color: accent, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _bucketKindLabel(BucketKind kind) => switch (kind) {
+  BucketKind.general => '通用流量',
+  BucketKind.directed => '定向流量',
+  BucketKind.unknown => '用途未知',
+};
+
+Widget _bucketValueDetails(TrafficBucket bucket, {required bool estimated}) =>
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _BucketDetailValue(
+          label: estimated ? '剩余流量（估算）' : '剩余流量',
+          value: _bucketRemainingText(bucket, estimated: estimated),
+        ),
+        const SizedBox(height: 12),
+        _BucketDetailValue(label: '套餐总量', value: _bucketTotalText(bucket)),
+        if (estimated) ...[
+          const SizedBox(height: 12),
+          const Text(
+            '剩余值按官网已用量与总量的显示值估算，可能有舍入差异；套餐适用范围以官网规则为准。',
+            style: TextStyle(color: Color(0xFF777D87), fontSize: 12),
+          ),
+        ],
+        if (bucket.isUnlimited) ...[
+          const SizedBox(height: 12),
+          const Text(
+            '官网标注不限量；达量后可能限速，具体规则以官网为准。',
+            style: TextStyle(color: Color(0xFF777D87), fontSize: 12),
+          ),
+        ] else if (bucket.remainingBytes == null && estimated) ...[
+          const SizedBox(height: 8),
+          const Text(
+            '此项已用量或总量无法确认，因此不展示估算余额。',
+            style: TextStyle(color: Color(0xFF777D87), fontSize: 12),
+          ),
+        ] else if (bucket.remainingBytes == null) ...[
+          const SizedBox(height: 12),
+          const Text(
+            '此项余额或单位尚未确认，请对照官方页面。',
+            style: TextStyle(color: Color(0xFF777D87), fontSize: 12),
+          ),
+        ],
+      ],
+    );
 
 class _BucketDetailValue extends StatelessWidget {
   const _BucketDetailValue({required this.label, required this.value});

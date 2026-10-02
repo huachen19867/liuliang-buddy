@@ -353,3 +353,13 @@ iOS对应源码云端run36956057050（4271666）回读为in_progress：https://g
 iOS旧run36956057050回读failure，编译与冷启动已执行，失败发生在smoke仍等待旧“1 家已选择”文案，当前三四卡选择页为“1 / 4 张已选择”。同步修正integration_test的断言与过时双击注释，不改生产界面，也不删除断言。a0ac8e8触发run36964950810仍in_progress，但同旧断言，不能预告通过；修正后将触发新云端验收。Windows的python命令为WindowsApps空桩，不执行文档脚本，已经改用apply_patch并回读确认，不再依赖该命令。
 
 修正后的公开main为05b0e224af2a99b4b77f6f7ed99e47b09b37617c，新的iOS云端验收run36965455032已触发，交付回读pending：https://github.com/huachen19867/liuliang-buddy/actions/runs/36965455032 。不得标为已通过。最终GitHub latest再次回读v1.10.1，非草稿/非预发布、仍唯一APK且digest一致；个别API EOF通过只读重试排除，未重复发布或增加Assets。
+
+## 2026-10-02：APP 手动套餐分类与卡片同步
+
+老板发来反馈要求在套餐子项弹窗手动选择通用/定向，追加明确“在app里面调整，自动同步卡片”。先定位本技术日志，复用已经下载的 FlowLite README 个性化分组实践及既有官方 AppWidget/WorkManager 参考，不重复下载或复制无许可证业务代码。轻量分工为 Astra中等审查缓存/后台/账号边界，GPT6.1 SOL高实现保留官方kind的manualKind与唯一套餐名分类映射，GPT6 Luna极高实现弹窗与界面测试；根完成前后台接线、卡片同步、集成验收及正式交付。分类按账号+唯一非空套餐名保存，不依赖列表索引/余额，汇总和重名套餐拒绝标注，保留恢复自动识别入口。分类只更改用途，不制造余量、单位或刷新时间。
+
+前台 _putSnapshot 统一叠加最新独立分类，初始化与返回前台先恢复配置，弹窗保存进入现有串行存储队列并检查账号/号码/当前唯一套餐；保存后重算快照并发布WidgetBridge，Android桌面/已启用通知栏余额/快捷设置共用既有payload，iOS也沿用现有WidgetKit数据通道。低量通知另对原始查询结果叠加覆盖并注明含手动分类。后台只读覆盖，不回写此key；最终prefs.reload后apply所有账号再生成payload。通用明细不再隐藏，使分类后还能改回；失败留弹窗，小屏大字滚动覆盖。换号码清此账号覆盖，改备注不清，隐藏不清，清全部资料删除整个key。
+
+首轮format发现nullable索引在三元表达式中的语法歧义，括号明确分支；analyze随后清理mounted判断、死代码与imports，另补多行if的花括号。首次命令在app目录误用相对PUB_CACHE，已改绝对路径并重跑pub get恢复ASCII依赖元数据。定向用例通过至截图时发现仅toImage进入runAsync，编码/文件异步仍留在fake async导致等待；中断本任务并将完整编码写文件放入runAsync，不删测试或关断言。最终全量Flutter244项/13秒通过，analyze无问题，新弹窗PNG136181字节目视中文/选项/保存正常。选择页无关自动重渲染恢复旧图，其余因通用明细显示变化的截图保留更新。原生 :app:testDebugUnitTest --rerun 新运行BUILD SUCCESSFUL48秒，四份XML更新时间13:32:40、29项0失败，不采用旧结果。正式Release构建正在执行；无USB、真号或新Launcher验收。
+
+正式Release正常构建91秒成功，APK27,907,308字节/SHA256 6184e1a6efd977d32be82bfd7fad89186991014913d17b738e93934d78a030e0；1.10.2/code19/v2正式证书33b11555/非debuggable/ARM64/API24-36/16KB ZIP对齐通过，wrapper恢复官方配置。最后有限Astra审查无阻断，后台极小非事务发布窗口及改号码时第二次存储失败可能仅清覆盖的边界已记录，不改动通过后的生产Dart。前轮iOS run36965455032回读success，是修正smoke后的05b0e22，不能用来标新1.10.2云端通过。准备唯一APK正式公开发布，仅push public，截图在正文及源码。

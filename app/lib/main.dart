@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'data/models.dart';
 import 'data/carrier_selection.dart';
 import 'data/carrier_accounts.dart';
+import 'data/traffic_classification.dart';
 import 'ui/carrier_selection_screen.dart';
 import 'data/parsers.dart';
 import 'services/page_probe.dart';
@@ -129,6 +130,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   final Map<String, Map<String, dynamic>> _broadnetSessions = {};
   final Set<String> _unicomAppAccounts = {};
   final Map<String, Object> _appQueryTickets = {};
+  TrafficClassificationOverrides _trafficClassifications =
+      TrafficClassificationOverrides.restore(null);
   String? _visibleAccountId;
   double _thresholdGb = 5;
   BackgroundRefreshInterval _backgroundRefresh = BackgroundRefreshInterval.off;
@@ -164,8 +167,79 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   void _putSnapshot(CarrierAccount account, CarrierSnapshot snapshot) {
     if (snapshot.carrier != account.carrier) return;
-    _accountSnapshots[account.id] = snapshot;
-    if (account.isPrimary) _snapshots[account.carrier] = snapshot;
+    final classified = _trafficClassifications.apply(account.id, snapshot);
+    _accountSnapshots[account.id] = classified;
+    if (account.isPrimary) _snapshots[account.carrier] = classified;
+  }
+
+  void _reapplyTrafficClassifications() {
+    for (final account in _accounts.accounts) {
+      final snapshot = _accountSnapshots[account.id];
+      if (snapshot != null) _putSnapshot(account, snapshot);
+    }
+  }
+
+  Future<bool> _classifyTrafficBucket(
+    String id,
+    TrafficBucket bucket,
+    BucketKind? kind, {
+    required CarrierAccount? expectedAccount,
+  }) async {
+    if (demoMode ||
+        _clearing ||
+        _profileClearPending ||
+        _savingSelection ||
+        kind == BucketKind.unknown) {
+      return false;
+    }
+    final generation = _generation;
+    var saved = false;
+    try {
+      await _store(() async {
+        final account = _account(id);
+        if (!_current(generation) ||
+            account == null ||
+            !account.enabled ||
+            expectedAccount == null ||
+            account.phoneNumber != expectedAccount.phoneNumber) {
+          return;
+        }
+        final snapshot = _snapshot(account);
+        if (!TrafficClassificationOverrides.canOverride(snapshot, bucket)) {
+          return;
+        }
+        final next = _trafficClassifications.withOverride(
+          id,
+          snapshot,
+          bucket,
+          kind,
+        );
+        if (await _prefs?.setString(
+              TrafficClassificationOverrides.storageKey,
+              jsonEncode(next.toJson()),
+            ) !=
+            true) {
+          return;
+        }
+        if (!_current(generation)) return;
+        setState(() {
+          _trafficClassifications = next;
+          _warnedLow.remove(id);
+          _reapplyTrafficClassifications();
+        });
+        saved = true;
+      });
+      if (saved && _current(generation)) await _publishWidget();
+    } catch (_) {
+      // The dialog keeps the choice available for a retry on a failed save.
+      if (saved && mounted && _current(generation)) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('分类已保存，卡片暂未同步，返回首页后会重试')));
+      }
+      return saved;
+    }
+    return saved;
   }
 
   void _settleInterruptedQueries() {
@@ -488,6 +562,9 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _prefs = prefs;
       _selection = restoredSelection;
       _accounts = restoredAccounts;
+      _trafficClassifications = TrafficClassificationOverrides.restore(
+        prefs.getString(TrafficClassificationOverrides.storageKey),
+      );
       _restoring = false;
       _thresholdGb = (prefs.getDouble('threshold_gb') ?? 5).clamp(1, 20);
       _backgroundRefresh = _ios
@@ -582,6 +659,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       await prefs.reload();
       if (!mounted || _clearing) return;
       setState(() {
+        _trafficClassifications = TrafficClassificationOverrides.restore(
+          prefs.getString(TrafficClassificationOverrides.storageKey),
+        );
+        _reapplyTrafficClassifications();
         for (final account in _visibleAccounts) {
           if (_inFlight.contains(account.id)) continue;
           final raw = prefs.getString(account.snapshotKey);
@@ -1239,7 +1320,11 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     CarrierAccount account,
     CarrierSnapshot snapshot,
   ) async {
-    final remaining = snapshot.generalRemainingBytes;
+    final classified = _trafficClassifications.apply(account.id, snapshot);
+    final remaining = classified.generalRemainingBytes;
+    final hasManualGeneral = classified.buckets.any(
+      (bucket) => bucket.manualKind == BucketKind.general,
+    );
     final low = remaining != null && remaining / 1073741824 <= _thresholdGb;
     if (low &&
         !(_warnedLow[account.id] ?? false) &&
@@ -1250,7 +1335,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           'id': accountLowTrafficNotificationId(account),
           'title': '${account.label}流量快见底了',
           'body':
-              '通用流量剩余 ${(remaining / 1073741824).toStringAsFixed(2)} GB，数据以运营商查询为准。',
+              '通用流量剩余 ${(remaining / 1073741824).toStringAsFixed(2)} GB${hasManualGeneral ? '（含手动分类）' : ''}，数据以运营商查询为准。',
         });
       } on PlatformException {
         /* Dashboard retains the actual result. */
@@ -1757,6 +1842,23 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           note: identity.$1,
           phoneNumber: identity.$2,
         );
+        final phoneChanged = account.phoneNumber != next.find(id)?.phoneNumber;
+        if (phoneChanged) {
+          final classifications = _trafficClassifications.withoutAccount(id);
+          if (await _prefs?.setString(
+                TrafficClassificationOverrides.storageKey,
+                jsonEncode(classifications.toJson()),
+              ) !=
+              true) {
+            throw StateError('Classification reset failed');
+          }
+          if (!_current(generation)) return;
+          setState(() {
+            _trafficClassifications = classifications;
+            _warnedLow.remove(id);
+            _reapplyTrafficClassifications();
+          });
+        }
         if (await _prefs?.setString(
               CarrierAccounts.storageKey,
               next.toStorageString(),
@@ -1767,7 +1869,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         if (_current(generation)) {
           setState(() {
             _accounts = next;
-            if (account.phoneNumber != identity.$2.trim()) {
+            if (phoneChanged) {
               _appQueryTickets.remove(id);
               _inFlight.remove(id);
               _refreshThrottle.loginOrLoadFailed(id);
@@ -2204,6 +2306,14 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       }
     }
     try {
+      if (await _prefs?.remove(TrafficClassificationOverrides.storageKey) !=
+          true) {
+        otherDataCleared = false;
+      }
+    } catch (_) {
+      otherDataCleared = false;
+    }
+    try {
       final clearedAccounts = _accounts.withoutIdentities();
       if (await _prefs?.setString(
             CarrierAccounts.storageKey,
@@ -2245,6 +2355,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _appQueryTickets.clear();
       _visibleAccountId = null;
       _accountSnapshots.clear();
+      _trafficClassifications = TrafficClassificationOverrides.restore(null);
       for (final carrier in Carrier.values) {
         _snapshots[carrier] = CarrierSnapshot(
           carrier: carrier,
@@ -2273,71 +2384,82 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   );
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: _visibleAccountId == null,
-    onPopInvokedWithResult: (didPop, result) {
-      if (!didPop) unawaited(_closeOfficialPage());
-    },
-    child: Scaffold(
-      body: Stack(
-        children: [
-          if (_restoring || _savingSelection)
-            const Center(child: CircularProgressIndicator())
-          else if (!_selection.setupCompleted)
-            CarrierSelectionScreen(
-              selectedCarriers: _draftSelection,
-              accountCounts: _draftAccountCounts,
-              onSelectionChanged: (value) =>
-                  setState(() => _draftSelection = value),
-              onAccountCountsChanged: (counts) async {
-                if (await _canSetAccountCounts(counts) && mounted) {
-                  setState(() => _draftAccountCounts.addAll(counts));
-                }
-              },
-              onContinue: (value) => unawaited(
-                _applySelection(value, accountCounts: _draftAccountCounts),
+  Widget build(BuildContext context) {
+    final classificationAccounts = _accounts;
+    return PopScope(
+      canPop: _visibleAccountId == null,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_closeOfficialPage());
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            if (_restoring || _savingSelection)
+              const Center(child: CircularProgressIndicator())
+            else if (!_selection.setupCompleted)
+              CarrierSelectionScreen(
+                selectedCarriers: _draftSelection,
+                accountCounts: _draftAccountCounts,
+                onSelectionChanged: (value) =>
+                    setState(() => _draftSelection = value),
+                onAccountCountsChanged: (counts) async {
+                  if (await _canSetAccountCounts(counts) && mounted) {
+                    setState(() => _draftAccountCounts.addAll(counts));
+                  }
+                },
+                onContinue: (value) => unawaited(
+                  _applySelection(value, accountCounts: _draftAccountCounts),
+                ),
+                demo: demoMode,
+              )
+            else
+              DashboardScreen(
+                snapshots: _selection.visibleSnapshots(_snapshots.values),
+                cleanupPending: _profileClearPending,
+                accountEntries: [
+                  for (final account in _visibleAccounts)
+                    DashboardAccountEntry(account, _snapshot(account)),
+                ],
+                selectedCarriers: _selection.selectedCarriers,
+                onManageCarriers: _manageCarriers,
+                thresholdGb: _thresholdGb,
+                onConnect: _connect,
+                onRefresh: _refresh,
+                onConnectAccount: _connectAccount,
+                onRefreshAccount: (id) => unawaited(_refreshAccount(id)),
+                onEditAccount: (id) => unawaited(_editAccount(id)),
+                onClassifyBucket: demoMode
+                    ? null
+                    : (id, bucket, kind) => _classifyTrafficBucket(
+                        id,
+                        bucket,
+                        kind,
+                        expectedAccount: classificationAccounts.find(id),
+                      ),
+                onRefreshAll: _refreshAll,
+                onSettings: _settings,
+                onAddWidget: _addWidget,
+                widgetSupported: _nativeMobile && !demoMode,
+                onAbout: () => _showInfo(
+                  kReleaseMode ? '流量小伙伴' : '流量小伙伴 · 开发版',
+                  '可选择移动、联通、电信、广电，至少一家。数据来自官方查询，通用、定向和用途未知的流量分开展示。\n\n联通默认查询官网，也可在连接方式中选择 App 查询试验；该方式需要主动导入自己的会话，不能自动读取官方 App 或一键获取验证码。电信按官网已用量和总量的舍入显示值估算，主位标「约」。真实号码和余额准确性仍需手机验证。\n\n会话保存在手机本地，广电备份与联通 App 会话使用系统安全存储；不上传第三方服务器，不读取短信或服务密码。Android 可选择桌面卡片后台刷新间隔，但系统可能延迟任务；iPhone 桌面卡片显示上次查询结果，打开 APP 后刷新。电信需要打开 APP 查询。',
+                ),
+                demo: demoMode,
               ),
-              demo: demoMode,
-            )
-          else
-            DashboardScreen(
-              snapshots: _selection.visibleSnapshots(_snapshots.values),
-              cleanupPending: _profileClearPending,
-              accountEntries: [
-                for (final account in _visibleAccounts)
-                  DashboardAccountEntry(account, _snapshot(account)),
-              ],
-              selectedCarriers: _selection.selectedCarriers,
-              onManageCarriers: _manageCarriers,
-              thresholdGb: _thresholdGb,
-              onConnect: _connect,
-              onRefresh: _refresh,
-              onConnectAccount: _connectAccount,
-              onRefreshAccount: (id) => unawaited(_refreshAccount(id)),
-              onEditAccount: (id) => unawaited(_editAccount(id)),
-              onRefreshAll: _refreshAll,
-              onSettings: _settings,
-              onAddWidget: _addWidget,
-              widgetSupported: _nativeMobile && !demoMode,
-              onAbout: () => _showInfo(
-                kReleaseMode ? '流量小伙伴' : '流量小伙伴 · 开发版',
-                '可选择移动、联通、电信、广电，至少一家。数据来自官方查询，通用、定向和用途未知的流量分开展示。\n\n联通默认查询官网，也可在连接方式中选择 App 查询试验；该方式需要主动导入自己的会话，不能自动读取官方 App 或一键获取验证码。电信按官网已用量和总量的舍入显示值估算，主位标「约」。真实号码和余额准确性仍需手机验证。\n\n会话保存在手机本地，广电备份与联通 App 会话使用系统安全存储；不上传第三方服务器，不读取短信或服务密码。Android 可选择桌面卡片后台刷新间隔，但系统可能延迟任务；iPhone 桌面卡片显示上次查询结果，打开 APP 后刷新。电信需要打开 APP 查询。',
-              ),
-              demo: demoMode,
-            ),
-          if (_nativeMobile && !demoMode)
-            if (!_restoring && !_savingSelection)
-              for (final account in _visibleAccounts.where(
-                (a) =>
-                    _connected.contains(a.id) &&
-                    !_profileClearPending &&
-                    !_unicomAppAccounts.contains(a.id),
-              ))
-                _webView(account),
-        ],
+            if (_nativeMobile && !demoMode)
+              if (!_restoring && !_savingSelection)
+                for (final account in _visibleAccounts.where(
+                  (a) =>
+                      _connected.contains(a.id) &&
+                      !_profileClearPending &&
+                      !_unicomAppAccounts.contains(a.id),
+                ))
+                  _webView(account),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   @override
   void dispose() {
