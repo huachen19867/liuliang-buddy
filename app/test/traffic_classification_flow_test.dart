@@ -123,6 +123,51 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   }
 
+  testWidgets('电信旧缓存启动即按名称重分类并同步现有桌面', (tester) async {
+    final selection = CarrierSelection.complete([Carrier.telecom]);
+    final accounts = CarrierAccounts.fromSelection(selection);
+    final account = accounts.accounts.single;
+    final snapshot = CarrierSnapshot(
+      carrier: Carrier.telecom,
+      status: QueryStatus.success,
+      queriedAt: _at,
+      buckets: const [
+        TrafficBucket(
+          name: '国内上网含10GB',
+          kind: BucketKind.general,
+          remainingBytes: 2 * _gib,
+          totalBytes: 10 * _gib,
+          rawUnit: 'B',
+        ),
+        TrafficBucket(
+          name: '定向国内上网流量',
+          kind: BucketKind.unknown,
+          remainingBytes: 3 * _gib,
+          totalBytes: 10 * _gib,
+          rawUnit: 'B',
+        ),
+      ],
+    );
+    SharedPreferences.setMockInitialValues({
+      'carrier_selection': selection.toStorageString(),
+      CarrierAccounts.storageKey: accounts.toStorageString(),
+      account.snapshotKey: jsonEncode(snapshot.toJson()),
+    });
+    await tester.pumpWidget(MaterialApp(home: FlowHome()));
+    await tester.pumpAndSettle();
+    final restored = _dashboard(tester).accountEntries!.single.snapshot!;
+    expect(restored.buckets[0].effectiveKind, BucketKind.unknown);
+    expect(restored.buckets[1].effectiveKind, BucketKind.directed);
+    expect(restored.queriedAt, _at);
+    expect(restored.generalRemainingBytes, isNull);
+    final row = (updates.last['instances'] as List).single as Map;
+    expect(row['otherRemainingBytes'], 2 * _gib);
+    expect(row['directedRemainingBytes'], 3 * _gib);
+    expect(row['generalRemainingBytes'], isNull);
+    expect(row['queriedAt'], _at.millisecondsSinceEpoch);
+    await finish(tester);
+  });
+
   testWidgets('应用内分类立即同步组件，仅影响当前账号，重启保留且可恢复自动', (tester) async {
     await mount(tester);
     final before = _dashboard(tester);

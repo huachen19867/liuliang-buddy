@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'models.dart';
+import 'telecom_name_classification.dart';
 
 /// Local purpose corrections, isolated by stable account ID and exact trimmed
 /// package name. Query values and timestamps never enter this storage.
@@ -86,6 +87,11 @@ class TrafficClassificationOverrides {
       buckets: List<TrafficBucket>.unmodifiable([
         for (final bucket in snapshot.buckets)
           bucket.copyWith(
+            // Reclassify old Telecom caches too, before applying saved user
+            // choices. Other carriers keep their official field-based kind.
+            kind: snapshot.carrier == Carrier.telecom
+                ? classifyTelecomTrafficName(bucket.name)
+                : bucket.kind,
             // Always remove cached classifications before applying this
             // authoritative account map, including duplicates and aggregates.
             manualKind:

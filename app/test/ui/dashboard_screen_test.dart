@@ -704,12 +704,12 @@ void main() {
     expect(find.textContaining('舍入'), findsNWidgets(2));
     expect(find.text('通用流量总览'), findsNothing);
     expect(find.textContaining('提醒线'), findsNothing);
-    expect(find.text('约 18.0 GB'), findsOneWidget);
-    await tester.ensureVisible(find.text('约 18.0 GB'));
-    await tester.tap(find.text('约 18.0 GB'));
+    expect(find.text('约 18.0 GB'), findsNWidgets(2));
+    await tester.ensureVisible(find.text('约 18.0 GB').last);
+    await tester.tap(find.text('约 18.0 GB').last);
     await tester.pumpAndSettle();
     expect(find.text('剩余流量（估算）'), findsOneWidget);
-    expect(find.text('约 18.0 GB'), findsNWidgets(2));
+    expect(find.text('约 18.0 GB'), findsNWidgets(3));
     expect(find.textContaining('舍入差异'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -733,7 +733,9 @@ void main() {
     expect(find.text('余额待确认'), findsNothing);
     expect(find.text('通话余量'), findsNothing);
     expect(find.text('短信余量'), findsNothing);
-    expect(find.text('套餐用途待确认，可点明细设置'), findsOneWidget);
+    expect(find.text('部分套餐余量待确认，详见明细'), findsNWidgets(2));
+    expect(find.text('套餐用途待确认，可点明细设置'), findsNothing);
+    expect(find.textContaining('用途待确认'), findsNothing);
     expect(find.text('部分官网明细无法估算，暂不显示合计；请核对官方查询页'), findsOneWidget);
     expect(find.text('约 18.0 GB'), findsOneWidget);
     expect(find.text('剩余额无法确认（单位待确认）'), findsOneWidget);
@@ -746,6 +748,89 @@ void main() {
     expect(find.textContaining('舍入差异'), findsOneWidget);
     expect(find.textContaining('不展示估算余额'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('电信定向与其他流量分组可分别估算，分类弹窗使用其他流量名称并生成预览', (tester) async {
+    _configureViewport(tester, const Size(390, 844));
+    final snapshot = CarrierSnapshot(
+      carrier: Carrier.telecom,
+      status: QueryStatus.success,
+      queriedAt: DateTime(2026, 10, 2, 15),
+      message: '部分官网明细无法估算，暂不显示合计；请核对官方查询页',
+      buckets: const [
+        TrafficBucket(
+          name: '定向视频流量',
+          kind: BucketKind.directed,
+          remainingBytes: 2 * _gib,
+          totalBytes: 8 * _gib,
+          rawUnit: 'GB',
+        ),
+        TrafficBucket(
+          name: '定向视频流量',
+          kind: BucketKind.directed,
+          remainingBytes: 3 * _gib,
+          totalBytes: 8 * _gib,
+          rawUnit: 'GB',
+        ),
+        TrafficBucket(
+          name: '国内上网流量含12GB',
+          kind: BucketKind.unknown,
+          remainingBytes: 4 * _gib,
+          totalBytes: 12 * _gib,
+          rawUnit: 'GB',
+        ),
+        TrafficBucket(
+          name: '需核对的补充套餐',
+          kind: BucketKind.general,
+          manualKind: BucketKind.general,
+          rawRemaining: '待确认',
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      _host(
+        snapshots: [snapshot],
+        selectedCarriers: const {Carrier.telecom},
+        demo: true,
+        textScale: 1,
+        previewBoundaryKey: _previewBoundaryKey,
+        onClassifyBucket: (_, _, _) async => true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('其他流量'), findsOneWidget);
+    expect(find.text('定向流量'), findsOneWidget);
+    expect(find.text('约 5.0 GB'), findsOneWidget);
+    expect(find.text('约 4.0 GB'), findsAtLeastNWidgets(1));
+    expect(find.text('待确认'), findsWidgets);
+    expect(find.textContaining('用途未知'), findsNothing);
+    expect(find.textContaining('用途待确认'), findsNothing);
+    expect(find.text('余额待确认'), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    await tester.ensureVisible(find.text('国内上网流量含12GB'));
+    await tester.tap(find.text('国内上网流量含12GB'));
+    await tester.pumpAndSettle();
+    expect(find.text('流量分类'), findsOneWidget);
+    expect(find.text('当前：其他流量'), findsOneWidget);
+    expect(find.text('当前：用途未知'), findsNothing);
+    expect(find.text('用途分类'), findsNothing);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    tester.view.physicalSize = const Size(390, 1100);
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byType(SingleChildScrollView).first,
+      const Offset(0, 2000),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
+    await _writeScreenshot(
+      tester,
+      'telecom-directed-other-partial-preview.png',
+    );
   });
 
   testWidgets('电信仅有通话有效时不冒称流量部分同步', (tester) async {
@@ -865,7 +950,7 @@ void main() {
     await tester.ensureVisible(find.text('分页套餐 6'));
     await tester.tap(find.text('分页套餐 6'));
     await tester.pumpAndSettle();
-    expect(find.text('用途分类'), findsOneWidget);
+    expect(find.text('流量分类'), findsOneWidget);
     await tester.ensureVisible(
       find.byKey(const ValueKey('bucket-classification-general')),
     );
@@ -929,14 +1014,18 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('共 8 项'), findsOneWidget);
+    expect(find.text('合并约 36.0 GB'), findsOneWidget);
+    expect(find.text('共 8 项'), findsNothing);
     expect(find.text('已读取 8 项 · 1 项待确认'), findsOneWidget);
     expect(find.text('$longName（省内）'), findsOneWidget);
     expect(find.text('查看全部 9 项'), findsNothing);
     expect(find.text('约 1.0 GB'), findsNothing);
-    await tester.ensureVisible(find.text('共 8 项'));
-    await tester.tap(find.text('共 8 项'));
+    await tester.ensureVisible(find.text('合并约 36.0 GB'));
+    await tester.tap(find.text('合并约 36.0 GB'));
     await tester.pumpAndSettle();
+    expect(find.textContaining('合并估算：约 36.0 GB'), findsOneWidget);
+    expect(find.textContaining('来自 8 个同名子项'), findsOneWidget);
+    expect(find.text('共 8 项'), findsNothing);
     expect(find.text('约 1.0 GB'), findsOneWidget);
     await tester.tap(find.text('约 1.0 GB'));
     await tester.pumpAndSettle();
@@ -961,7 +1050,7 @@ void main() {
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsNothing);
-    expect(find.text('共 8 项'), findsOneWidget);
+    expect(find.text('合并约 36.0 GB'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -1001,8 +1090,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
     expect(find.text('已读取 23 项 · 1 项待确认'), findsOneWidget);
-    expect(find.text('共 8 项'), findsNWidgets(2));
-    expect(find.text('共 7 项'), findsOneWidget);
+    expect(find.text('合并约 36.0 GB'), findsOneWidget);
+    expect(find.text('合并约 100 GB'), findsOneWidget);
+    expect(find.text('合并约 140 GB'), findsOneWidget);
+    expect(find.text('查看全部 4 项'), findsOneWidget);
+    expect(find.text('查看全部 24 项'), findsNothing);
+    expect(find.textContaining('共 8 项'), findsNothing);
+    expect(find.textContaining('共 7 项'), findsNothing);
     expect(find.text('已同步'), findsNothing);
     expect(find.text('号码未备注'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -1233,7 +1327,7 @@ void main() {
     expect(find.text('套餐估算余量'), findsNWidgets(2));
     expect(find.text('约'), findsNWidgets(2));
     expect(find.textContaining('舍入'), findsNWidgets(2));
-    expect(find.text('约 18.0 GB'), findsOneWidget);
+    expect(find.text('约 18.0 GB'), findsNWidgets(2));
     await _writeScreenshot(tester, 'dashboard-telecom-demo.png');
 
     tester.view.physicalSize = const Size(390, 844);

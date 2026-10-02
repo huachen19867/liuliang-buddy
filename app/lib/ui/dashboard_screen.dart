@@ -414,6 +414,8 @@ class _SummaryCard extends StatelessWidget {
       single?.snapshot,
       singleSummary,
     );
+    final singleCategoriesUnavailable =
+        singlePartial && _allTrafficCategoriesUnavailable(single!.snapshot!);
     final singleMessage = single?.snapshot?.message?.trim();
     final singleStatusMessage =
         single != null &&
@@ -457,6 +459,8 @@ class _SummaryCard extends StatelessWidget {
               : '所选运营商的通用流量剩余合计'
         : hasSingleBalance
         ? singleSummary!.detailNotice ?? '已查询套餐余额'
+        : singleCategoriesUnavailable
+        ? '部分套餐余量待确认，详见明细'
         : singlePartial
         ? '${_trafficReadProgress(single!.snapshot!)}；合计待确认，详见下方套餐。'
         : hasUnlimited
@@ -677,6 +681,12 @@ String _trafficReadProgress(CarrierSnapshot snapshot) {
   final confirmed = snapshot.buckets.where(_isConfirmedTrafficBucket).length;
   return '已读取 $confirmed 项 · ${snapshot.buckets.length - confirmed} 项待确认';
 }
+
+bool _allTrafficCategoriesUnavailable(CarrierSnapshot snapshot) =>
+    BucketKind.values.every((kind) {
+      final group = summarizeTrafficGroup(snapshot, kind);
+      return !group.isComplete && !group.isUnlimited;
+    });
 
 class _CarrierCard extends StatelessWidget {
   const _CarrierCard({
@@ -988,14 +998,9 @@ class _CarrierCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 9),
-          if (partialSync &&
-              BucketKind.values.every(
-                (kind) =>
-                    !summarizeTrafficGroup(snapshot!, kind).isComplete &&
-                    !summarizeTrafficGroup(snapshot!, kind).isUnlimited,
-              ))
+          if (partialSync && _allTrafficCategoriesUnavailable(snapshot!))
             const Text(
-              '套餐用途待确认，可点明细设置',
+              '部分套餐余量待确认，详见明细',
               style: TextStyle(color: ResortPalette.muted, fontSize: 11),
             )
           else
@@ -1136,7 +1141,12 @@ class _TrafficCategoryRow extends StatelessWidget {
         ResortPalette.lavender,
         ResortPalette.lavenderWash,
       ),
-      ('用途未知', BucketKind.unknown, ResortPalette.pink, ResortPalette.pinkWash),
+      (
+        snapshot?.carrier == Carrier.telecom ? '其他流量' : '用途未知',
+        BucketKind.unknown,
+        ResortPalette.pink,
+        ResortPalette.pinkWash,
+      ),
     ];
     final scale = MediaQuery.textScalerOf(context).scale(12);
     return LayoutBuilder(
@@ -1191,15 +1201,16 @@ class _TrafficCategoryChip extends StatelessWidget {
         ? const TrafficGroupSummary()
         : summarizeTrafficGroup(snapshot!, kind);
     final unknownPurpose = kind == BucketKind.unknown;
+    final telecomOther = unknownPurpose && snapshot?.carrier == Carrier.telecom;
     final value = group.isUnlimited
-        ? unknownPurpose
+        ? unknownPurpose && !telecomOther
               ? '不限量 · 用途待确认'
               : '不限量'
         : group.isComplete && group.remainingBytes != null
-        ? '${group.isEstimated ? '约 ' : ''}${_formatGb(group.remainingBytes!)} GB${unknownPurpose ? ' · 用途待确认' : ''}'
+        ? '${group.isEstimated ? '约 ' : ''}${_formatGb(group.remainingBytes!)} GB${unknownPurpose && !telecomOther ? ' · 用途待确认' : ''}'
         : status == QueryStatus.notConnected
         ? '待连接'
-        : unknownPurpose
+        : unknownPurpose && !telecomOther
         ? '用途待确认'
         : '待确认';
     return Container(
@@ -1597,7 +1608,9 @@ class _TrafficBucketListState extends State<_TrafficBucketList> {
                 size: 17,
               ),
               label: Text(
-                _expanded ? '收起套餐明细' : '查看全部 ${widget.buckets.length} 项',
+                _expanded
+                    ? '收起套餐明细'
+                    : '查看全部 ${widget.snapshot?.carrier == Carrier.telecom ? groups.length : widget.buckets.length} 项',
                 style: Theme.of(
                   context,
                 ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
@@ -1637,6 +1650,23 @@ List<_TrafficBucketGroup> _groupTrafficBuckets(List<TrafficBucket> buckets) {
   return groups;
 }
 
+String _telecomNamedGroupExplanation(
+  int itemCount,
+  TrafficGroupSummary summary, {
+  required bool hasSomeUnlimited,
+  required bool allUnlimited,
+}) {
+  final source = '来自 $itemCount 个同名子项；是否共享、独立以官网规则为准，以下明细可逐项核对。';
+  if (allUnlimited && summary.isUnlimited) return '合并结果：不限量\n$source';
+  if (summary.isComplete && summary.remainingBytes != null) {
+    return '合并估算：约 ${_formatGb(summary.remainingBytes!)} GB；同名子项余量相加。\n$source';
+  }
+  if (hasSomeUnlimited) {
+    return '合并估算待确认（含不限量）；有限余量不计入不限量。\n$source';
+  }
+  return '合并估算待确认；子项缺少可确认余额或单位时不显示部分和。\n$source';
+}
+
 class _TrafficBucketGroupRow extends StatelessWidget {
   const _TrafficBucketGroupRow({
     required this.accountId,
@@ -1656,6 +1686,7 @@ class _TrafficBucketGroupRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTelecom = snapshot?.carrier == Carrier.telecom;
     if (group.buckets.length == 1) {
       return _TrafficBucketRow(
         accountId: accountId,
@@ -1666,11 +1697,29 @@ class _TrafficBucketGroupRow extends StatelessWidget {
         onClassifyBucket: onClassifyBucket,
       );
     }
+    final namedSummary = isTelecom
+        ? summarizeTelecomNamedGroup(group.buckets)
+        : null;
+    final hasSomeUnlimited =
+        isTelecom && group.buckets.any((bucket) => bucket.isUnlimited);
+    final allUnlimited = isTelecom && namedSummary?.isUnlimited == true;
+    final rowValue = !isTelecom
+        ? '共 ${group.buckets.length} 项'
+        : allUnlimited
+        ? '不限量'
+        : namedSummary?.isComplete == true &&
+              namedSummary?.remainingBytes != null
+        ? '合并约 ${_formatGb(namedSummary!.remainingBytes!)} GB'
+        : hasSomeUnlimited
+        ? '含不限量 · 待确认'
+        : '待确认';
     return Material(
       color: Colors.transparent,
       child: Semantics(
         button: true,
-        label: '查看 ${group.name} 的全部 ${group.buckets.length} 项明细',
+        label: isTelecom
+            ? '查看 ${group.name} 的合并估算与 ${group.buckets.length} 项明细'
+            : '查看 ${group.name} 的全部 ${group.buckets.length} 项明细',
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
           onTap: () => showDialog<void>(
@@ -1681,8 +1730,8 @@ class _TrafficBucketGroupRow extends StatelessWidget {
                 vertical: 18,
               ),
               title: Text(
-                group.name,
-                maxLines: 2,
+                isTelecom ? '${group.name}\n合并估算' : group.name,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
               content: ConstrainedBox(
@@ -1698,8 +1747,16 @@ class _TrafficBucketGroupRow extends StatelessWidget {
                     separatorBuilder: (_, _) => const Divider(height: 13),
                     itemBuilder: (context, index) {
                       if (index == 0) {
+                        final explanation = isTelecom
+                            ? _telecomNamedGroupExplanation(
+                                group.buckets.length,
+                                namedSummary!,
+                                hasSomeUnlimited: hasSomeUnlimited,
+                                allUnlimited: allUnlimited,
+                              )
+                            : '${group.name}\n共 ${group.buckets.length} 项，点明细查看各项余额与分类';
                         return Text(
-                          '${group.name}\n共 ${group.buckets.length} 项，点明细查看各项余额与分类',
+                          explanation,
                           style: const TextStyle(
                             color: ResortPalette.muted,
                             fontSize: 11,
@@ -1758,7 +1815,7 @@ class _TrafficBucketGroupRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '共 ${group.buckets.length} 项',
+                  rowValue,
                   style: const TextStyle(
                     color: Color(0xFF4C5563),
                     fontSize: 11,
@@ -1986,6 +2043,7 @@ class _BucketDetailsDialogState extends State<_BucketDetailsDialog> {
   Widget build(BuildContext context) {
     final bucket = widget.bucket;
     final estimated = widget.estimated;
+    final isTelecom = widget.snapshot?.carrier == Carrier.telecom;
     if (widget.onClassifyBucket == null) {
       return AlertDialog(
         title: Text(_bucketName(bucket)),
@@ -2017,10 +2075,10 @@ class _BucketDetailsDialogState extends State<_BucketDetailsDialog> {
               const SizedBox(height: 18),
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      '用途分类',
-                      style: TextStyle(
+                      isTelecom ? '流量分类' : '用途分类',
+                      style: const TextStyle(
                         color: ResortPalette.ink,
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
@@ -2050,7 +2108,7 @@ class _BucketDetailsDialogState extends State<_BucketDetailsDialog> {
               ),
               const SizedBox(height: 4),
               Text(
-                '当前：${_bucketKindLabel(currentKind)}',
+                '当前：${_bucketKindLabel(currentKind, telecom: isTelecom)}',
                 style: const TextStyle(
                   color: ResortPalette.muted,
                   fontSize: 12,
@@ -2235,11 +2293,12 @@ class _ClassificationChoice extends StatelessWidget {
   }
 }
 
-String _bucketKindLabel(BucketKind kind) => switch (kind) {
-  BucketKind.general => '通用流量',
-  BucketKind.directed => '定向流量',
-  BucketKind.unknown => '用途未知',
-};
+String _bucketKindLabel(BucketKind kind, {bool telecom = false}) =>
+    switch (kind) {
+      BucketKind.general => '通用流量',
+      BucketKind.directed => '定向流量',
+      BucketKind.unknown => telecom ? '其他流量' : '用途未知',
+    };
 
 Widget _bucketValueDetails(TrafficBucket bucket, {required bool estimated}) =>
     Column(

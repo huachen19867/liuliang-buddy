@@ -12,6 +12,71 @@ void main() {
     'source': 'officialRendered',
     'rows': rows,
   };
+  test('only the literal directed name marker classifies Telecom rows', () {
+    final names = [
+      '国内上网流量',
+      '国内上网含5GB',
+      '国内上网含100G',
+      '国内通用流量',
+      '视频专属流量',
+      '国内上网含5GB定向流量',
+      '定向通用流量',
+      ' 定向流量 ',
+    ];
+    final snapshot = parseTelecomRendered(
+      sample([for (final name in names) row('1GB', '5GB', name: name)]),
+    );
+    expect(snapshot.status, QueryStatus.success);
+    expect(snapshot.buckets, hasLength(names.length));
+    expect(snapshot.buckets.map((bucket) => bucket.kind), [
+      ...List.filled(5, BucketKind.unknown),
+      ...List.filled(3, BucketKind.directed),
+    ]);
+    expect(snapshot.generalRemainingBytes, isNull);
+    expect(snapshot.buckets.last.name, '定向流量');
+    expect(
+      snapshot.buckets.every((bucket) => bucket.manualKind == null),
+      isTrue,
+    );
+  });
+  test('name amounts never supply or override the rendered traffic amount', () {
+    final snapshot = parseTelecomRendered(
+      sample([
+        row('512MB', '2GB', name: '国内上网含100G'),
+        row('--MB', '5GB', name: '国内上网含5GB定向流量'),
+      ]),
+    );
+    expect(snapshot.status, QueryStatus.success);
+    expect(snapshot.buckets.first.kind, BucketKind.unknown);
+    expect(snapshot.buckets.first.remainingBytes, 1536 * 1024 * 1024);
+    expect(snapshot.buckets.last.kind, BucketKind.directed);
+    expect(snapshot.buckets.last.remainingBytes, isNull);
+    expect(snapshot.buckets.last.totalBytes, isNull);
+    expect(summarizeTraffic(snapshot), isNull);
+  });
+  test('same-name rows remain separate with their individual amounts', () {
+    final snapshot = parseTelecomRendered(
+      sample([
+        row('1GB', '5GB', name: '定向流量'),
+        row('2GB', '5GB', name: '定向流量'),
+        row('1GB', '5GB', name: '国内上网流量'),
+        row('2GB', '5GB', name: '国内上网流量'),
+      ]),
+    );
+    expect(snapshot.buckets, hasLength(4));
+    expect(snapshot.buckets.map((bucket) => bucket.kind), [
+      BucketKind.directed,
+      BucketKind.directed,
+      BucketKind.unknown,
+      BucketKind.unknown,
+    ]);
+    expect(snapshot.buckets.map((bucket) => bucket.remainingBytes), [
+      4 * 1024 * 1024 * 1024,
+      3 * 1024 * 1024 * 1024,
+      4 * 1024 * 1024 * 1024,
+      3 * 1024 * 1024 * 1024,
+    ]);
+  });
   test('currency requires rendered yuan and cannot reuse traffic balance', () {
     final response = sample([row('0MB', '1GB')]);
     expect(

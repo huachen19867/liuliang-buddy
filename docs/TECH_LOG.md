@@ -401,3 +401,17 @@ iOS旧run36956057050回读failure，编译与冷启动已执行，失败发生�
 Swift回归复核发现9e18+1的NSNumber转doubleValue后与9e18相同，不能当作明显超上界断言；仅测试样本改为9.1e18（仍在Int64范围），不改生产或APK。首次代理审查消息发送给已完成代理不会启动新turn，根接管补测试，避免依赖未收到的修正。此测试源码补正随主分支后续提交，iOS云端结果单独回读，不能冒称已通过。
 
 1.10.5公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.5 ，非草稿/非预发布，target/tag均64dad650dd7097534c6db106aa1add443ade3e42（含Swift测试浮点样本修正），唯一APKuploaded/28039020字节，远端digest f88a7eadf0cebbee95645bfc93097d8228d0fb3bafff1263d4a5ca60307fa048与本机一致。直连两次push分别连接重置/连接失败，没有执行到releasecreate；测试本机代理已恢复200，仅当前进程设置proxy后push public成功。一次发布回读EOF仅重试只读API成功，不重复资产。新iOS run37002298627 in_progress，不能标本版云端通过；旧1.10.4 run36999305137回读success。回执另docs提交，未移动tag或替换APK。
+
+## 2026-10-02：电信套餐名称分类规则
+
+老板明确拍板难以区分的“国内上网流量”“国内上网含XG”等归其他，名字有“定向”归定向，授权直接实现。开始定位TECH_LOG，复用dlife-public官网Account明细及FlowLite已下载分组研究，不新增外部解析/无许可证代码。轻量分工GPT6.1 SOL高实现parser与override缓存重算及数据回归，GPT6 Luna极高实现电信其他显示与截图，Astra中等只读查前后台/组件路径；根改Android静态分类label、介绍与索引并串行验收发布。仅电信采用名称fallback，其他运营商明确官方字段规则保留；用户手动设置优先。名称分类不制造金额、单位或查询时间，不去重同名项。介绍同时说明电信名称规则和估算。
+
+过程中老板追加同名子项为何折叠、要求归为一项。根说明此前顾虑共享额度只折叠，现按用户决策改电信完整名称相同的首页项为合并估算、全部有效余量相加；有缺项则整组待确认，原始明细留详情，不能当成独立可用额度保证。数据分工续加summarizeTelecomNamedGroup与sum/缺项/overflow/不限量测试，UI续接合并行/核对详情。其他运营商未获同名金额合并需求，保持原共N项展示。
+
+首轮analyze发现动态电信分类标题仍在const Expanded中，移除外层const保留静态style。首轮全量UI6项断言失败：分类芯片与明细同值使旧唯一文字匹配不再成立，电信标题改流量分类、合并说明title/body重复匹配，以及>=100GB既有formatter无小数。保留断言并用明确行点击/确切说明文本、正确数值精度更新。全量278项通过后补合并后的“查看全部”项数、组合截图恢复页顶并显式显示演示标记；随后重新全量验收另补最终结果。根新增真实FlowHome缓存启动→组件MethodChannel回归，确认旧general的国内上网改other、旧unknown定向改directed，原时间/金额保持。没有实际运营商会话，不称真实查询通过。
+
+最终修改后完整Flutter278项/28秒通过，analyze无问题；组合实际Flutter截图已重新生成并目视确认定向5GB合并、其他4GB、缺项待确认及显式演示标记，同名24子项按4项查看。两/三/四卡XML预览61ID及可见性校验通过。所有金额仍来自原快照，没有按名字里的容量生成余量；实际手机/运营商未新增验收。
+
+原生本项目 :app:testDebugUnitTest --rerun 13秒成功，四份新XML时间2026-10-02T12:16:49Z，共32项0失败0错误。验证后没有再改生产Dart，SDK均串行；Release构建正在执行。
+
+正式Release36.1秒成功，APK28,038,996字节/SHA256 88f93678dad92b84b468259abdd08e7082788a43233f5a11d6039a070e6a6fff；1.10.6/code23、v2正式证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐通过，wrapper官方配置无diff。只准备push public并发布唯一APK，名称规则是应用归类，合并是用户指定的数学估算，不冒称运营商认定共享/独立。

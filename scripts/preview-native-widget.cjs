@@ -10,9 +10,10 @@ const root = path.resolve(__dirname, '..');
 const resourceRoot = path.join(root, 'app/android/app/src/main/res');
 const count = Number(process.argv[2] || 2);
 const partial = process.argv.includes('--partial');
+const classified = process.argv.includes('--classified');
 if (![2, 3, 4].includes(count)) throw new Error('Preview count must be 2, 3 or 4.');
 const layoutPath = path.join(resourceRoot, count >= 3 ? 'layout/traffic_widget_compact.xml' : 'layout/traffic_widget.xml');
-const outputPath = path.join(root, partial ? `artifacts/widget-partial-${count}-preview.png` : count === 2 ? 'artifacts/widget-glass-preview.png' : `artifacts/widget-${count === 3 ? 'three' : 'four'}-preview.png`);
+const outputPath = path.join(root, classified ? `artifacts/widget-classified-${count}-preview.png` : partial ? `artifacts/widget-partial-${count}-preview.png` : count === 2 ? 'artifacts/widget-glass-preview.png' : `artifacts/widget-${count === 3 ? 'three' : 'four'}-preview.png`);
 
 const demo = {
   widget_root: { visibility: 'visible' },
@@ -79,6 +80,17 @@ if (partial) {
   demo[`slot_${count}_details`] = {visibility: 'gone'};
   demo[`slot_${count}_partial`] = {text: '单项约 27.50 GB\n1项待确认', visibility: 'visible'};
   demo[`slot_${count}_summary`] = count >= 3 ? {text: '9项可读 · 1项待确认', visibility: 'visible'} : {visibility: 'gone'};
+}
+
+if (classified) {
+  demo[`slot_${count}_name`] = {text: '中国电信 1'};
+  demo[`slot_${count}_badge`] = {src: '@drawable/carrier_telecom'};
+  demo[`slot_${count}_summary`] = {visibility: 'gone'};
+  demo[`slot_${count}_state`] = {visibility: 'gone'};
+  demo[`slot_${count}_general`] = {text: '—'};
+  demo[`slot_${count}_directed`] = {text: '约 27.50 GB'};
+  demo[`slot_${count}_other`] = {text: '约 20.60 GB'};
+  demo[`slot_${count}_voice`] = {text: '—'};
 }
 
 function readRequired(file) {

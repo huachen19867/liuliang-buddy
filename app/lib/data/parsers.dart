@@ -1,4 +1,5 @@
 import 'models.dart';
+import 'telecom_name_classification.dart';
 
 /// Billing DOM contains rounded used/total strings. Their difference is an
 /// estimate, not an exact network response or a verified general allowance.
@@ -51,7 +52,7 @@ CarrierSnapshot parseTelecomRendered(
     buckets.add(
       TrafficBucket(
         name: name,
-        kind: BucketKind.unknown,
+        kind: classifyTelecomTrafficName(name),
         remainingBytes: valid ? total - used : null,
         totalBytes: valid ? total : null,
         isUnlimited: unlimited,

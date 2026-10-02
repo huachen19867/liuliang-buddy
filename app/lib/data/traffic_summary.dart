@@ -19,6 +19,41 @@ class TrafficGroupSummary {
       : 'unavailable';
 }
 
+/// A display-only estimate for one exact Telecom package-name group. The source
+/// rows stay in the snapshot; incomplete groups never yield a partial sum.
+TrafficGroupSummary summarizeTelecomNamedGroup(
+  Iterable<TrafficBucket> buckets,
+) {
+  final rows = buckets.toList();
+  if (rows.isEmpty) return const TrafficGroupSummary();
+  final name = rows.first.name.trim();
+  final kind = rows.first.effectiveKind;
+  if (name.isEmpty ||
+      rows.any((row) => row.name.trim() != name || row.effectiveKind != kind)) {
+    return const TrafficGroupSummary();
+  }
+  if (rows.every((row) => row.isUnlimited)) {
+    if (rows.any(
+      (row) => row.remainingBytes != null || row.totalBytes != null,
+    )) {
+      return const TrafficGroupSummary();
+    }
+    return const TrafficGroupSummary(isUnlimited: true);
+  }
+  if (rows.any(
+    (row) => row.isUnlimited || !hasVerifiedTrafficUnit(row.rawUnit),
+  )) {
+    return const TrafficGroupSummary();
+  }
+  final remaining = _completeSum(rows, (row) => row.remainingBytes);
+  if (remaining == null) return const TrafficGroupSummary();
+  return TrafficGroupSummary(
+    remainingBytes: remaining,
+    isComplete: true,
+    isEstimated: true,
+  );
+}
+
 /// Keeps unknown purposes separate. Mobile's official aggregate includes other
 /// categories already, so it never joins the "other" package sum.
 TrafficGroupSummary summarizeTrafficGroup(

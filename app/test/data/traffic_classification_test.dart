@@ -45,6 +45,172 @@ void main() {
   TrafficClassificationOverrides empty() =>
       TrafficClassificationOverrides.restore(null);
 
+  test('old Telecom cache reclassifies names without changing query facts', () {
+    final original = sample([
+      row('国内上网流量', kind: BucketKind.general),
+      row('国内上网含5GB', kind: BucketKind.directed, remaining: 0),
+      row('视频专属流量', kind: BucketKind.directed, remaining: null),
+      row('国内上网定向流量'),
+      row('通用流量', kind: BucketKind.general, unlimited: true),
+    ], carrier: Carrier.telecom);
+    final restored = CarrierSnapshot.fromJson(original.toJson());
+    final adjusted = empty().apply('telecom', restored);
+    expect(adjusted.buckets.map((bucket) => bucket.kind), [
+      BucketKind.unknown,
+      BucketKind.unknown,
+      BucketKind.unknown,
+      BucketKind.directed,
+      BucketKind.unknown,
+    ]);
+    for (var index = 0; index < restored.buckets.length; index++) {
+      expect(adjusted.buckets[index].toJson(), {
+        ...restored.buckets[index].toJson(),
+        'kind': adjusted.buckets[index].kind.name,
+      });
+    }
+    expect(adjusted.toJson(), {
+      ...restored.toJson(),
+      'buckets': adjusted.buckets.map((bucket) => bucket.toJson()).toList(),
+    });
+    expect(adjusted.queriedAt, time);
+    expect(adjusted.balanceYuan, -2.5);
+    expect(adjusted.generalRemainingBytes, isNull);
+    expect(restored.buckets.first.kind, BucketKind.general);
+    expect(empty().apply('telecom', adjusted).toJson(), adjusted.toJson());
+  });
+
+  test('saved Telecom manual classification wins after cache restoration', () {
+    final original = sample([
+      row('定向流量'),
+      row('国内上网含5GB', kind: BucketKind.general),
+    ], carrier: Carrier.telecom);
+    var overrides = empty().withOverride(
+      'telecom_2',
+      original,
+      original.buckets.first,
+      BucketKind.general,
+    );
+    overrides = overrides.withOverride(
+      'telecom_2',
+      original,
+      original.buckets.last,
+      BucketKind.directed,
+    );
+    final cached = CarrierSnapshot.fromJson(
+      overrides.apply('telecom_2', original).toJson(),
+    );
+    final restarted = TrafficClassificationOverrides.restore(
+      jsonEncode(overrides.toJson()),
+    );
+    final adjusted = restarted.apply('telecom_2', cached);
+    expect(adjusted.buckets.first.kind, BucketKind.directed);
+    expect(adjusted.buckets.first.effectiveKind, BucketKind.general);
+    expect(adjusted.buckets.last.kind, BucketKind.unknown);
+    expect(adjusted.buckets.last.effectiveKind, BucketKind.directed);
+    expect(adjusted.generalRemainingBytes, 1024);
+    expect(
+      restarted.apply('telecom', cached).buckets.first.effectiveKind,
+      BucketKind.directed,
+    );
+    final reset = restarted.withOverride(
+      'telecom_2',
+      adjusted,
+      adjusted.buckets.first,
+      null,
+    );
+    expect(
+      reset.apply('telecom_2', adjusted).buckets.first.effectiveKind,
+      BucketKind.directed,
+    );
+    expect(reset.apply('telecom_2', adjusted).buckets.first.manualKind, isNull);
+  });
+
+  test(
+    'Telecom duplicates keep rows and automatic purpose but no manual rule',
+    () {
+      final original = sample([row('定向流量')], carrier: Carrier.telecom);
+      final overrides = empty().withOverride(
+        'telecom',
+        original,
+        original.buckets.single,
+        BucketKind.general,
+      );
+      final duplicate = sample([
+        row('定向流量', remaining: 10, manualKind: BucketKind.general),
+        row(' 定向流量 ', remaining: 20, manualKind: BucketKind.directed),
+        row('国内上网流量', kind: BucketKind.general, remaining: 30),
+        row('国内上网流量', kind: BucketKind.directed, remaining: null),
+      ], carrier: Carrier.telecom);
+      final adjusted = overrides.apply('telecom', duplicate);
+      expect(adjusted.buckets, hasLength(4));
+      expect(adjusted.buckets.map((bucket) => bucket.remainingBytes), [
+        10,
+        20,
+        30,
+        null,
+      ]);
+      expect(adjusted.buckets.map((bucket) => bucket.kind), [
+        BucketKind.directed,
+        BucketKind.directed,
+        BucketKind.unknown,
+        BucketKind.unknown,
+      ]);
+      expect(
+        adjusted.buckets.every((bucket) => bucket.manualKind == null),
+        isTrue,
+      );
+      expect(
+        overrides.apply('telecom', original).buckets.single.effectiveKind,
+        BucketKind.general,
+      );
+    },
+  );
+
+  test('background cache publishing uses latest Telecom manual choices', () {
+    final selection = CarrierSelection.complete([Carrier.telecom]);
+    final accounts = CarrierAccounts.fromSelection(selection);
+    final original = sample([
+      row('国内上网流量', kind: BucketKind.general, remaining: 10),
+      row('定向流量', remaining: 20),
+    ], carrier: Carrier.telecom);
+    final stored = CarrierSnapshot.fromJson(original.toJson());
+    final latest = empty().withOverride(
+      'telecom',
+      stored,
+      stored.buckets.first,
+      BucketKind.directed,
+    );
+    final adjusted = TrafficClassificationOverrides.restore(
+      jsonEncode(latest.toJson()),
+    ).apply('telecom', stored);
+    final payload = buildWidgetPayload(
+      [adjusted],
+      thresholdGb: 5,
+      accounts: accounts,
+      selection: selection,
+      accountSnapshots: {'telecom': adjusted},
+    );
+    final instance = (payload['instances'] as List).single as Map;
+    expect(instance['generalRemainingBytes'], isNull);
+    expect(instance['directedRemainingBytes'], 30);
+    expect(instance['otherState'], 'unavailable');
+    expect(instance['queriedAt'], time.millisecondsSinceEpoch);
+    expect(instance['balanceYuan'], -2.5);
+    expect(adjusted.buckets.first.kind, BucketKind.unknown);
+    expect(adjusted.buckets.first.manualKind, BucketKind.directed);
+  });
+
+  test('other carriers retain their official purpose classifications', () {
+    for (final carrier in [Carrier.mobile, Carrier.broadnet, Carrier.unicom]) {
+      final original = sample([
+        row('国内上网流量', kind: BucketKind.general),
+        row('视频专属流量', kind: BucketKind.directed),
+        row('定向流量'),
+      ], carrier: carrier);
+      expect(empty().apply(carrier.name, original).toJson(), original.toJson());
+    }
+  });
+
   test('manual correction keeps automatic kind and all query facts', () {
     final original = sample([row('国内包')]);
     final overrides = empty().withOverride(

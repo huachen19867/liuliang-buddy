@@ -59,3 +59,5 @@ unicom-solutions-20261002/ 保存 Newxin394/unicom-monitor 的 App 登录/续期
 2026-10-02 电信明细压缩复用 telecom-public-deep 的 Account 模板及 scripts/test-telecom-rendered-browser.cjs。模板对每个套餐条目渲染一行，无可靠唯一业务ID，完整名称相同只做展示折叠、不去重或求和；本轮未新增外部业务代码。
 
 2026-10-02 桌面部分套餐同步复用 ios-home-widget 官方 WidgetKit/App Group 与已有 RemoteViews 布局参考。仅扩展示字段，不发布运营商原始明细，不引入外部解析或认证代码；组件压缩契约见 docs/WIDGET_PARTIAL_DATA.md。
+
+2026-10-02 电信名称分类按用户明确产品规则实现，复用 dlife-public Account 名称来源和 FlowLite 分组研究。没有复制外部业务代码，名字容量不作为余量来源，官方单位/额度与同名实例仍按原校验保留。
