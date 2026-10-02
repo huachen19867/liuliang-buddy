@@ -347,3 +347,7 @@ iOS对应源码云端run36956057050（4271666）回读为in_progress：https://g
 最终完整Flutter220项通过、analyze无问题，更新后的高级页和用途未知首页预览已生成且目视检查中文/图标/提交按钮正常，合成资料非实机。与本轮无关的选择页自动重渲染恢复原图，其余用途未知的首页截图更新。Release正常构建42.8秒成功，APK27,907,248字节/SHA256 30869ed0cfcf9ffeb40a1d8c6411acf2269f6807489ec58eedf8db8291905a56；1.10.1/code18、v2正式证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐通过。生产代码检验完成后未再改Dart实现；原生JUnit和公开发布回执另补。没有联通真实卡或USB，不能声称实号联通或新Launcher已验收。
 
 原生全模块 testDebugUnitTest 首轮失败定位到第三方 shared_preferences_android 的 Robolectric SDK36 需Java21，本机Java17不满足；项目 :app:testDebugUnitTest 原为UP-TO-DATE，不能凭旧XML记通过。改用 :app:testDebugUnitTest --rerun 仅强制重跑本项目任务，BUILD SUCCESSFUL 10秒，四份新JUnit XML时间2026-10-02T12:28:26，合计29项/0失败/0错误。明确不把依赖库全模块失败记为通过，不修改依赖或生产代码以绕过环境要求。签名APK再核SHA256不变，README更新最新验证链接、旧iOS回执版本边界和新增文件索引。
+
+1.10.1 正式公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.1 ，仓库isPrivate=false，draft=false/prerelease=false，target与tag均a0ac8e839d3225edb36e25955b85780ce1a13866。Assets唯一liuliang-buddy-release.apk，uploaded/27,907,248字节，远端digest 30869ed0cfcf9ffeb40a1d8c6411acf2269f6807489ec58eedf8db8291905a56与本机一致。仅push public，研究参考/本机签名凭证未公开；发布正文含三张合成Flutter预览和实号边界。回执另文档提交，不移动tag或替换APK。
+
+iOS旧run36956057050回读failure，编译与冷启动已执行，失败发生在smoke仍等待旧“1 家已选择”文案，当前三四卡选择页为“1 / 4 张已选择”。同步修正integration_test的断言与过时双击注释，不改生产界面，也不删除断言。a0ac8e8触发run36964950810仍in_progress，但同旧断言，不能预告通过；修正后将触发新云端验收。Windows的python命令为WindowsApps空桩，不执行文档脚本，已经改用apply_patch并回读确认，不再依赖该命令。

@@ -29,3 +29,5 @@ APK 为 27,907,248 字节（27.91 MB）；SHA-256：
 `30869ed0cfcf9ffeb40a1d8c6411acf2269f6807489ec58eedf8db8291905a56`
 
 版本1.10.1/code18，API24/36，仅 ARM64、非 debuggable；apksigner v2 通过，正式证书 SHA-256 `33b115558027fdfa667a3f14a9351fbdb29901948c085daf739e16a9055a497e` 与此前相同，16KB ZIP 对齐通过。Gradle wrapper 已恢复，未打包本地参考项目或研究截图，未使用 DEMO。
+
+已正式公开发布，Release 非草稿、非预发布，tag 指向 `a0ac8e839d3225edb36e25955b85780ce1a13866`。唯一 APK asset 为 uploaded，远端字节数和 SHA-256 与上述一致。iOS 当前版本云端验收尚待完成；源码主分支另同步修正三四卡选择页的旧测试文案，不移动安卓发布 tag。
