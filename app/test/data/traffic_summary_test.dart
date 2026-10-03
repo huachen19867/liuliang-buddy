@@ -6,6 +6,207 @@ void main() {
   final queriedAt = DateTime.utc(2026, 9, 30, 9, 10);
   const gib = 1024 * 1024 * 1024;
 
+  CarrierSnapshot telecom(List<TrafficBucket> buckets) => CarrierSnapshot(
+    carrier: Carrier.telecom,
+    status: QueryStatus.success,
+    queriedAt: queriedAt,
+    buckets: buckets,
+  );
+  const readableOther = TrafficBucket(
+    name: '国内上网含5G',
+    kind: BucketKind.unknown,
+    remainingBytes: 5 * gib,
+    rawUnit: 'GB',
+  );
+  const pendingOther = TrafficBucket(
+    name: '国内上网流量',
+    kind: BucketKind.unknown,
+    rawRemaining: '待确认',
+  );
+
+  test(
+    'Telecom other sums readable amounts while retaining the pending row',
+    () {
+      final snapshot = telecom(const [
+        readableOther,
+        readableOther,
+        pendingOther,
+      ]);
+      final summary = summarizeTrafficGroup(snapshot, BucketKind.unknown);
+      expect(summary.remainingBytes, 10 * gib);
+      expect(summary.state, 'partial');
+      expect(summary.isPartial, isTrue);
+      expect(summary.isComplete, isFalse);
+      expect(summary.isEstimated, isTrue);
+      expect(summary.pendingCount, 1);
+      expect(summarizeTraffic(snapshot), isNull);
+      expect(snapshot.buckets, const [
+        readableOther,
+        readableOther,
+        pendingOther,
+      ]);
+      expect(
+        summarizeTelecomNamedGroup([
+          readableOther,
+          readableOther.copyWith(remainingBytes: null),
+        ]).remainingBytes,
+        isNull,
+      );
+    },
+  );
+
+  test(
+    'Telecom other differentiates complete, zero partial and wholly pending',
+    () {
+      final complete = summarizeTrafficGroup(
+        telecom(const [readableOther, readableOther]),
+        BucketKind.unknown,
+      );
+      expect(complete.remainingBytes, 10 * gib);
+      expect(complete.state, 'provided');
+      expect(complete.pendingCount, 0);
+      expect(complete.isPartial, isFalse);
+      final zero = summarizeTrafficGroup(
+        telecom([readableOther.copyWith(remainingBytes: 0), pendingOther]),
+        BucketKind.unknown,
+      );
+      expect(zero.remainingBytes, 0);
+      expect(zero.state, 'partial');
+      expect(zero.pendingCount, 1);
+      final pending = summarizeTrafficGroup(
+        telecom(const [pendingOther, pendingOther]),
+        BucketKind.unknown,
+      );
+      expect(pending.remainingBytes, isNull);
+      expect(pending.state, 'unavailable');
+      expect(pending.pendingCount, 2);
+    },
+  );
+
+  test(
+    'Telecom other skips unverified and contradictory amounts without guessing',
+    () {
+      final invalid = [
+        pendingOther.copyWith(remainingBytes: 7 * gib),
+        readableOther.copyWith(rawUnit: '分钟'),
+        readableOther.copyWith(name: ' '),
+        readableOther.copyWith(remainingBytes: -1),
+        readableOther.copyWith(totalBytes: 4 * gib),
+        readableOther.copyWith(isUnlimited: true),
+        const TrafficBucket(
+          name: '不限量',
+          kind: BucketKind.unknown,
+          isUnlimited: true,
+        ),
+      ];
+      final summary = summarizeTrafficGroup(
+        telecom([readableOther, ...invalid]),
+        BucketKind.unknown,
+      );
+      expect(summary.remainingBytes, 5 * gib);
+      expect(summary.pendingCount, invalid.length);
+      expect(summary.state, 'partial');
+      expect(summary.isUnlimited, isFalse);
+      final unlimited = summarizeTrafficGroup(
+        telecom([invalid.last]),
+        BucketKind.unknown,
+      );
+      expect(unlimited.state, 'unlimited');
+      expect(unlimited.remainingBytes, isNull);
+      final conflicting = summarizeTrafficGroup(
+        telecom([invalid[5]]),
+        BucketKind.unknown,
+      );
+      expect(conflicting.state, 'unavailable');
+      expect(conflicting.remainingBytes, isNull);
+    },
+  );
+
+  test('Telecom other overflow is unavailable regardless of row ordering', () {
+    final largest = readableOther.copyWith(remainingBytes: 9223372036854775807);
+    for (final rows in [
+      [largest, readableOther, pendingOther],
+      [readableOther, pendingOther, largest],
+    ]) {
+      final summary = summarizeTrafficGroup(telecom(rows), BucketKind.unknown);
+      expect(summary.remainingBytes, isNull);
+      expect(summary.state, 'unavailable');
+      expect(summary.pendingCount, 1);
+    }
+  });
+
+  test('partial other respects manual classifications and snapshot gates', () {
+    final snapshot = telecom([
+      readableOther,
+      readableOther.copyWith(manualKind: BucketKind.general),
+      pendingOther.copyWith(manualKind: BucketKind.directed),
+      pendingOther,
+    ]);
+    final other = summarizeTrafficGroup(snapshot, BucketKind.unknown);
+    expect(other.remainingBytes, 5 * gib);
+    expect(other.pendingCount, 1);
+    expect(
+      summarizeTrafficGroup(snapshot, BucketKind.general).remainingBytes,
+      5 * gib,
+    );
+    expect(
+      summarizeTrafficGroup(snapshot, BucketKind.directed).state,
+      'unavailable',
+    );
+    expect(snapshot.buckets[1].kind, BucketKind.unknown);
+    expect(snapshot.buckets[1].manualKind, BucketKind.general);
+    for (final status in [
+      QueryStatus.loading,
+      QueryStatus.error,
+      QueryStatus.authExpired,
+    ]) {
+      final cached = summarizeTrafficGroup(
+        snapshot.copyWith(status: status),
+        BucketKind.unknown,
+      );
+      expect(cached.remainingBytes, 5 * gib);
+      expect(cached.state, 'partial');
+    }
+    for (final gated in [
+      snapshot.copyWith(status: QueryStatus.notConnected),
+      snapshot.copyWith(queriedAt: null),
+    ]) {
+      final summary = summarizeTrafficGroup(gated, BucketKind.unknown);
+      expect(summary.remainingBytes, isNull);
+      expect(summary.pendingCount, 0);
+    }
+  });
+
+  test(
+    'other carriers and Telecom general or directed keep complete-sum rules',
+    () {
+      for (final carrier in [
+        Carrier.mobile,
+        Carrier.unicom,
+        Carrier.broadnet,
+      ]) {
+        final snapshot = telecom(const [
+          readableOther,
+          pendingOther,
+        ]).copyWith(carrier: carrier);
+        final summary = summarizeTrafficGroup(snapshot, BucketKind.unknown);
+        expect(summary.state, 'unavailable');
+        expect(summary.remainingBytes, isNull);
+        expect(summary.isPartial, isFalse);
+      }
+      for (final kind in [BucketKind.general, BucketKind.directed]) {
+        final snapshot = telecom([
+          readableOther.copyWith(manualKind: kind),
+          pendingOther.copyWith(manualKind: kind),
+        ]);
+        final summary = summarizeTrafficGroup(snapshot, kind);
+        expect(summary.state, 'unavailable');
+        expect(summary.remainingBytes, isNull);
+        expect(summary.isPartial, isFalse);
+      }
+    },
+  );
+
   test('one App unknown package is visible without becoming general', () {
     final snapshot = CarrierSnapshot(
       carrier: Carrier.unicom,

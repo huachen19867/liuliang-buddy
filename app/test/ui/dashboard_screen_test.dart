@@ -714,7 +714,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('电信部分套餐无法估算时仍标记可计算明细且弹窗保留估算说明', (tester) async {
+  testWidgets('电信其他类别显示已读部分估算与待确认项且详情保留说明', (tester) async {
     _configureViewport(tester, const Size(390, 844));
     await tester.pumpWidget(
       _host(
@@ -733,10 +733,12 @@ void main() {
     expect(find.text('余额待确认'), findsNothing);
     expect(find.text('通话余量'), findsNothing);
     expect(find.text('短信余量'), findsNothing);
-    expect(find.text('部分套餐余量待确认，详见明细'), findsNWidgets(2));
+    expect(find.text('部分套餐余量待确认，详见明细'), findsNothing);
+    expect(find.text('已读约18.0GB\n1项待确认'), findsOneWidget);
+    expect(find.textContaining('其他流量已读部分约 18.0 GB，另有 1 项待确认'), findsOneWidget);
     expect(find.text('套餐用途待确认，可点明细设置'), findsNothing);
     expect(find.textContaining('用途待确认'), findsNothing);
-    expect(find.text('部分官网明细无法估算，暂不显示合计；请核对官方查询页'), findsOneWidget);
+    expect(find.text('其他流量只显示已确认子项的估算；未计入项待确认，完整套餐合计待确认。'), findsOneWidget);
     expect(find.text('约 18.0 GB'), findsOneWidget);
     expect(find.text('剩余额无法确认（单位待确认）'), findsOneWidget);
 
@@ -897,6 +899,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('189****7612'), findsOneWidget);
     expect(find.text('已读取 1 项 · 1 项待确认'), findsOneWidget);
+    expect(find.text('已读约18.0GB\n1项待确认'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -1090,6 +1093,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('界面演示 · 非真实流量'), findsOneWidget);
     expect(find.text('已读取 23 项 · 1 项待确认'), findsOneWidget);
+    expect(find.text('已读约276GB\n1项待确认'), findsOneWidget);
     expect(find.text('合并约 36.0 GB'), findsOneWidget);
     expect(find.text('合并约 100 GB'), findsOneWidget);
     expect(find.text('合并约 140 GB'), findsOneWidget);

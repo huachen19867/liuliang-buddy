@@ -188,5 +188,26 @@ enum TrafficSnapshotTests {
         precondition(TrafficSnapshot.read(from: defaults).instances.isEmpty)
         precondition(TrafficSnapshot.read(from: nil).instances.isEmpty)
         print("TrafficSnapshot model checks passed")
+        var otherPartial = partialRow()
+        otherPartial["otherState"] = "partial"
+        otherPartial["otherRemainingBytes"] = 10_737_418_240
+        otherPartial["otherPendingCount"] = 1
+        let other = snapshot([otherPartial]).instances[0]
+        precondition(other.primaryValue == nil)
+        precondition(other.otherPartialText == "其他已读约 10.00 GB · 1项待确认")
+        let otherRestored = try JSONDecoder().decode(TrafficSnapshot.self,
+            from: snapshot([otherPartial]).encoded()).instances[0]
+        precondition(otherRestored.otherPartialText == other.otherPartialText)
+        var unknownOtherStatus = otherPartial
+        unknownOtherStatus["status"] = "unexpected"
+        precondition(snapshot([unknownOtherStatus]).instances[0].otherPartialText == nil)
+        for field in ["otherRemainingBytes", "otherPendingCount"] {
+            var invalid = otherPartial
+            invalid[field] = -1
+            precondition(snapshot([invalid]).instances[0].otherPartialText == nil)
+        }
+        otherPartial["carrier"] = "mobile"
+        otherPartial["accountId"] = "mobile"
+        precondition(snapshot([otherPartial]).instances[0].otherPartialText == nil)
     }
 }

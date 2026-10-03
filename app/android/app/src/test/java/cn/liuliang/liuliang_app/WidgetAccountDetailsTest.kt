@@ -4,6 +4,32 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class WidgetAccountDetailsTest {
+    @Test fun telecomOtherPartialSumSurvivesNativeAttachAndCompactDisplay() {
+        val parsed = partial(mapOf("otherState" to "partial", "otherRemainingBytes" to 10 * gib, "otherPendingCount" to 1))
+        assertEquals("partial", parsed.otherState)
+        assertEquals(10 * gib, parsed.otherRemainingBytes)
+        assertEquals("已读约 10.00 GB", WidgetAccountDetails.traffic(parsed.otherState, parsed.otherRemainingBytes, true, true))
+        assertEquals("其他已读约 10.00 GB · 1项待确认", WidgetAccountLayout.compactDetail(parsed, now, false))
+        assertFalse(WidgetAccountDetails.usePartialPanel(parsed, now))
+        assertEquals("—", WidgetAccountDetails.traffic(parsed.otherState, parsed.otherRemainingBytes, true, false))
+    }
+
+    @Test fun otherPartialDoesNotOpenOtherCarriersOrInvalidAmounts() {
+        for (extra in listOf(
+            mapOf("otherRemainingBytes" to -1L), mapOf("otherRemainingBytes" to Double.NaN),
+            mapOf("otherPendingCount" to 0), mapOf("otherPendingCount" to 201))) {
+            val parsed = partial(mapOf("otherState" to "partial", "otherRemainingBytes" to gib, "otherPendingCount" to 1) + extra)
+            assertEquals("unavailable", parsed.otherState)
+            assertNull(parsed.otherRemainingBytes)
+        }
+        val mobile = WidgetAccountDetails.attach(WidgetCardData(carrier = "mobile", status = "success", remainingBytes = null, queriedAt = now),
+            mapOf("otherState" to "partial", "otherRemainingBytes" to gib, "otherPendingCount" to 1,
+                "generalState" to "partial", "generalRemainingBytes" to gib))
+        assertEquals("unavailable", mobile.otherState)
+        assertEquals("unavailable", mobile.generalState)
+        val zero = partial(mapOf("otherState" to "partial", "otherRemainingBytes" to 0L, "otherPendingCount" to 1))
+        assertEquals("已读约 0 MB", WidgetAccountDetails.traffic(zero.otherState, zero.otherRemainingBytes, true, true))
+    }
     private val now = 1_790_744_400_000L
     private val gib = 1024L * 1024L * 1024L
     private fun partial(extra: Map<String, Any?> = emptyMap()): WidgetCardData = WidgetInstances.fromPayload(

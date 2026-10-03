@@ -95,6 +95,7 @@ Map<String, Object?> buildWidgetPayload(
         'directedState': directed.state,
         'otherRemainingBytes': other.remainingBytes,
         'otherState': other.state,
+        'otherPendingCount': other.pendingCount.clamp(0, 200),
         'trafficEstimated':
             general.isEstimated || directed.isEstimated || other.isEstimated,
         'voiceRemainingMinutes': voice?.remaining,

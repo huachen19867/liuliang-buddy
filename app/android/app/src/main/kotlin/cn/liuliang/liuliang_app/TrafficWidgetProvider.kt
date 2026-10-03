@@ -34,6 +34,7 @@ data class WidgetCardData(
     val directedRemainingBytes: Long? = null,
     val otherState: String = "unavailable",
     val otherRemainingBytes: Long? = null,
+    val otherPendingCount: Int = 0,
     val trafficEstimated: Boolean = false,
     val voiceState: String = "unavailable",
     val voiceRemainingMinutes: Double? = null,
@@ -405,6 +406,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
             putString("instance_${index}_directedState", card.directedState)
             card.directedRemainingBytes?.let { putLong("instance_${index}_directedRemainingBytes", it) }
             putString("instance_${index}_otherState", card.otherState)
+            putInt("instance_${index}_otherPendingCount", card.otherPendingCount)
             card.otherRemainingBytes?.let { putLong("instance_${index}_otherRemainingBytes", it) }
             putBoolean("instance_${index}_trafficEstimated", card.trafficEstimated)
             putString("instance_${index}_voiceState", card.voiceState)
@@ -468,6 +470,7 @@ class TrafficWidgetProvider : AppWidgetProvider() {
                 "directedState" to prefs.getString("instance_${index}_directedState", null),
                 "directedRemainingBytes" to if (prefs.contains("instance_${index}_directedRemainingBytes")) prefs.getLong("instance_${index}_directedRemainingBytes", -1L) else null,
                 "otherState" to prefs.getString("instance_${index}_otherState", null),
+                "otherPendingCount" to prefs.getInt("instance_${index}_otherPendingCount", 0),
                 "otherRemainingBytes" to if (prefs.contains("instance_${index}_otherRemainingBytes")) prefs.getLong("instance_${index}_otherRemainingBytes", -1L) else null,
                 "trafficEstimated" to prefs.getBoolean("instance_${index}_trafficEstimated", false),
                 "voiceState" to prefs.getString("instance_${index}_voiceState", null),

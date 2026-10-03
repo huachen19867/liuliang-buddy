@@ -31,7 +31,7 @@ void main() {
   }
 
   test(
-    'partial Telecom carries one package preview without any partial sum',
+    'partial Telecom keeps the headline pending and publishes a readable other estimate',
     () {
       final snapshot = CarrierSnapshot(
         carrier: Carrier.telecom,
@@ -66,8 +66,9 @@ void main() {
       }
       expect((legacy['telecom'] as Map)['remainingBytes'], isNull);
       expect(instance['primaryValue'], isNull);
-      expect(instance['otherRemainingBytes'], isNull);
-      expect(instance['otherState'], 'unavailable');
+      expect(instance['otherRemainingBytes'], previewBytes + 10737418240);
+      expect(instance['otherState'], 'partial');
+      expect(instance['otherPendingCount'], 1);
       expect(instance['generalRemainingBytes'], isNull);
     },
   );
@@ -90,6 +91,8 @@ void main() {
       expect(row['primaryValue'], isNull);
       expect(row['generalRemainingBytes'], isNull);
       expect(row['generalState'], 'unavailable');
+      expect(row['otherState'], 'unavailable');
+      expect(row['otherPendingCount'], 0);
       expect(row['previewRemainingBytes'], previewBytes);
     },
   );
@@ -124,6 +127,9 @@ void main() {
       expect(row['previewRemainingBytes'], isNull);
       expect(row['previewUnlimited'], isFalse);
       expect(row['primaryValue'], isNull);
+      expect(row['otherRemainingBytes'], isNull);
+      expect(row['otherState'], 'unavailable');
+      expect(row['otherPendingCount'], 8);
     },
   );
 
@@ -141,6 +147,9 @@ void main() {
     expect(row['trafficReadableCount'], 1);
     expect(row['trafficPendingCount'], 1);
     expect(row['primaryValue'], isNull);
+    expect(row['otherRemainingBytes'], 0);
+    expect(row['otherState'], 'partial');
+    expect(row['otherPendingCount'], 1);
   });
 
   test(
@@ -196,6 +205,10 @@ void main() {
           expect(row['trafficReadableCount'], 1);
           expect(row['trafficPendingCount'], 1);
         }
+        final instance = (payload['instances'] as List).single as Map;
+        expect(instance['otherState'], 'partial');
+        expect(instance['otherRemainingBytes'], previewBytes);
+        expect(instance['otherPendingCount'], 1);
       }
     },
   );
@@ -224,6 +237,10 @@ void main() {
         expect(row['previewRemainingBytes'], isNull);
         expect(row['previewUnlimited'], isFalse);
       }
+      final instance = (payload['instances'] as List).single as Map;
+      expect(instance['otherState'], 'unavailable');
+      expect(instance['otherRemainingBytes'], isNull);
+      expect(instance['otherPendingCount'], 0);
     }
   });
 
@@ -268,6 +285,9 @@ void main() {
       expect(row['trafficPendingCount'], 0);
       expect(row['previewRemainingBytes'], isNull);
       expect(row['previewUnlimited'], isFalse);
+      expect(row['otherState'], 'unavailable');
+      expect(row['otherRemainingBytes'], isNull);
+      expect(row['otherPendingCount'], 0);
     }
   });
 
@@ -290,6 +310,9 @@ void main() {
       expect(row['trafficPendingCount'], 200);
       expect(row['previewRemainingBytes'], previewBytes);
       expect(row['primaryValue'], isNull);
+      expect(row['otherRemainingBytes'], 250 * previewBytes);
+      expect(row['otherState'], 'partial');
+      expect(row['otherPendingCount'], 200);
     },
   );
   test(

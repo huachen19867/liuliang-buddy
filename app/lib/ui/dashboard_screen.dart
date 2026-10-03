@@ -407,6 +407,16 @@ class _SummaryCard extends StatelessWidget {
             single?.snapshot?.status != QueryStatus.success
         ? null
         : summarizeTraffic(single!.snapshot!);
+    final partialTelecomOther = <TrafficGroupSummary>[];
+    for (final entry in entries) {
+      final group = _partialTelecomOtherSummary(entry.snapshot);
+      if (group != null) partialTelecomOther.add(group);
+    }
+    final otherPartialNotice = partialTelecomOther.length == 1
+        ? '其他流量已读部分约 ${_formatGb(partialTelecomOther.single.remainingBytes!)} GB，另有 ${partialTelecomOther.single.pendingCount} 项待确认'
+        : partialTelecomOther.isNotEmpty
+        ? '电信其他流量已显示可确认部分，仍有项目待确认'
+        : null;
     final hasSinglePackageTotal = singleSummary?.label == '套餐明细合计';
     final hasSingleEstimate = singleSummary?.isEstimate == true;
     final hasSingleBalance = hasSinglePackageTotal || hasSingleEstimate;
@@ -462,15 +472,23 @@ class _SummaryCard extends StatelessWidget {
         : singleCategoriesUnavailable
         ? '部分套餐余量待确认，详见明细'
         : singlePartial
-        ? '${_trafficReadProgress(single!.snapshot!)}；合计待确认，详见下方套餐。'
+        ? otherPartialNotice != null
+              ? '${_trafficReadProgress(single!.snapshot!)}；$otherPartialNotice，详见下方套餐。'
+              : '${_trafficReadProgress(single!.snapshot!)}；合计待确认，详见下方套餐。'
         : hasUnlimited
         ? '官网标注不限量，达量后的使用规则请查看下方套餐说明。'
         : singleStatusMessage ??
               (entries.isEmpty
                   ? '选择至少一家运营商后，这里会显示对应流量。'
                   : hasRecords
-                  ? '余额见下方，完整的通用流量合计待确认。'
+                  ? otherPartialNotice != null
+                        ? '$otherPartialNotice；其他套餐完整合计待确认。'
+                        : '余额见下方，完整的通用流量合计待确认。'
                   : '连接已选择的运营商账号后，流量会显示在这里。');
+    final summaryExplanation =
+        otherPartialNotice != null && (hasGeneralTotal || hasSingleBalance)
+        ? '$explanation；$otherPartialNotice。'
+        : explanation;
     final theme = Theme.of(context);
 
     return Container(
@@ -550,7 +568,7 @@ class _SummaryCard extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 2),
                       child: Text(
-                        explanation,
+                        summaryExplanation,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -670,6 +688,15 @@ bool _hasPartialTelecomTraffic(
     snapshot!.buckets.any(_isConfirmedTrafficBucket) &&
     snapshot.buckets.any((bucket) => !_isConfirmedTrafficBucket(bucket));
 
+TrafficGroupSummary? _partialTelecomOtherSummary(CarrierSnapshot? snapshot) {
+  if (snapshot?.carrier != Carrier.telecom ||
+      snapshot?.status != QueryStatus.success) {
+    return null;
+  }
+  final group = summarizeTrafficGroup(snapshot!, BucketKind.unknown);
+  return group.isPartial ? group : null;
+}
+
 bool _isConfirmedTrafficBucket(TrafficBucket bucket) =>
     bucket.name.trim().isNotEmpty &&
     (bucket.isUnlimited ||
@@ -685,7 +712,7 @@ String _trafficReadProgress(CarrierSnapshot snapshot) {
 bool _allTrafficCategoriesUnavailable(CarrierSnapshot snapshot) =>
     BucketKind.values.every((kind) {
       final group = summarizeTrafficGroup(snapshot, kind);
-      return !group.isComplete && !group.isUnlimited;
+      return !group.isComplete && !group.isUnlimited && !group.isPartial;
     });
 
 class _CarrierCard extends StatelessWidget {
@@ -767,7 +794,9 @@ class _CarrierCard extends StatelessWidget {
         status == QueryStatus.success &&
             carrier == Carrier.telecom &&
             trafficSummary == null
-        ? snapshot?.message?.trim()
+        ? _partialTelecomOtherSummary(snapshot) != null
+              ? '其他流量只显示已确认子项的估算；未计入项待确认，完整套餐合计待确认。'
+              : snapshot?.message?.trim()
         : null;
     final detailNotice =
         trafficSummary?.detailNotice ??
@@ -1151,7 +1180,10 @@ class _TrafficCategoryRow extends StatelessWidget {
     final scale = MediaQuery.textScalerOf(context).scale(12);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 270 || scale > 16;
+        final hasPartialCategory =
+            _partialTelecomOtherSummary(snapshot) != null;
+        final compact =
+            hasPartialCategory || constraints.maxWidth < 270 || scale > 16;
         final itemWidth = compact
             ? (constraints.maxWidth - 7) / 2
             : (constraints.maxWidth - 14) / 3;
@@ -1202,7 +1234,9 @@ class _TrafficCategoryChip extends StatelessWidget {
         : summarizeTrafficGroup(snapshot!, kind);
     final unknownPurpose = kind == BucketKind.unknown;
     final telecomOther = unknownPurpose && snapshot?.carrier == Carrier.telecom;
-    final value = group.isUnlimited
+    final value = group.isPartial
+        ? '已读约${_formatGb(group.remainingBytes!)}GB\n${group.pendingCount}项待确认'
+        : group.isUnlimited
         ? unknownPurpose && !telecomOther
               ? '不限量 · 用途待确认'
               : '不限量'
@@ -1240,9 +1274,9 @@ class _TrafficCategoryChip extends StatelessWidget {
             value,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               color: ResortPalette.ink,
-              fontSize: 11,
+              fontSize: group.isPartial ? 10.5 : 11,
               height: 1.15,
               fontWeight: FontWeight.w800,
             ),

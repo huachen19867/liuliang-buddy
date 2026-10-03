@@ -48,6 +48,9 @@ struct TrafficAccountSnapshot: Codable, Identifiable {
     let trafficPendingCount: Int?
     let previewRemainingBytes: Double?
     let previewUnlimited: Bool?
+    let otherState: String?
+    let otherRemainingBytes: Double?
+    let otherPendingCount: Int?
 
     var id: String { accountId }
     var queryDate: Date? { queriedAt.map { Date(timeIntervalSince1970: $0 / 1000) } }
@@ -68,6 +71,17 @@ struct TrafficAccountSnapshot: Codable, Identifiable {
     }
 
     var labelText: String { hasPartialPreview() ? "部分套餐" : primaryLabel }
+
+    var otherPartialText: String? {
+        guard carrier == "telecom", otherState == "partial",
+              ["success", "loading", "authExpired", "error"].contains(status),
+              let time = queriedAt, time.isFinite, time > 0, time <= 4_102_444_800_000,
+              let date = queryDate, date <= Date().addingTimeInterval(300),
+              let amount = otherRemainingBytes, amount.isFinite, amount >= 0,
+              amount <= 9_000_000_000_000_000_000,
+              let count = otherPendingCount, (1...200).contains(count) else { return nil }
+        return String(format: "其他已读约 %.2f GB · %d项待确认", amount / 1_073_741_824, count)
+    }
 
     static func parse(_ row: [String: Any]) -> TrafficAccountSnapshot? {
         if let enabled = row["enabled"] as? NSNumber,
@@ -111,6 +125,11 @@ struct TrafficAccountSnapshot: Codable, Identifiable {
             CFGetTypeID($0) == CFBooleanGetTypeID() && $0.boolValue
         } ?? false
         let hasPreview = previewUnlimited ? previewAmount == nil : previewAmount != nil
+        let otherAmount = finiteNumber(row["otherRemainingBytes"])
+            .flatMap { $0 <= 9_000_000_000_000_000_000 ? $0 : nil }
+        let otherPending = boundedCount(row["otherPendingCount"])
+        let otherPartial = knownStatus && carrier == "telecom" && (row["otherState"] as? String) == "partial" &&
+            otherAmount != nil && otherPending != nil
         return TrafficAccountSnapshot(
             accountId: id,
             carrier: carrier,
@@ -123,7 +142,10 @@ struct TrafficAccountSnapshot: Codable, Identifiable {
             trafficReadableCount: validCounts && knownStatus ? readableCount : nil,
             trafficPendingCount: validCounts && knownStatus ? pendingCount : nil,
             previewRemainingBytes: hasPreview ? previewAmount : nil,
-            previewUnlimited: hasPreview && previewUnlimited ? true : nil
+            previewUnlimited: hasPreview && previewUnlimited ? true : nil,
+            otherState: otherPartial ? "partial" : nil,
+            otherRemainingBytes: otherPartial ? otherAmount : nil,
+            otherPendingCount: otherPartial ? otherPending : nil
         )
     }
 

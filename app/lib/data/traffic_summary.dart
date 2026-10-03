@@ -6,14 +6,22 @@ class TrafficGroupSummary {
     this.isUnlimited = false,
     this.isComplete = false,
     this.isEstimated = false,
+    this.pendingCount = 0,
   });
 
   final int? remainingBytes;
   final bool isUnlimited;
   final bool isComplete;
   final bool isEstimated;
+
+  /// Rows excluded from a Telecom other-category finite estimate.
+  final int pendingCount;
+  bool get isPartial =>
+      remainingBytes != null && pendingCount > 0 && !isComplete;
   String get state => isUnlimited
       ? 'unlimited'
+      : isPartial
+      ? 'partial'
       : isComplete
       ? 'provided'
       : 'unavailable';
@@ -72,6 +80,9 @@ TrafficGroupSummary summarizeTrafficGroup(
       )
       .toList();
   if (rows.isEmpty) return const TrafficGroupSummary();
+  if (snapshot.carrier == Carrier.telecom && kind == BucketKind.unknown) {
+    return _summarizeTelecomOther(rows);
+  }
   if (rows.any((bucket) => bucket.isUnlimited)) {
     return const TrafficGroupSummary(isUnlimited: true);
   }
@@ -83,6 +94,61 @@ TrafficGroupSummary summarizeTrafficGroup(
     remainingBytes: sum,
     isComplete: sum != null,
     isEstimated: snapshot.carrier == Carrier.telecom,
+  );
+}
+
+/// A missing other-package amount must not hide verified finite amounts.
+/// This remains an estimate of readable rows, not a complete carrier balance.
+TrafficGroupSummary _summarizeTelecomOther(List<TrafficBucket> rows) {
+  var sum = 0;
+  var readableCount = 0;
+  var pendingCount = 0;
+  var overflow = false;
+  for (final row in rows) {
+    final remaining = row.remainingBytes;
+    final total = row.totalBytes;
+    final readable =
+        row.name.trim().isNotEmpty &&
+        !row.isUnlimited &&
+        hasVerifiedTrafficUnit(row.rawUnit) &&
+        remaining != null &&
+        remaining >= 0 &&
+        remaining <= 9223372036854775807 &&
+        (total == null || (total >= remaining && total <= 9223372036854775807));
+    if (!readable) {
+      pendingCount++;
+      continue;
+    }
+    readableCount++;
+    if (remaining > 9223372036854775807 - sum) {
+      overflow = true;
+    } else if (!overflow) {
+      sum += remaining;
+    }
+  }
+  if (overflow) {
+    return TrafficGroupSummary(isEstimated: true, pendingCount: pendingCount);
+  }
+  if (readableCount == 0) {
+    // Preserve explicit unlimited presentation without inventing a numeric sum.
+    final unlimited = rows.any(
+      (row) =>
+          row.name.trim().isNotEmpty &&
+          row.isUnlimited &&
+          row.remainingBytes == null &&
+          row.totalBytes == null,
+    );
+    return TrafficGroupSummary(
+      isUnlimited: unlimited,
+      isEstimated: true,
+      pendingCount: pendingCount,
+    );
+  }
+  return TrafficGroupSummary(
+    remainingBytes: sum,
+    isComplete: pendingCount == 0,
+    isEstimated: true,
+    pendingCount: pendingCount,
   );
 }
 

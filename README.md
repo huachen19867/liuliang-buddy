@@ -30,10 +30,14 @@
 
 最新公开正式版 1.10.7：移动话费余额读取及 Android 桌面同步，并包含此前未公开的电信分类/合并修改。详见 [1.10.7 说明](docs/RELEASE_1.10.7.md)。
 
+本机正在验收 1.10.8：电信其他流量有缺项时显示已读数字及待确认项数，APP 与桌面同步。详见 [1.10.8 说明](docs/RELEASE_1.10.8.md)。
+
 ## 文件索引
 
 | 位置 | 内容 |
 | --- | --- |
+| docs/RELEASE_1.10.8.md | 电信其他类别部分数字及桌面同步 |
+| docs/TELECOM_OTHER_PARTIAL.md | 已读余量汇总与缺项保留协议 |
 | docs/RELEASE_1.10.7.md | 移动话费、两路结果合并与正式分发 |
 | docs/MOBILE_BALANCE.md | 移动官网渲染余额读取与严格单位边界 |
 | docs/MOBILE_BALANCE_SURFACES.md | Android 多卡紧凑余额展示 |

@@ -432,3 +432,17 @@ Swift回归复核发现9e18+1的NSNumber转doubleValue后与9e18相同，不能�
 1.10.7公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.7 ，非草稿/非预发布，target/tag均bcdd4ba5487cbe34063e6b22e582f7e0ee8f64a4。Assets唯一APK uploaded/28104528字节，远端sha256 2cc9868d9ee02b1bacf9c113ac9c98deabe3df08fe0ea0fd320676bd45fe34d4与本机一致，源码仅push public。没有移动真号/USB验收。
 
 回读旧iOS1.10.5 run37002298627发现已失败，原Swift测试参数顺序错误（pending必须在preview前）；已仅修正测试调用顺序，不改变Android生产代码/签名APK、不移动release tag。本次原始实现CI run37010280030尚未结束，不声称云端通过。该源码校正随文档回执主分支push，新CI结果另记。
+
+## 2026-10-03：电信其他流量待确认截图解释
+
+老板提供真实APP截图：27项可读/1项待确认，定向约26.9GB，其他待确认但下方可见两个约5GB明细。核对summarizeTrafficGroup：名称归类与金额可读性独立；同类别任一单位/余量缺失即拒绝完整类别合计。故“其他”不是没分类，而是不能计算完整总量；UI把部分可读与全部未读都映射unavailable/待确认，且未明确标出阻塞子项，造成明显误解。截图不足以定位该一项套餐名/原始单位，也不能断言官网缺失或把名字5GB当可用额度。此次仅解释与记录，未改产品或发布。
+
+## 2026-10-03：取消其他流量整类数字阻断
+
+老板纠正“不确定的全归其他”，要求已经读到的数字不能因一条缺项被挡住。根承认此前整类合计限制错误，先读日志并复用既有FlowLite分组/dlife官网明细/AppWidget/WidgetKit参考，不重复下载。轻量分工SOL高实现电信other部分和及回归，Luna极高APP短文案/小屏/Astra中等协议复核；根Android缓存与布局、Swift副行、串行SDK和正式分发。
+
+电信默认名称含定向归定向、其余归其他的规则保留；仅other内可读有限值相加，缺项仍保留，没有数字不当0，手动分类优先。partial/pendingCount经schema2发布，Android仅电信other放开partial，独立保存恢复待确认项数，紧凑摘要显示其他已读数而非只有首单项；iOS增加可选副行避免把部分other写成主合计，旧Codable可读。审查修正动态字号const编译错误及Swift未知状态门禁。根误在app/android目录执行根路径版本编辑，产生0字节app/android/app/pubspec.yaml，确认是本轮自己生成后按确切路径移除，未删除用户文件；版本已在根正确升1.10.8/code25。
+
+数据/bridge35项定向验收通过。原生本项目testDebugUnitTest强制rerun40秒成功，四份新XML时间2026-10-03T06:10:14Z共35项0失败0错误。双/四卡实际XML合成预览61ID及可见性检查通过。APP全量与截图正在验收；无真实电信账号/USB，不将合成数据当实号。
+最终完整Flutter292项/13秒通过，analyze无问题，实际APP合成图已目视其他已读约276GB和1项待确认，双/四卡XML其他已读约10GB完整可见；窄屏1.4字体使用两列短文案避免数字被省略。无需重复扩大测试。SDK串行，正式Release构建中。
+正式1.10.8/code25 Release59.6秒成功，APK28104532字节/SHA256 81bd97686278c856b4bc25f0b5d7f872f36cbb1fdf586f49f5da75e121f3a171，v2正式证书33b11555/API24-36/16KB ZIP对齐通过。旧Swift修正754e986云端run37010582041回读success，是1.10.7后源码校正，不当本轮1.10.8验收。准备public正式唯一APK发布。

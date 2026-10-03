@@ -91,6 +91,10 @@ private struct TrafficWidgetView: View {
                 .lineLimit(1).minimumScaleFactor(0.65)
             Text(item.labelText)
                 .font(.system(size: 10)).lineLimit(1).minimumScaleFactor(0.75)
+            if let other = item.otherPartialText {
+                Text(other)
+                    .font(.system(size: 9)).lineLimit(1).minimumScaleFactor(0.65)
+            }
             Text(item.stateText(at: entry.date))
                 .font(.system(size: 9)).foregroundStyle(.secondary)
                 .lineLimit(1).minimumScaleFactor(0.65)

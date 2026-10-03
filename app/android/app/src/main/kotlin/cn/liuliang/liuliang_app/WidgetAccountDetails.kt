@@ -33,6 +33,11 @@ object WidgetAccountDetails {
 
     private fun state(raw: Any?): String = (raw as? String)?.takeIf { it in states } ?: "unavailable"
 
+    private fun otherState(card: WidgetCardData, raw: Map<*, *>): String =
+        if (raw["otherState"] == "partial" && card.carrier == "telecom" &&
+            safeCount(raw["otherPendingCount"]) in 1..200 && safeBytes(raw["otherRemainingBytes"]) != null) "partial"
+        else state(raw["otherState"])
+
     fun attach(card: WidgetCardData, raw: Map<*, *>): WidgetCardData = card.copy(
         name = safeName(raw["name"]),
         phoneHint = safePhoneHint(raw["phoneHint"]),
@@ -41,8 +46,9 @@ object WidgetAccountDetails {
         generalRemainingBytes = if (state(raw["generalState"]) == "provided") safeBytes(raw["generalRemainingBytes"]) else null,
         directedState = state(raw["directedState"]),
         directedRemainingBytes = if (state(raw["directedState"]) == "provided") safeBytes(raw["directedRemainingBytes"]) else null,
-        otherState = state(raw["otherState"]),
-        otherRemainingBytes = if (state(raw["otherState"]) == "provided") safeBytes(raw["otherRemainingBytes"]) else null,
+        otherState = otherState(card, raw),
+        otherRemainingBytes = if (otherState(card, raw) in setOf("provided", "partial")) safeBytes(raw["otherRemainingBytes"]) else null,
+        otherPendingCount = if (otherState(card, raw) == "partial") safeCount(raw["otherPendingCount"]) else 0,
         trafficEstimated = raw["trafficEstimated"] == true,
         voiceState = state(raw["voiceState"]),
         voiceRemainingMinutes = if (state(raw["voiceState"]) == "provided") safeDecimal(raw["voiceRemainingMinutes"], false) else null,
@@ -100,12 +106,15 @@ object WidgetAccountDetails {
 
     fun primarySummary(card: WidgetCardData, now: Long): String? {
         if (!validQuery(card, now)) return null
+        if (card.otherState == "partial" && card.otherRemainingBytes != null) {
+            return "其他已读约 ${WidgetPresentation.formatBytes(card.otherRemainingBytes)} · ${card.otherPendingCount}项待确认"
+        }
         if (hasPartialPreview(card, now)) return "单项${previewAmount(card)}"
         val hasCategory = listOf(
             card.generalState to card.generalRemainingBytes,
             card.directedState to card.directedRemainingBytes,
             card.otherState to card.otherRemainingBytes,
-        ).any { (state, bytes) -> state == "unlimited" || (state == "provided" && bytes != null && bytes >= 0L) }
+        ).any { (state, bytes) -> state == "unlimited" || (state in setOf("provided", "partial") && bytes != null && bytes >= 0L) }
         if (hasCategory) return null
         val display = WidgetPresentation.present(card, 0.0, now)
         return if (display.amount != "—") "${display.label} ${display.amount}" else null
@@ -114,6 +123,7 @@ object WidgetAccountDetails {
     fun traffic(state: String, bytes: Long?, estimated: Boolean, validQuery: Boolean): String = when {
         !validQuery -> "—"
         state == "unlimited" -> "不限量"
+        state == "partial" && bytes != null && bytes >= 0L -> "已读约 " + WidgetPresentation.formatBytes(bytes)
         state == "provided" && bytes != null && bytes >= 0L -> (if (estimated) "约 " else "") + WidgetPresentation.formatBytes(bytes)
         else -> "—"
     }
@@ -147,6 +157,12 @@ object WidgetAccountLayout {
     }
 
     fun compactDetail(card: WidgetCardData, now: Long, low: Boolean): String? {
+        if (card.otherState == "partial" && WidgetAccountDetails.validQuery(card, now)) {
+            val summary = WidgetAccountDetails.primarySummary(card, now)
+            val status = if (card.status == "success" && now - card.queriedAt!! <= 24L * 60L * 60L * 1000L) null
+                else WidgetAccountDetails.secondaryStatus(card, now)
+            return listOfNotNull(status, summary).joinToString(" · ")
+        }
         if (WidgetAccountDetails.hasPartialPreview(card, now)) {
             val status = if (card.status == "success" && now - card.queriedAt!! <= 24L * 60L * 60L * 1000L) "${card.trafficPendingCount}项待确认"
                 else WidgetAccountDetails.secondaryStatus(card, now)
