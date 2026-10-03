@@ -6,8 +6,9 @@
 
 APP 类别框和说明、Android 两卡/三四卡布局与缓存同步该部分数字；iOS 源码增加其他已读副行及旧缓存兼容，编译结果由 macOS CI 另核。
 
-Flutter292项/13秒、analyze无问题、Android本项目35项（新XML时间2026-10-03T06:10:14Z）通过。Release59.6秒构建成功，版本1.10.8/code25，APK28,104,532字节（28.10MB），SHA256 `81bd97686278c856b4bc25f0b5d7f872f36cbb1fdf586f49f5da75e121f3a171`，正式v2证书33b11555、API24/36及16KB ZIP对齐通过。GitHub公开回执待补。没有连接电信真实账号或手机；截图是使用实际组件与 XML 的合成预览，不是用户数据。
+Flutter292项/13秒、analyze无问题、Android本项目35项（新XML时间2026-10-03T06:10:14Z）通过。Release59.6秒构建成功，版本1.10.8/code25，APK28,104,532字节（28.10MB），SHA256 `81bd97686278c856b4bc25f0b5d7f872f36cbb1fdf586f49f5da75e121f3a171`，正式v2证书33b11555、API24/36及16KB ZIP对齐通过。[GitHub正式发布](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.8)已公开，非草稿、非预发布，tag/target均c2efb31026b13e10d93f157ecb359a6605367050，Assets唯一APK uploaded，远端完整digest与上述本机hash一致。没有连接电信真实账号或手机；截图是使用实际组件与 XML 的合成预览，不是用户数据。
 
 协议见 [其他部分合计](TELECOM_OTHER_PARTIAL.md)，APP 展示见 [部分明细界面](TELECOM_PARTIAL_UI.md)。
 
 [APP合成预览](../artifacts/telecom-partial-preview.png) · [双卡桌面合成预览](../artifacts/widget-other-partial-2-preview.png) · [四卡桌面合成预览](../artifacts/widget-other-partial-4-preview.png)。
+新iOS云端 [run37102731382](https://github.com/huachen19867/liuliang-buddy/actions/runs/37102731382)正在执行，不标本版已通过。

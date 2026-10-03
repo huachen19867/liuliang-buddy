@@ -446,3 +446,5 @@ Swift回归复核发现9e18+1的NSNumber转doubleValue后与9e18相同，不能�
 数据/bridge35项定向验收通过。原生本项目testDebugUnitTest强制rerun40秒成功，四份新XML时间2026-10-03T06:10:14Z共35项0失败0错误。双/四卡实际XML合成预览61ID及可见性检查通过。APP全量与截图正在验收；无真实电信账号/USB，不将合成数据当实号。
 最终完整Flutter292项/13秒通过，analyze无问题，实际APP合成图已目视其他已读约276GB和1项待确认，双/四卡XML其他已读约10GB完整可见；窄屏1.4字体使用两列短文案避免数字被省略。无需重复扩大测试。SDK串行，正式Release构建中。
 正式1.10.8/code25 Release59.6秒成功，APK28104532字节/SHA256 81bd97686278c856b4bc25f0b5d7f872f36cbb1fdf586f49f5da75e121f3a171，v2正式证书33b11555/API24-36/16KB ZIP对齐通过。旧Swift修正754e986云端run37010582041回读success，是1.10.7后源码校正，不当本轮1.10.8验收。准备public正式唯一APK发布。
+
+1.10.8正式公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.8 ，非草稿/非预发布，tag/target均c2efb31026b13e10d93f157ecb359a6605367050。Assets唯一liuliang-buddy-release.apk uploaded/28104532字节，远端sha256 81bd97686278c856b4bc25f0b5d7f872f36cbb1fdf586f49f5da75e121f3a171与本机一致。只push public，源码与正式APK已公开。iOS新run37102731382仍in_progress，不能用旧754e986 success替代本版。无新真号或USB，小屏和桌面为合成回归与预览。回执另docs提交，不移动tag/替换资产。

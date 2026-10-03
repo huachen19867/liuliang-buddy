@@ -102,3 +102,4 @@ widget-three-preview.png、widget-four-preview.png 读取当前 traffic_widget_c
 ## 1.10.8 输出
 
 最新正式主包版本1.10.8/code25，APK28,104,532字节（28.10MB），SHA256 `81bd97686278c856b4bc25f0b5d7f872f36cbb1fdf586f49f5da75e121f3a171`。Release59.6秒，v2正式证书33b11555/API24-36/16KB ZIP对齐通过。Flutter292项/analyze/Android本项目35项通过。telecom-partial-preview.png为实际Flutter合成已读约276GB与1项待确认；widget-other-partial-{2,4}-preview.png为实际XML合成其他已读約10GB与1项待确认，均非真机或用户数据。最新版包替换本机同名主输出，旧版本hash是历史回执，不用于当前文件。GitHub回执另补。
+1.10.8已公开：[正式发布](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.8)，唯一APK远端digest与本机一致。
