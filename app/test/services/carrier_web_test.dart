@@ -4,6 +4,33 @@ import 'package:liuliang_app/services/carrier_web.dart';
 
 void main() {
   test(
+    'number-auth agreement opens only its exact official HTTPS document',
+    () {
+      const contract =
+          'https://wap.cmpassport.com/resources/html/contract.html';
+      expect(isMobileNumberAuthAgreement(Uri.parse(contract)), isTrue);
+      expect(
+        isMobileNumberAuthAgreement(Uri.parse('$contract#privacy')),
+        isTrue,
+      );
+      for (final url in [
+        'http://wap.cmpassport.com/resources/html/contract.html',
+        'https://wap.cmpassport.com.evil.test/resources/html/contract.html',
+        'https://user@wap.cmpassport.com/resources/html/contract.html',
+        'https://wap.cmpassport.com:444/resources/html/contract.html',
+        'https://wap.cmpassport.com/resources/html/other.html',
+        '$contract?redirect=https://example.com',
+      ]) {
+        expect(isMobileNumberAuthAgreement(Uri.parse(url)), isFalse);
+      }
+      expect(
+        isCarrierNavigationAllowed(Carrier.mobile, Uri.parse(contract)),
+        isFalse,
+        reason: 'agreement must not replace the login WebView',
+      );
+    },
+  );
+  test(
     'mobile rendered balance requires current official homepage identity',
     () {
       final home = Uri.parse(carrierQueryUrl(Carrier.mobile));

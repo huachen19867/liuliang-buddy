@@ -107,3 +107,8 @@ widget-three-preview.png、widget-four-preview.png 读取当前 traffic_widget_c
 ## 1.10.9 输出
 
 最新正式主包版本1.10.9/code26，APK28,104,532字节（28.10MB），SHA256 `3c635d5d4ac9e7b759b0ee8edb765af025dc96e7355b1ceac43f1e25dfc4ac24`。最终Release66.5秒，v2正式证书33b11555/API24-36/16KB ZIP对齐通过；297项Flutter/analyze与Node会话恢复/XHR合成通过。仅广电有效查询后保存完整会话、移除7日本地弃用、更新恢复脚本与访问拒绝误报修正，不是官网三日续期接口。没有新增native/Swift生产改动，因此不冒称运行新的JUnit/macOS验收。真实移动广电长期会话未验证。GitHub回执另补。
+1.10.9唯一APK已正式公开，远端digest一致：[正式发布](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.9)。
+
+## 1.10.10 输出
+
+1.10.10/code27主包28,170,068字节（28.17MB），SHA256 `34bb1a0db48e2758c08b4d4ad37c666389958f70f328f473e6e3e130dd247de2`。Release96.6秒，v2正式证书33b11555/API24-36/16KB ZIP对齐通过，Flutter298项/29秒和analyze通过。使用既有插件Chrome/Safari打开精确官方号码认证协议，完善移动官网本机登录指引，包含会话恢复修复；广电原生一键登录尚未在本应用接通。未新增真实SIM/三日登录/原生协议浏览器真机验收，公开回执另补。

@@ -1430,6 +1430,20 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _openMobileAuthAgreement(Uri target) async {
+    if (!isMobileNumberAuthAgreement(target)) return;
+    try {
+      await ChromeSafariBrowser().open(url: WebUri(target.toString()));
+    } catch (_) {
+      if (mounted) {
+        _showInfo(
+          '认证协议暂时无法打开',
+          '请在系统浏览器查看中国移动认证协议：\nhttps://wap.cmpassport.com/resources/html/contract.html',
+        );
+      }
+    }
+  }
+
   Widget _webView(CarrierAccount account) {
     final carrier = account.carrier;
     final accountId = account.id;
@@ -1443,7 +1457,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           message:
               _webMessage ??
               (carrier == Carrier.mobile
-                  ? '请在官网自行勾选协议并获取验证码。完成验证后点击上方「查询流量」。'
+                  ? mobileLoginGuide
                   : carrier == Carrier.unicom
                   ? '在官网选择「随机密码登录」获取短信密码。表单可双指缩放、左右移动；登录后点击「查询流量」。'
                   : '在官网完成验证后点击上方「查询流量」。关闭此页可回到首页。'),
@@ -1568,10 +1582,19 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                 await _refreshAccount(accountId);
               }
             },
-            shouldOverrideUrlLoading: (controller, action) async =>
-                _allowedUrl(carrier, action.request.url)
-                ? NavigationActionPolicy.ALLOW
-                : NavigationActionPolicy.CANCEL,
+            shouldOverrideUrlLoading: (controller, action) async {
+              final target = Uri.tryParse(action.request.url?.toString() ?? '');
+              if (carrier == Carrier.mobile &&
+                  action.isForMainFrame &&
+                  target != null &&
+                  isMobileNumberAuthAgreement(target)) {
+                await _openMobileAuthAgreement(target);
+                return NavigationActionPolicy.CANCEL;
+              }
+              return _allowedUrl(carrier, action.request.url)
+                  ? NavigationActionPolicy.ALLOW
+                  : NavigationActionPolicy.CANCEL;
+            },
             onUpdateVisitedHistory: (controller, url, isReload) {
               if (!_current(generation) || url == null) return;
               final uri = Uri.tryParse(url.toString());

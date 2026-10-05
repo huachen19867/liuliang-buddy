@@ -2,7 +2,17 @@ import '../data/models.dart';
 import 'page_probe.dart';
 
 const mobileLoginHelpMessage =
-    '可在官网自行勾选「3天免登录」。这个期限由移动官网控制，查询流量不保证续期，真正到期后仍需短信验证。\n\n如果网页不提供短信验证，或要求人脸验证，请先在中国移动官方 App 完成身份验证。官方 App 的验证不会自动同步本 App 的网页登录；网页版仍无法登录时，这个号码暂不支持自动查询。官方 App 下载入口：https://www.10086.cn/cmccclient/';
+    '支持时官网会显示本机号码的一键登录授权框。请使用要查询的移动卡的数据网络，核对官网显示的号码后自行同意协议；双卡手机的默认数据卡可能是另一个号码。未出现授权框或取号失败时，仍可用短信验证。\n\n可在官网自行勾选「3天免登录」。这个期限由移动官网控制，查询流量不保证续期，到期后仍需官网验证。\n\n如果网页不提供短信验证，或要求人脸验证，请先在中国移动官方 App 完成身份验证。官方 App 的验证不会自动同步本 App 的网页登录；网页版仍无法登录时，这个号码暂不支持自动查询。官方 App 下载入口：https://www.10086.cn/cmccclient/';
+
+const mobileLoginGuide = '支持时可用官网本机号码登录，请使用对应移动卡的数据网络并核对号码；也可短信验证。完成后点「查询流量」。';
+
+/// Read-only official number-authentication agreement, opened separately so
+/// reading it never replaces the account's login page or triggers a query.
+bool isMobileNumberAuthAgreement(Uri uri) =>
+    _https(uri) &&
+    uri.host == 'wap.cmpassport.com' &&
+    uri.path == '/resources/html/contract.html' &&
+    !uri.hasQuery;
 
 String carrierLoginUrl(Carrier carrier) => switch (carrier) {
   Carrier.mobile => mobileLoginUrl,

@@ -34,10 +34,17 @@
 
 本机正在验收1.10.9：广电登录资料恢复和移动/广电过期误报修正；官网真正到期仍需验证。见 [1.10.9说明](docs/RELEASE_1.10.9.md)。
 
+本机已验收1.10.10：包含登录资料恢复修复，完善移动官网本机登录指引及协议阅读；广电官方App确有本机认证，本应用的广电原生接入仍未完成。见 [1.10.10说明](docs/RELEASE_1.10.10.md)。
+
 ## 文件索引
 
 | 位置 | 内容 |
 | --- | --- |
+| docs/RELEASE_1.10.10.md | 移动官网本机登录指引与协议阅读 |
+| docs/BROADNET_AUTH_OPEN_RESEARCH.md | 广电专项开放能力及第三方SDK支持范围复核 |
+| docs/BROADNET_AUTH_NATIVE_RESEARCH.md | 广电公开安装包元数据与原生认证识别边界 |
+| docs/BROADNET_AUTH_INTEGRATION_BRIEF.md | 未发送的正式技术接入材料 |
+| docs/ONE_CLICK_LOGIN_RESEARCH.md | 官方本机认证、网页/原生桥接和接入条件 |
 | docs/RELEASE_1.10.9.md | 会话资料恢复、认证错误识别与正式分发 |
 | docs/BROADNET_SESSION_RECOVERY.md | 广电不透明会话备份与官网判定边界 |
 | app/lib/services/broadnet_session.dart | 前后台会话校验与新登录比较 |

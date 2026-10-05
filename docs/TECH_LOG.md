@@ -467,3 +467,26 @@ Astra已从移动归档allowances/mobile-10.js确认3天勾选checkCtrol=0/1，�
 
 最终复核进一步收紧：官网可能生成带地区信息的游客phoneInfo，不能仅靠完整pair判断已登录。根移除前台关闭/刷新前/onLoadStop的未验证保存，唯一_saveVerifiedBroadnetSession只从成功套餐响应调用；后台也移除onLoadStop备用捕获，只从成功回包捕获。第一次96.4秒本机构建在这次收紧前完成，仅作为弃用的中间包，未公开/未上传；收紧后重新验证并重建，最终hash回执另补。没有修改登录请求checkCtrol或用户协议/验证码，没有复制App私有令牌。
 收紧后的完整Flutter297项/28秒、analyze无问题、Node新广电恢复和旧XHR/fetch通过。最终Release66.5秒，1.10.9/code26，APK28104532字节/SHA256 3c635d5d4ac9e7b759b0ee8edb765af025dc96e7355b1ceac43f1e25dfc4ac24；v2正式证书33b11555/API24-36/16KB ZIP对齐通过。未改native/Swift，未重复JUnit，也无三日真号验收。构建中老板新增本机号码一键登录建议，已启动官方号码认证/营业厅授权区别调研，不把新建议冒称含在当前包内。准备public唯一APK发布。
+
+1.10.9公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.9 ，非草稿/非预发布，target f92ad18f76c8242d52d212bfe822374e76e7d59b，唯一APK uploaded/28104532字节，远端完整sha256 3c635d5d4ac9e7b759b0ee8edb765af025dc96e7355b1ceac43f1e25dfc4ac24一致。只push public；此包是会话保存恢复/误判修复，移动一键登录指引后续改动尚未包含。
+
+## 2026-10-05：本机号码登录建议与广电截图纠正
+
+老板建议借鉴官方App本机号码登录。先复用allowances移动官方H5归档，Astra补官方移动/电信认证门户与文档，保存references/one-click-login-20261005/index.json；取得事实是第三方号码认证与营业厅查询授权不能混同，但移动官网本身已有完整YDRZ→官网sign/info→营业厅登录回调。现有无参数URL默认channel10086已自动尝试，支持时展示掩码号码并由用户同意，不注入或复制官网appId/签名、不添加noPerception/loginauth自动提交参数。根完善数据SIM与号码核对指引，精确移动认证协议URL在Chrome/Safari独立打开，不替换登录WebView、不泛放cmpassport导航白名单。
+
+此前表达以网页版仅短信的证据限定广电，老板给出官方App“本机登录/短信登录”“由中国广电提供认证服务”的真实截图，明确纠正：广电确实有本机号码认证，尚未找到第三方接入和营业厅会话兑换的公开资料，不能表述成广电没有该功能。已当面纠正并致歉，Astra继续官方客户端/H5路径，Luna核官方隐私SDK供应商，根不中断已经授权的会话修复和移动指引完善。广电一键入口尚未新增，不能假按钮冒称接通。
+1.10.10最终Flutter298项/29秒、analyze无问题；实际公开广电App H5源码已定位CBN UA的nativeCall(type:login)和普通浏览器showLoginModal（loginPhone/loginPassWord）分支，确认截图功能属于原生链路而非不存在。新代码只完善已有移动官网本机指引和精确协议独立浏览器阅读，不冒称广电已接入。正式Release96.6秒，code27/28170068字节/SHA256 34bb1a0db48e2758c08b4d4ad37c666389958f70f328f473e6e3e130dd247de2，v2证书33b11555/API24-36/16KB ZIP对齐通过，包含1.10.9全部修复。准备public唯一APK发布。
+
+## 2026-10-05：中断后继续广电SDK专项调查
+
+两次turn被外部中断后根提前收尾仅报进度，老板问“怎么停了”；明确继续并恢复interrupted研究代理，复用已有归档不重下。Astra完成腾讯云/阿里云正文、广电GBA行业草案正向但非可用SDK的复核，四份新官网参考含来源/hash；SOL从应用宝公开奖台取得广电2.3.0包，官方m域直接链接404，包名com.ai.obc.cbn.app，MD5与公开分发元信息匹配。APK加固，唯一DEX只有34个类型，业务类不可静态辨认；未执行/脱壳、不复制私有AppId/密钥/签名，不能虚构SDK供应商。登录Activity没有可见第三方intent回调，支付宝回调不是本机号码授权。原生功能已经由老板截图证实，但这次还缺可在本项目使用的正式SDK、应用授权和营业厅兑换契约。
+
+新增BROADNET_AUTH_OPEN_RESEARCH/BROADNET_AUTH_NATIVE_RESEARCH记录证据边界，另备BROADNET_AUTH_INTEGRATION_BRIEF含本应用公开包名/证书/只读查询业务与回调核对要求，未向外部发送、未注册或消费。异步询问老板是否有官方文档或技术渠道，独立完成此前已验证1.10.10交付，不能把发布这个包当成广电一键已接入。SDK及授权缺失前不加入无效按钮。
+
+## 2026-10-06：广电账号原生组件及正式合作平台追查
+
+老板要求SDK资料“自己找”，根停止索取其文档，继续从APK未加固资源/公开协议、广电自身合作入口与供应商追线索。原生资源直接对应截图：CbnAuthDialog、cbn_account_brand_text“由中国广电提供认证服务”、cbn_account_auth_privacy_text《中国广电账号服务与隐私协议》，另有com/cbn/libcipher/CipherUtils加密工具候选。libblhttp/CBNLive属于视频模块，不错认号码认证；沒有提取私有常量、执行或脱壳。正式组件/AAR/API合同仍未公开取得，不能把style名当已可集成SDK名。
+
+Astra找到open.10099.com.cn/partner.10099.com.cn并读取正常公开首页素材请求，确认入驻产品是权益/彩铃，不能冒认是号码SDK；亚信BSS案例与金山SDK192号段校验线索均未能证明本机认证开放。另GBA标准已正式发布T/CAICI91-2024，之前引用草案并非现行状态，已修文档。根只GET easy-login.10099.com.cn根目录，HTTP502带“请求URI必须是:/http”，仅说明存在该服务，不继续发起取号/认证、不当作SDK文档。新证据都维护reference index，不重复旧包。
+
+SDK授权仍有外部资料缺口，根提出可开发替代为官方App辅助同步，用户主动打开官方App完成原生认证，通过单独启用的无障碍权限读取可见余额回卡片，不取私有会话，不保证后台无感。异步询问是否接受，未在其选择前加入敏感服务或更改Manifest。已构建/验证的1.10.10独立准备交付，广电原生一键没有冒称完成。

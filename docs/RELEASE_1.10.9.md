@@ -8,4 +8,4 @@
 
 老板已确认广电三天后官网也要求重新收验证码，这是官网真实失效；本版没有可验证的服务器续期接口，不能承诺消除这个三日重新登录。保留上次数据与时间，真正失效后仍需官网短信验证。没有真实账号的连续三日验证。
 
-完整Flutter297项/28秒、analyze无问题、新旧Node会话恢复/XHR捕获回归通过。最终Release66.5秒成功，版本1.10.9/code26，APK28,104,532字节（28.10MB），SHA256 `3c635d5d4ac9e7b759b0ee8edb765af025dc96e7355b1ceac43f1e25dfc4ac24`。v2正式证书33b11555、API24/36、16KB ZIP对齐通过。GitHub回执待补。实现约定见 [广电会话恢复](BROADNET_SESSION_RECOVERY.md)。
+完整Flutter297项/28秒、analyze无问题、新旧Node会话恢复/XHR捕获回归通过。最终Release66.5秒成功，版本1.10.9/code26，APK28,104,532字节（28.10MB），SHA256 `3c635d5d4ac9e7b759b0ee8edb765af025dc96e7355b1ceac43f1e25dfc4ac24`。v2正式证书33b11555、API24/36、16KB ZIP对齐通过。[1.10.9正式公开](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.9)，非草稿/非预发布，target为f92ad18f76c8242d52d212bfe822374e76e7d59b，唯一APK uploaded，远端digest与本机一致。实现约定见 [广电会话恢复](BROADNET_SESSION_RECOVERY.md)。
