@@ -316,13 +316,17 @@ CarrierSnapshot parseMobile(
     message: message,
   );
 
-  if (httpStatus == 401 || httpStatus == 403) {
+  final authFailure = _isAuthFailure(response);
+  if (httpStatus == 401 || (httpStatus == 403 && authFailure)) {
     return failed(QueryStatus.authExpired, '中国移动登录已失效');
+  }
+  if (httpStatus == 403) {
+    return failed(QueryStatus.error, '中国移动查询暂不可用（HTTP 403）');
   }
   if (httpStatus != null && (httpStatus < 200 || httpStatus >= 300)) {
     return failed(QueryStatus.error, '中国移动查询失败（HTTP $httpStatus）');
   }
-  if (_isAuthFailure(response)) {
+  if (authFailure) {
     return failed(QueryStatus.authExpired, '中国移动登录已失效');
   }
 
@@ -464,16 +468,21 @@ CarrierSnapshot parseBroadnet(
     message: message,
   );
 
-  if (httpStatus == 401 || httpStatus == 403) {
+  final explicitAuthFailure =
+      _text(response['status']) == '701' || _isAuthFailure(response);
+  if (httpStatus == 401 || (httpStatus == 403 && explicitAuthFailure)) {
     return failed(QueryStatus.authExpired, '中国广电登录已失效');
+  }
+  if (httpStatus == 403) {
+    return failed(QueryStatus.error, '中国广电查询暂不可用（HTTP 403）');
   }
   if (httpStatus != null && (httpStatus < 200 || httpStatus >= 300)) {
     return failed(QueryStatus.error, '中国广电查询失败（HTTP $httpStatus）');
   }
   if (response['status'] != '000000') {
     return failed(
-      _isAuthFailure(response) ? QueryStatus.authExpired : QueryStatus.error,
-      _isAuthFailure(response) ? '中国广电登录已失效' : '中国广电接口返回异常',
+      explicitAuthFailure ? QueryStatus.authExpired : QueryStatus.error,
+      explicitAuthFailure ? '中国广电登录已失效' : '中国广电接口返回异常',
     );
   }
 
@@ -535,15 +544,23 @@ CarrierSnapshot parseBroadnetH5(
     message: message,
   );
 
-  if (httpStatus == 401 || httpStatus == 403) {
+  final outerStatus = _text(response['status']);
+  final responseBusiness = _map(response['data']);
+  final explicitAuthFailure =
+      outerStatus == '701' ||
+      _isAuthFailure(response) ||
+      (responseBusiness != null && _isAuthFailure(responseBusiness));
+  if (httpStatus == 401 || (httpStatus == 403 && explicitAuthFailure)) {
     return failed(QueryStatus.authExpired, '中国广电登录已失效');
+  }
+  if (httpStatus == 403) {
+    return failed(QueryStatus.error, '中国广电查询暂不可用（HTTP 403）');
   }
   if (httpStatus != null && (httpStatus < 200 || httpStatus >= 300)) {
     return failed(QueryStatus.error, '中国广电查询失败（HTTP $httpStatus）');
   }
 
-  final outerStatus = _text(response['status']);
-  if (outerStatus == '701' || _isAuthFailure(response)) {
+  if (explicitAuthFailure) {
     return failed(QueryStatus.authExpired, '中国广电登录已失效');
   }
   if (outerStatus != null && outerStatus != '000000') {
@@ -674,6 +691,7 @@ bool _isAuthFailure(Map<String, dynamic> response) {
   return text.contains('登录失效') ||
       text.contains('登录已失效') ||
       text.contains('登录过期') ||
+      text.contains('登录已过期') ||
       text.contains('未登录') ||
       text.contains('重新登录') ||
       text.contains('认证失败') ||

@@ -32,10 +32,15 @@
 
 最新公开正式版 1.10.8：电信其他流量有缺项时显示已读数字及待确认项数，APP 与桌面同步。详见 [1.10.8 说明](docs/RELEASE_1.10.8.md)。
 
+本机正在验收1.10.9：广电登录资料恢复和移动/广电过期误报修正；官网真正到期仍需验证。见 [1.10.9说明](docs/RELEASE_1.10.9.md)。
+
 ## 文件索引
 
 | 位置 | 内容 |
 | --- | --- |
+| docs/RELEASE_1.10.9.md | 会话资料恢复、认证错误识别与正式分发 |
+| docs/BROADNET_SESSION_RECOVERY.md | 广电不透明会话备份与官网判定边界 |
+| app/lib/services/broadnet_session.dart | 前后台会话校验与新登录比较 |
 | docs/RELEASE_1.10.8.md | 电信其他类别部分数字及桌面同步 |
 | docs/TELECOM_OTHER_PARTIAL.md | 已读余量汇总与缺项保留协议 |
 | docs/RELEASE_1.10.7.md | 移动话费、两路结果合并与正式分发 |

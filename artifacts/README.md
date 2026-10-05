@@ -103,3 +103,7 @@ widget-three-preview.png、widget-four-preview.png 读取当前 traffic_widget_c
 
 最新正式主包版本1.10.8/code25，APK28,104,532字节（28.10MB），SHA256 `81bd97686278c856b4bc25f0b5d7f872f36cbb1fdf586f49f5da75e121f3a171`。Release59.6秒，v2正式证书33b11555/API24-36/16KB ZIP对齐通过。Flutter292项/analyze/Android本项目35项通过。telecom-partial-preview.png为实际Flutter合成已读约276GB与1项待确认；widget-other-partial-{2,4}-preview.png为实际XML合成其他已读約10GB与1项待确认，均非真机或用户数据。最新版包替换本机同名主输出，旧版本hash是历史回执，不用于当前文件。GitHub回执另补。
 1.10.8已公开：[正式发布](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.8)，唯一APK远端digest与本机一致。
+
+## 1.10.9 输出
+
+最新正式主包版本1.10.9/code26，APK28,104,532字节（28.10MB），SHA256 `3c635d5d4ac9e7b759b0ee8edb765af025dc96e7355b1ceac43f1e25dfc4ac24`。最终Release66.5秒，v2正式证书33b11555/API24-36/16KB ZIP对齐通过；297项Flutter/analyze与Node会话恢复/XHR合成通过。仅广电有效查询后保存完整会话、移除7日本地弃用、更新恢复脚本与访问拒绝误报修正，不是官网三日续期接口。没有新增native/Swift生产改动，因此不冒称运行新的JUnit/macOS验收。真实移动广电长期会话未验证。GitHub回执另补。

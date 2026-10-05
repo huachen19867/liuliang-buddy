@@ -2,7 +2,7 @@ import '../data/models.dart';
 import 'page_probe.dart';
 
 const mobileLoginHelpMessage =
-    '如果网页不提供短信验证，或要求人脸验证，请先在中国移动官方 App 完成身份验证。官方 App 的验证不会自动同步本 App 的网页登录；网页版仍无法登录时，这个号码暂不支持自动查询。官方 App 下载入口：https://www.10086.cn/cmccclient/';
+    '可在官网自行勾选「3天免登录」。这个期限由移动官网控制，查询流量不保证续期，真正到期后仍需短信验证。\n\n如果网页不提供短信验证，或要求人脸验证，请先在中国移动官方 App 完成身份验证。官方 App 的验证不会自动同步本 App 的网页登录；网页版仍无法登录时，这个号码暂不支持自动查询。官方 App 下载入口：https://www.10086.cn/cmccclient/';
 
 String carrierLoginUrl(Carrier carrier) => switch (carrier) {
   Carrier.mobile => mobileLoginUrl,

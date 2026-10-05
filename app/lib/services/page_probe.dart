@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:encrypt/encrypt.dart' as crypto;
 
+import 'broadnet_session.dart';
+
 const mobileLoginUrl = 'https://wx.10086.cn/website/bind/bindAccount/new';
 const mobileQueryUrl = 'https://wx.10086.cn/website/spa/main/newHome';
 const broadnetLoginUrl = 'https://www.10099.com.cn/login.html';
@@ -322,7 +324,8 @@ const broadnetSessionCaptureScript = r'''
   try {
     const phoneInfo = sessionStorage.getItem('broadnetUserPhoneInfo');
     const sessionId = sessionStorage.getItem('broadnetUserSessionId');
-    if (!phoneInfo || !sessionId || phoneInfo.length > 20000 ||
+    if (!phoneInfo || !sessionId || !phoneInfo.trim() || !sessionId.trim() ||
+        phoneInfo.length > 20000 ||
         sessionId.length > 20000) return null;
     return {phoneInfo, sessionId};
   } catch (_) { return null; }
@@ -330,24 +333,21 @@ const broadnetSessionCaptureScript = r'''
 ''';
 
 String broadnetSessionRestoreScript(Map<String, dynamic>? saved) {
-  final phoneInfo = saved?['phoneInfo'];
-  final sessionId = saved?['sessionId'];
-  if (phoneInfo is! String ||
-      sessionId is! String ||
-      phoneInfo.isEmpty ||
-      sessionId.isEmpty ||
-      phoneInfo.length > 20000 ||
-      sessionId.length > 20000) {
-    return '(() => false)();';
-  }
+  final session = normalizeBroadnetSession(saved);
+  if (session == null) return '(() => false)();';
   // JSON encoding preserves literal values and prevents script interpolation.
-  final payload = jsonEncode({'phoneInfo': phoneInfo, 'sessionId': sessionId});
+  final payload = jsonEncode({
+    'phoneInfo': session['phoneInfo'],
+    'sessionId': session['sessionId'],
+  });
   return '''
 (() => {
   if (location.origin !== 'https://www.10099.com.cn' || window.top !== window)
     return false;
   if (location.pathname === '/login.html') return false;
   try {
+    // Preserve a complete newer login. The website may create a guest
+    // sessionId without phoneInfo; that alone must not block paired recovery.
     if (sessionStorage.getItem('broadnetUserPhoneInfo') &&
         sessionStorage.getItem('broadnetUserSessionId')) return false;
     const saved = $payload;

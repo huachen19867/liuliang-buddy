@@ -18,6 +18,7 @@ import 'data/traffic_classification.dart';
 import 'ui/carrier_selection_screen.dart';
 import 'data/parsers.dart';
 import 'services/page_probe.dart';
+import 'services/broadnet_session.dart';
 import 'services/mobile_query_assembly.dart';
 import 'services/unicom_official_query.dart';
 import 'services/unicom_app_client.dart';
@@ -322,9 +323,6 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         : _account(_visibleAccountId!);
     final controller = account == null ? null : _controllers[account.id];
     if (account != null) await _dismissOfficialKeyboard(account.id);
-    if (account?.carrier == Carrier.broadnet && controller != null) {
-      await _saveSession(account!, controller, generation);
-    }
     if (!_current(generation) || _visibleAccountId != account?.id) return;
     setState(() => _visibleAccountId = null);
     if (account != null && controller != null) {
@@ -545,15 +543,9 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
             .read(key: account.broadnetSessionKey)
             .timeout(const Duration(seconds: 3));
         if (raw == null) continue;
-        final candidate = jsonDecode(raw) as Map<String, dynamic>;
-        final savedAt = DateTime.tryParse(
-          candidate['savedAt'] as String? ?? '',
-        );
-        final age = savedAt == null ? null : DateTime.now().difference(savedAt);
-        if (age != null && !age.isNegative && age < const Duration(days: 7)) {
+        final candidate = normalizeBroadnetSession(jsonDecode(raw));
+        if (candidate != null) {
           _broadnetSessions[account.id] = candidate;
-        } else {
-          await _secure.delete(key: account.broadnetSessionKey);
         }
       } catch (_) {
         // A corrupt session requires official login again.
@@ -1144,9 +1136,6 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     if (controller == null) return;
     final generation = _generation;
     _inFlight.add(accountId);
-    if (carrier == Carrier.broadnet) {
-      await _saveSession(account, controller, generation);
-    }
     if (!_current(generation)) {
       _inFlight.remove(accountId);
       return;
@@ -1358,6 +1347,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     });
     if (!_current(generation)) return;
     if (snapshot.status == QueryStatus.success) {
+      if (carrier == Carrier.broadnet) {
+        await _saveVerifiedBroadnetSession(account, controller, generation);
+      }
+      if (!_current(generation)) return;
       if (!hadPreviousQuery) await _syncBackgroundSchedule();
       if (!_current(generation)) return;
       await _notifyLowTraffic(account, snapshot);
@@ -1392,28 +1385,22 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     _warnedLow[account.id] = low;
   }
 
-  Future<void> _saveSession(
+  Future<void> _saveVerifiedBroadnetSession(
     CarrierAccount account,
     InAppWebViewController controller,
     int generation,
   ) async {
     if (!_current(generation)) return;
     try {
-      final result = await controller.evaluateJavascript(
-        source: broadnetSessionCaptureScript,
+      final result = await controller
+          .evaluateJavascript(source: broadnetSessionCaptureScript)
+          .timeout(const Duration(seconds: 2));
+      if (!_current(generation)) return;
+      final session = captureBroadnetSession(
+        result,
+        capturedAt: DateTime.now(),
       );
-      if (!_current(generation) || result is! Map) return;
-      final session = Map<String, dynamic>.from(result);
-      if (session['phoneInfo'] is! String ||
-          session['sessionId'] is! String ||
-          (session['phoneInfo'] as String).isEmpty ||
-          (session['sessionId'] as String).isEmpty) {
-        return;
-      }
-      if (_broadnetSessions[account.id]?['sessionId'] == session['sessionId']) {
-        return;
-      }
-      session['savedAt'] = DateTime.now().toIso8601String();
+      if (session == null) return;
       await _store(() async {
         if (_current(generation)) {
           await _secure.write(
@@ -1422,7 +1409,22 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           );
         }
       });
-      if (_current(generation)) _broadnetSessions[account.id] = session;
+      if (!_current(generation)) return;
+      _broadnetSessions[account.id] = session;
+      // Document-start scripts retain their original source. Replace the
+      // backup after an official rotation rather than restoring old keys on
+      // a later reload with empty sessionStorage.
+      await controller.removeUserScriptsByGroupName(
+        groupName: 'broadnetRestore',
+      );
+      if (!_current(generation)) return;
+      await controller.addUserScript(
+        userScript: UserScript(
+          groupName: 'broadnetRestore',
+          source: broadnetSessionRestoreScript(session),
+          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        ),
+      );
     } catch (_) {
       /* Official login remains usable for this WebView session. */
     }
@@ -1645,9 +1647,6 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   ),
                 );
                 unawaited(_publishWidget());
-              } else if (carrier == Carrier.broadnet &&
-                  url.host == 'www.10099.com.cn') {
-                await _saveSession(account, controller, generation);
               }
               if (_current(generation) &&
                   !isCarrierLoginPage(Uri.parse(url.toString())) &&
@@ -1743,14 +1742,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         try {
           final secureRaw = await _secure.read(key: account.broadnetSessionKey);
           if (secureRaw == null) continue;
-          final session = jsonDecode(secureRaw) as Map<String, dynamic>;
-          final savedAt = DateTime.tryParse(
-            session['savedAt'] as String? ?? '',
-          );
-          final age = savedAt == null
-              ? null
-              : DateTime.now().difference(savedAt);
-          if (age != null && !age.isNegative && age < const Duration(days: 7)) {
+          final session = normalizeBroadnetSession(jsonDecode(secureRaw));
+          if (session != null) {
             restoredSessions[account.id] = session;
           }
         } catch (_) {

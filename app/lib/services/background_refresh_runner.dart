@@ -17,6 +17,7 @@ import '../data/models.dart';
 import '../data/parsers.dart';
 import 'carrier_web.dart';
 import 'page_probe.dart';
+import 'broadnet_session.dart';
 import 'mobile_query_assembly.dart';
 import 'unicom_official_query.dart';
 import 'unicom_app_client.dart';
@@ -150,6 +151,16 @@ Future<Map<String, Object?>?> _runScheduledRefresh() async {
         latestAccount.phoneNumber != account.phoneNumber) {
       continue;
     }
+    if (carrier == Carrier.broadnet &&
+        !sameBroadnetSession(
+          await _readBroadnetSession(account),
+          result.initialSession,
+        )) {
+      // A fresh foreground login must not be overwritten or paused by a
+      // response sent using the previous official session.
+      continue;
+    }
+    if (!await _isTaskCurrent()) return null;
     if (carrier == Carrier.unicom) {
       final stillApp =
           prefs.getString('unicom_query_method_${account.id}') == 'app';
@@ -185,7 +196,11 @@ Future<Map<String, Object?>?> _runScheduledRefresh() async {
       snapshots[account.id] = result.snapshot;
       await prefs.setBool('background_auth_required_${account.id}', false);
       if (carrier == Carrier.broadnet) {
-        await _saveBroadnetSession(account, result.session);
+        await _saveBroadnetSession(
+          account,
+          result.session,
+          expected: result.initialSession,
+        );
       }
     } else {
       snapshots[account.id] = previous.copyWith(
@@ -267,9 +282,10 @@ Future<bool> _isTaskCurrent() async {
 }
 
 class _HeadlessResult {
-  const _HeadlessResult(this.snapshot, {this.session});
+  const _HeadlessResult(this.snapshot, {this.session, this.initialSession});
   final CarrierSnapshot snapshot;
   final Map<String, dynamic>? session;
+  final Map<String, dynamic>? initialSession;
   QueryStatus get status => snapshot.status;
   String? get message => snapshot.message;
 }
@@ -279,13 +295,20 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
   final result = Completer<_HeadlessResult>();
   HeadlessInAppWebView? webView;
   Map<String, dynamic>? broadnetSession;
+  Map<String, dynamic>? initialBroadnetSession;
   var acceptingResponses = true;
   final mobileQuery = MobileQueryAssembly();
   CarrierSnapshot? pendingMobileFlow;
 
   void complete(CarrierSnapshot snapshot) {
     if (acceptingResponses && !result.isCompleted) {
-      result.complete(_HeadlessResult(snapshot, session: broadnetSession));
+      result.complete(
+        _HeadlessResult(
+          snapshot,
+          session: broadnetSession,
+          initialSession: initialBroadnetSession,
+        ),
+      );
     }
   }
 
@@ -293,6 +316,7 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
     final savedSession = carrier == Carrier.broadnet
         ? await _readBroadnetSession(account)
         : null;
+    initialBroadnetSession = savedSession;
     webView = HeadlessInAppWebView(
       initialSettings: InAppWebViewSettings(
         javaScriptEnabled: true,
@@ -404,6 +428,17 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
                 }
               }
             }
+            if (parsed?.status == QueryStatus.success &&
+                carrier == Carrier.broadnet) {
+              try {
+                final captured = await created
+                    .evaluateJavascript(source: broadnetSessionCaptureScript)
+                    .timeout(const Duration(seconds: 2));
+                broadnetSession = normalizeBroadnetSession(captured);
+              } on Exception {
+                // An existing backup is retained if capture is unavailable.
+              }
+            }
             if (parsed != null) complete(parsed);
             return true;
           },
@@ -472,21 +507,6 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
             // Existing bounded task timeout retains the prior snapshot.
           }
         }
-        if (carrier == Carrier.broadnet && uri.host == 'www.10099.com.cn') {
-          try {
-            final captured = await created.evaluateJavascript(
-              source: broadnetSessionCaptureScript,
-            );
-            if (captured is Map) {
-              final candidate = Map<String, dynamic>.from(captured);
-              if (_validBroadnetSession(candidate)) {
-                broadnetSession = candidate;
-              }
-            }
-          } catch (_) {
-            // A query response may still be usable when session backup fails.
-          }
-        }
       },
       onReceivedError: (created, request, error) {
         if (request.isForMainFrame != true) return;
@@ -509,6 +529,7 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
               status: QueryStatus.error,
               message: '后台未取得可识别结果，保留上次查询时间',
             ),
+        initialSession: initialBroadnetSession,
       ),
     );
     return completed;
@@ -519,6 +540,7 @@ Future<_HeadlessResult> _queryInHeadlessWebView(CarrierAccount account) async {
         status: QueryStatus.error,
         message: '后台网页查询暂不可用，保留上次查询时间',
       ),
+      initialSession: initialBroadnetSession,
     );
   } finally {
     acceptingResponses = false;
@@ -602,38 +624,34 @@ Future<Map<String, dynamic>?> _readBroadnetSession(
         .read(key: account.broadnetSessionKey)
         .timeout(const Duration(seconds: 3));
     if (raw == null) return null;
-    final candidate = jsonDecode(raw);
-    if (candidate is! Map) return null;
-    final session = Map<String, dynamic>.from(candidate);
-    final savedAt = DateTime.tryParse(session['savedAt'] as String? ?? '');
-    final age = savedAt == null ? null : DateTime.now().difference(savedAt);
-    if (age == null || age.isNegative || age >= const Duration(days: 7)) {
-      return null;
-    }
-    return _validBroadnetSession(session) ? session : null;
+    return normalizeBroadnetSession(jsonDecode(raw));
   } catch (_) {
     return null;
   }
 }
 
 bool _validBroadnetSession(Map<String, dynamic> session) =>
-    session['phoneInfo'] is String &&
-    session['sessionId'] is String &&
-    (session['phoneInfo'] as String).isNotEmpty &&
-    (session['sessionId'] as String).isNotEmpty &&
-    (session['phoneInfo'] as String).length <= 20000 &&
-    (session['sessionId'] as String).length <= 20000;
+    normalizeBroadnetSession(session) != null;
 
 Future<void> _saveBroadnetSession(
   CarrierAccount account,
-  Map<String, dynamic>? session,
-) async {
+  Map<String, dynamic>? session, {
+  required Map<String, dynamic>? expected,
+}) async {
   if (session == null || !_validBroadnetSession(session)) return;
   try {
-    session['savedAt'] = DateTime.now().toIso8601String();
+    final captured = captureBroadnetSession(
+      session,
+      capturedAt: DateTime.now(),
+    );
+    if (captured == null) return;
+    if (!sameBroadnetSession(await _readBroadnetSession(account), expected) ||
+        !await _isTaskCurrent()) {
+      return;
+    }
     await _secureStorage.write(
       key: account.broadnetSessionKey,
-      value: jsonEncode(session),
+      value: jsonEncode(captured),
     );
   } catch (_) {
     // The balance remains useful; the next refresh may need foreground login.

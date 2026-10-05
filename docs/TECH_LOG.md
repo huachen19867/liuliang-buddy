@@ -448,3 +448,22 @@ Swift回归复核发现9e18+1的NSNumber转doubleValue后与9e18相同，不能�
 正式1.10.8/code25 Release59.6秒成功，APK28104532字节/SHA256 81bd97686278c856b4bc25f0b5d7f872f36cbb1fdf586f49f5da75e121f3a171，v2正式证书33b11555/API24-36/16KB ZIP对齐通过。旧Swift修正754e986云端run37010582041回读success，是1.10.7后源码校正，不当本轮1.10.8验收。准备public正式唯一APK发布。
 
 1.10.8正式公开回执：https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.8 ，非草稿/非预发布，tag/target均c2efb31026b13e10d93f157ecb359a6605367050。Assets唯一liuliang-buddy-release.apk uploaded/28104532字节，远端sha256 81bd97686278c856b4bc25f0b5d7f872f36cbb1fdf586f49f5da75e121f3a171与本机一致。只push public，源码与正式APK已公开。iOS新run37102731382仍in_progress，不能用旧754e986 success替代本版。无新真号或USB，小屏和桌面为合成回归与预览。回执另docs提交，不移动tag/替换资产。
+
+## 2026-10-05：移动与广电 HTTP 403 不再单独判登录过期
+
+复核发现移动与广电解析器把 HTTP 403 直接记为 `authExpired`，后台随后设置 `background_auth_required`，周期查询会一直跳过该账号，直到前台流程成功。广电公开归档同时保留了两类相反证据：`references/broadnet-public/page.html` 的 WAF 验证页要求完成安全验证；`references/broadnet-public/unauthenticated-qryUserRes.json` 则记录官网明确的 `status=701`、“登录已过期”业务响应。故 403 本身只算查询错误，401 仍算认证失效；广电 701 或明确认证文本即使伴随 403 仍算失效。移动和广电三条解析入口已按此收紧，联通逻辑不变。
+
+补充移动/广电 401、纯 403、403 安全验证文本以及广电 701/认证文本的解析回归。已有网页参考没有证明移动会话固定三天失效；其实际有效期仍需用真实账号观察。本轮未跑 SDK，新增回归尚未执行，也未用真实号码验证。
+
+## 2026-10-05：登录会话针对修复与真实三日边界
+
+老板先问移动3天免登录，再报广电也过期要求修复；异步补充广电约3日且APP内官网也重新要验证码。先定位日志、复用已下载10099官网/ChinaMobileMonitor/BroadnetFlowKeeper等，不重复下载或复制无许可证代码。分工Astra中等只读官网契约、SOL高广电共享helper/JS、Luna极高HTTP认证判定；根前后台接线、保存/恢复时序、串行SDK和正式分发。
+
+代码实际为广电7天本地age门禁（不是24小时），移除三处本地到期推断/自动删除，仅校验有界完整凭证再由官网响应判断。_saveSession对phoneInfo/sessionId整对比较，官方成功触碰当前捕获时间并替换document-start恢复脚本，覆盖同id字段更新/轮换；普通重新加载不把旧pair触碰当认证成功。后台成功回包后捕获，避免先返回result再onLoadStop保存的竞态；前台更换凭证时旧后台结果跳过，写前二次凭证/任务检查，原生APP可见即停后台已有保护，小的非原子read/write窗口不声称彻底消除。_saveSession网页读取限时2秒不拖住刷新。guest仅一个字段时可整对恢复，完整官网新pair不覆盖；捕获存在不等于服务器有效。
+
+Astra已从移动归档allowances/mobile-10.js确认3天勾选checkCtrol=0/1，“永久免登录”是外部平台介绍而非可直接延长cookie的开关。广电公开common JS未找到登录refresh接口，客服getToken不是登录续期。用户真官网三日重新验证属于真实会话失效，本次修本地恢复/漏保存/误判，不能宣称已解决服务器三日到期。
+
+首次全量296通过1失败，新增内层“登录已过期”预期暴露通用auth文本少此变体，补显式短语后保留断言，297项/20秒通过。Node新广电恢复和旧XHR/fetch捕获回归通过，真实长期账号/USB没有条件；生产读取限时小改后做最终检查。版本1.10.9/code26，正式包与公开回执另补。
+
+最终复核进一步收紧：官网可能生成带地区信息的游客phoneInfo，不能仅靠完整pair判断已登录。根移除前台关闭/刷新前/onLoadStop的未验证保存，唯一_saveVerifiedBroadnetSession只从成功套餐响应调用；后台也移除onLoadStop备用捕获，只从成功回包捕获。第一次96.4秒本机构建在这次收紧前完成，仅作为弃用的中间包，未公开/未上传；收紧后重新验证并重建，最终hash回执另补。没有修改登录请求checkCtrol或用户协议/验证码，没有复制App私有令牌。
+收紧后的完整Flutter297项/28秒、analyze无问题、Node新广电恢复和旧XHR/fetch通过。最终Release66.5秒，1.10.9/code26，APK28104532字节/SHA256 3c635d5d4ac9e7b759b0ee8edb765af025dc96e7355b1ceac43f1e25dfc4ac24；v2正式证书33b11555/API24-36/16KB ZIP对齐通过。未改native/Swift，未重复JUnit，也无三日真号验收。构建中老板新增本机号码一键登录建议，已启动官方号码认证/营业厅授权区别调研，不把新建议冒称含在当前包内。准备public唯一APK发布。

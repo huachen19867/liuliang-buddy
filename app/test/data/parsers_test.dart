@@ -297,6 +297,28 @@ void main() {
       parseBroadnetH5({}, httpStatus: 401).status,
       QueryStatus.authExpired,
     );
+    expect(parseBroadnetH5({}, httpStatus: 403).status, QueryStatus.error);
+    expect(
+      parseBroadnetH5({
+        'status': '701',
+        'message': '登录已过期，请重新登录',
+      }, httpStatus: 403).status,
+      QueryStatus.authExpired,
+    );
+    expect(
+      parseBroadnetH5({
+        'status': '403',
+        'message': '请完成安全验证后重试',
+      }, httpStatus: 403).status,
+      QueryStatus.error,
+    );
+    expect(
+      parseBroadnetH5({
+        'status': '000000',
+        'data': {'respCode': '900001', 'message': '登录已过期'},
+      }, httpStatus: 403).status,
+      QueryStatus.authExpired,
+    );
     expect(parseBroadnetH5({}).status, QueryStatus.error);
     expect(parseBroadnetH5({'respCode': '999999'}).status, QueryStatus.error);
     final voiceOnly = parseBroadnetH5({
@@ -312,16 +334,39 @@ void main() {
     expect(voiceOnly.allowances.single.remaining, 200);
   });
 
-  test('authentication and malformed bodies never become success', () {
-    expect(parseMobile({}, httpStatus: 401).status, QueryStatus.authExpired);
-    expect(parseBroadnet({}, httpStatus: 403).status, QueryStatus.authExpired);
-    expect(
-      parseBroadnet({'status': '123', 'message': '登录已失效'}).status,
-      QueryStatus.authExpired,
-    );
-    expect(parseMobile({}).status, QueryStatus.error);
-    expect(parseBroadnet({'status': '000000'}).status, QueryStatus.error);
-  });
+  test(
+    '403 alone does not classify mobile or broadnet sessions as expired',
+    () {
+      expect(parseMobile({}, httpStatus: 401).status, QueryStatus.authExpired);
+      expect(parseMobile({}, httpStatus: 403).status, QueryStatus.error);
+      expect(
+        parseMobile({'message': '登录已过期，请重新登录'}, httpStatus: 403).status,
+        QueryStatus.authExpired,
+      );
+      expect(
+        parseBroadnet({}, httpStatus: 401).status,
+        QueryStatus.authExpired,
+      );
+      expect(parseBroadnet({}, httpStatus: 403).status, QueryStatus.error);
+      expect(
+        parseBroadnet({'status': '701'}, httpStatus: 403).status,
+        QueryStatus.authExpired,
+      );
+      expect(
+        parseBroadnet({
+          'status': '403',
+          'message': '请完成验证码验证',
+        }, httpStatus: 403).status,
+        QueryStatus.error,
+      );
+      expect(
+        parseBroadnet({'status': '123', 'message': '登录已失效'}).status,
+        QueryStatus.authExpired,
+      );
+      expect(parseMobile({}).status, QueryStatus.error);
+      expect(parseBroadnet({'status': '000000'}).status, QueryStatus.error);
+    },
+  );
 
   test('snapshot JSON preserves query time and nullable totals', () {
     final original = CarrierSnapshot(
