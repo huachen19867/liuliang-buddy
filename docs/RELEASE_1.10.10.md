@@ -7,3 +7,5 @@
 老板截图已证实广电官方App支持本机登录。本轮也从广电官方App H5公开代码确认原生登录桥接与普通网页验证码分支。广电本机认证在本应用尚未接通，需要取得其可使用的原生SDK/授权回调和营业厅会话接入资料；本版本没有冒称四家免验证码，也不能承诺营业厅会话永久有效。详见 [一键登录研究](ONE_CLICK_LOGIN_RESEARCH.md)。
 
 Flutter298项/29秒、analyze无问题。正式Release96.6秒成功，1.10.10/code27，APK28,170,068字节（28.17MB），SHA256 `34bb1a0db48e2758c08b4d4ad37c666389958f70f328f473e6e3e130dd247de2`。v2正式证书33b11555、API24/36、16KB ZIP对齐通过。GitHub回执待补。无真实SIM取号、授权或连续三日登录验收，Chrome/Safari协议打开仍待真机。
+
+公开回执：2026-10-06 回读确认 [v1.10.10](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.10) 为正式公开版，target/tag 为 `5620613f22861d1423dd1029139ccd1512f9e9ae`。唯一 APK 名为 `liuliang-buddy-release.apk`，状态 uploaded、28,170,068 字节，远端 SHA256 与上述本机结果一致。此回执不改变广电原生认证未接入及真机验证边界。

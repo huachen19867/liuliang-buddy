@@ -36,6 +36,8 @@ Manifest 声明了本 App 自有 `com.ai.obc.cbn.app.ui.other.activity.LoginActi
 
 这只说明本 APK 的静态声明中没有取得可供第三方使用的广电登录回调，不能证明所有服务端、动态入口或正式合作接口均不存在。没有尝试显式拉起内部 Activity，也没有把官方 App 的成功登录状态复制到本项目。
 
+2026-10-06 另核对 Android 系统账号共享路径：Manifest 未声明 `android.accounts.AccountAuthenticator` action 或对应 meta-data，亦没有其他账号认证 Service 意图声明。全部 5 个 Provider 均明确 `exported=false`，没有公开账号认证 Provider。8 个 Service 中唯一明确 `exported=true` 的是 `com.asia.sip_ua.src.socket.SocketService`，没有 intent-filter、账号认证 action 或公开 Binder 契约；按 SIP/音视频模块的类路径，它不能作为广电本机号码认证入口。其余 Service 为更新、旷视录屏、Room、音频和投屏等组件，也没有账号授权声明。这里没有尝试绑定任何 Service、调用 Binder、读取 AccountManager 账号或凭证；仅凭一个 Service 可导出不能推定有可合法复用的认证接口。
+
 此前官方 H5 的 `nativeCall({type:'login'})` 是 H5 与官方 App 宿主之间的桥接命令。它没有自动成为外部 App 的 SDK，也没有给本应用提供本机号码 token 或营业厅会话回传契约。本轮静态组件证据与既有 H5 分支相容，但不足以补出受保护原生实现的 SDK 调用流程。
 
 ## 公开正式接入与当前缺口

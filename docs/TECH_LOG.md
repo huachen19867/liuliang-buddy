@@ -490,3 +490,18 @@ Astra已从移动归档allowances/mobile-10.js确认3天勾选checkCtrol=0/1，�
 Astra找到open.10099.com.cn/partner.10099.com.cn并读取正常公开首页素材请求，确认入驻产品是权益/彩铃，不能冒认是号码SDK；亚信BSS案例与金山SDK192号段校验线索均未能证明本机认证开放。另GBA标准已正式发布T/CAICI91-2024，之前引用草案并非现行状态，已修文档。根只GET easy-login.10099.com.cn根目录，HTTP502带“请求URI必须是:/http”，仅说明存在该服务，不继续发起取号/认证、不当作SDK文档。新证据都维护reference index，不重复旧包。
 
 SDK授权仍有外部资料缺口，根提出可开发替代为官方App辅助同步，用户主动打开官方App完成原生认证，通过单独启用的无障碍权限读取可见余额回卡片，不取私有会话，不保证后台无感。异步询问是否接受，未在其选择前加入敏感服务或更改Manifest。已构建/验证的1.10.10独立准备交付，广电原生一键没有冒称完成。
+
+## 2026-10-06：可交付性修复与诊断入口
+
+老板确认“做”，按已有授权继续产品稳定性改造和正式公开交付。复用本地官网归档、Flutter Secure Storage 11.2.0 BSD-3-Clause 与既有 AppWidget/WorkManager 参考，没有重新下载同一项目。按老板分工 SOL 高处理数据和真实 FlowHome 竞态/诊断回归，Luna 极高处理诊断界面和后台本地读取失败，Astra 中等复核全链路和 vendor 完成回调队列；根串行执行 SDK、集成和发布。
+
+本轮修移动已收到流量后第二次 getUrl 无期限/异常留 loading；所有网页回包携带请求开始时 queryEpoch，旧 getUrl/loadUrl 迟到不能结束或覆盖新轮。移动余额等待另保留九秒终止期限，页面读取两秒、加载十五秒；失败保留原数字与查询时间。原生 onReceivedError 没有轮次身份，仅提示，交仍有效的 timer 收尾。广电 onLoadStop 先校验当前网页和轮次，然后在任何删除 await 前结束 loading；脚本或存储清理异常不会阻止重新登录。后台联通本地读取失败记 error，不虚构服务器过期或永久暂停自动刷新。
+
+Android vendor 只改调度层，所有引擎共享 FIFO 并由真实原生回调推进，保留上游加密/许可证；后台绑定 Worker current guard。Dart 三秒观察期限不释放原生槽位。清理 pending 独立保存，网页插件清理也有期限，未完成不解除登录门禁。没有把超时写入当成已取消，也不声称介质安全擦除。
+
+新增“设置→连接与刷新检查”、真实安装版本、每账号上次有效结果/本次尝试与对应恢复动作，报告不输出手机号、备注、token或原始服务端报文。成功套餐存在余量大于总量时与缓存统一判未知，保留原行，不改真零和不限量。
+
+首轮 FlowHome 三项回归失败查明是 fake addUserScript 在 pump 回调里用受 guard 的 expect，而非真实插件第二次安装失败；改 expectSync 保留断言。测试结束前需恢复 Android debug override，tearDown 在 Flutter 不变量检查之后不足以恢复。诊断操作路由转场需零时首帧再推进动画时间。修复后 FlowHome 网页/诊断八项通过，包括广电脚本失败/删除超时，未弱化路线断言。Android app 原生35项及队列3项已通过；最终全量和正式构建回执后补。adb 当前无设备，未取得真卡或长期后台验证。
+
+最终Flutter328项/15秒通过，analyze无问题；真实后台入口两项验证联通read抛异常和连续两次三秒挂起均保持error/旧数字/旧时间、不写永久认证门禁，故障后的迟到read也不恢复凭证。真实FlowHome七项、诊断路线两项和UI六项均包含在全量结果。清理额外验证stopLoading不返回仍有限退出并保留pending；首轮该测试停在未mock的Profile原生方法，补真实通道明确返回后保留原断言通过。截图已复用字体和原logo预缓存、按钮继承主题，目视核对。原生app35/queue3项通过，生产脚本Node/本地Chrome回归此前已通过且未再改JS；没有USB/真号/跨日验收。正式1.11.0+28构建中。全量测试生成的无关选择页演示图恢复本轮前版本，不删除用户文件。
+正式Release62.0秒成功，1.11.0/code28，APK28,171,100字节/SHA256 7426c9114802b43bb84ef8fbae3c492227de371fe34cb3e3c348470fe25283a5。v2正式证书33b11555、ARM64、API24-36、非debuggable及16KB ZIP对齐通过，wrapper官方配置无diff。新增忽略本轮生成的app/android/.kotlin缓存，不删除文件。只准备public main和唯一正式APK发布；macOS/iPhone本版尚无回执，真实四家账号/长期后台仍待设备。

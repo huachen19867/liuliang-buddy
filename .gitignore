@@ -17,6 +17,7 @@
 **/key.properties
 /artifacts/apk-*.txt
 /app/android/.gradle/
+/app/android/.kotlin/
 /app/android/build/
 /app/android/app/.cxx/
 **/vendor/**/.cxx/

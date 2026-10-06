@@ -147,7 +147,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
   await broadnet.context.fetch('https://wx.10099.com.cn/login');
   await settle();
   assert.equal(broadnet.messages.length, 2, 'only exact Broadnet API origins');
-  assert.equal(broadnet.jqHandlers.length, 1);
+  assert.equal(broadnet.jqHandlers.length, 2);
   const official = {respCode: '000000', intfResultBean: {userResList: []}};
   const officialXhr = {responseJSON: official, status: 200};
   const settings = {url: '/contact-web/api/busi/qryUserRes'};
@@ -208,11 +208,11 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
   assert.equal(factoryReceiver, receiver);
   assert.deepEqual(factoryArgs, [module, exports, require]);
   assert.equal(module.exports, privateJq);
-  assert.equal(privateHandlers.length, 1);
+  assert.equal(privateHandlers.length, 2);
   privateSite.scriptLoad();
   privateSite.tick();
-  assert.equal(privateSite.jqHandlers.length, 1, 'deduplicate global instance');
-  assert.equal(privateHandlers.length, 1, 'deduplicate private instance');
+  assert.equal(privateSite.jqHandlers.length, 2, 'deduplicate global instance');
+  assert.equal(privateHandlers.length, 2, 'deduplicate private instance');
   privateHandlers[0].callback({}, officialXhr, settings, official);
   assert.equal(privateSite.messages.at(-1).payload.stage, 'officialDecoded');
   assert.deepEqual(JSON.parse(privateSite.messages.at(-1).payload.body), official);
@@ -242,5 +242,67 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
   const response = await broken.context.fetch('/getNewMarginInfo');
   await settle();
   assert.equal(response, broken.response(), 'bridge errors do not affect requests');
-  console.log('PASS: fetch/XHR fidelity, private business jQuery, deferred bridge, bounded queue, origin/frame guards');
+  for (const fixture of [mobile, broadnet, privateSite, delayed, bounded, unicom]) {
+    assert.ok(fixture.messages.every(message =>
+      !Object.hasOwn(message.payload, 'queryEpoch')),
+    'legacy document without epoch does not gain an undefined property');
+  }
+
+  const epochMobile = setup('https://wx.10086.cn');
+  epochMobile.context.__liuliangQueryEpoch = 'round-open';
+  const lateXhr = new epochMobile.XHR();
+  lateXhr.open('GET', '/getNewMarginInfo');
+  epochMobile.context.__liuliangQueryEpoch = 'round-send';
+  lateXhr.send();
+  epochMobile.context.__liuliangQueryEpoch = 'round-newer';
+  lateXhr.complete('https://wx.10086.cn/getNewMarginInfo');
+  assert.equal(epochMobile.messages[0].payload.queryEpoch, 'round-send',
+    'XHR epoch is captured at send, not open or late completion');
+  epochMobile.context.__liuliangQueryEpoch = 'round-fetch';
+  const lateFetch = epochMobile.context.fetch('/getNewMarginInfo');
+  epochMobile.context.__liuliangQueryEpoch = 'round-after-fetch';
+  await lateFetch;
+  await settle();
+  assert.equal(epochMobile.messages[1].payload.queryEpoch, 'round-fetch',
+    'fetch keeps invocation epoch through response/body promises');
+  const untagged = setup('https://wx.10086.cn');
+  const untaggedXhr = new untagged.XHR();
+  untaggedXhr.open('GET', '/getNewMarginInfo'); untaggedXhr.send();
+  const untaggedFetch = untagged.context.fetch('/getNewMarginInfo');
+  untagged.context.__liuliangQueryEpoch = 'round-started-after-request';
+  untaggedXhr.complete('https://wx.10086.cn/getNewMarginInfo');
+  await untaggedFetch;
+  await settle();
+  assert.equal(untagged.messages.length, 2);
+  assert.ok(untagged.messages.every(message =>
+    !Object.hasOwn(message.payload, 'queryEpoch')),
+  'requests started before epoch setup cannot borrow a newer epoch');
+
+  const epochQueue = setup('https://www.10099.com.cn', {bridgeReady: false});
+  epochQueue.context.__liuliangQueryEpoch = 'round-ajax-start';
+  const epochSettings = {url: '/contact-web/api/busi/qryUserRes'};
+  const settingsBefore = {...epochSettings};
+  epochQueue.jqHandlers.find(handler => handler.name === 'ajaxSend.liuliang')
+    .callback({}, officialXhr, epochSettings);
+  epochQueue.context.__liuliangQueryEpoch = 'round-ajax-finish';
+  epochQueue.jqHandlers[0].callback({}, officialXhr, epochSettings, official);
+  epochQueue.context.__liuliangQueryEpoch = 'round-bridge-ready';
+  epochQueue.ready();
+  assert.equal(epochQueue.messages[0].payload.queryEpoch, 'round-ajax-start',
+    'decoded ajax and deferred queue retain start epoch');
+  assert.deepEqual(epochSettings, settingsBefore, 'do not mutate official jQuery settings');
+  epochQueue.jqHandlers[0].callback({}, officialXhr, settings, official);
+  assert.equal(Object.hasOwn(epochQueue.messages[1].payload, 'queryEpoch'), false,
+    'ajax response without observed send cannot borrow current epoch');
+
+  const rawQueue = setup('https://wx.10086.cn', {bridgeReady: false});
+  rawQueue.context.__liuliangQueryEpoch = 'round-raw-start';
+  const queuedXhr = new rawQueue.XHR();
+  queuedXhr.open('GET', '/getNewMarginInfo'); queuedXhr.send();
+  queuedXhr.complete('https://wx.10086.cn/getNewMarginInfo');
+  rawQueue.context.__liuliangQueryEpoch = 'round-raw-ready';
+  rawQueue.ready();
+  assert.equal(rawQueue.messages[0].payload.queryEpoch, 'round-raw-start',
+    'queued raw response is not upgraded when bridge becomes ready');
+  console.log('PASS: fetch/XHR fidelity, private jQuery, deferred bridge, bounded queue, guards, immutable request epochs');
 })().catch(error => { console.error(error); process.exitCode = 1; });

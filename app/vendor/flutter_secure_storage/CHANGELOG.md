@@ -1,0 +1,535 @@
+# Changelog
+
+## [11.2.0](https://github.com/juliansteenbakker/flutter_secure_storage/compare/flutter_secure_storage-v11.1.1...flutter_secure_storage-v11.2.0) (2026-09-16)
+
+
+### Features
+
+* **android:** requireBiometricsPerOperation flag ([#1264](https://github.com/juliansteenbakker/flutter_secure_storage/issues/1264)) ([321cf97](https://github.com/juliansteenbakker/flutter_secure_storage/commit/321cf97c72e78ddb81e888484560ebca74414614))
+
+
+### Bug Fixes
+
+* **android:** don't hang when biometric negative button is tapped ([#1267](https://github.com/juliansteenbakker/flutter_secure_storage/issues/1267)) ([405c6e6](https://github.com/juliansteenbakker/flutter_secure_storage/commit/405c6e6299c665dfb8a7211192b42319da2e88bc))
+* **android:** fix fresh biometric install crash on non-namespaced stores ([120bdf4](https://github.com/juliansteenbakker/flutter_secure_storage/commit/120bdf4ddb75e94d0c7d40519e2da9cea953a2c1))
+* **android:** port the shared-key multi-instance fixes to v11.x ([6cc9ddc](https://github.com/juliansteenbakker/flutter_secure_storage/commit/6cc9ddc55df42255edd4afb72bac56458997885d))
+* **android:** recover biometric-protected storage on post-auth cipher failure ([#1271](https://github.com/juliansteenbakker/flutter_secure_storage/issues/1271)) ([77eed59](https://github.com/juliansteenbakker/flutter_secure_storage/commit/77eed597eaa244106b946cd02c4d7edb3eb9fa05))
+* **android:** recover the biometric app key on a namespace switch ([31f6eeb](https://github.com/juliansteenbakker/flutter_secure_storage/commit/31f6eeb79ad8187a49d8675bbf58d81b050f506f))
+* **android:** scope deleteAll to the key prefix instead of clearing the file ([#1266](https://github.com/juliansteenbakker/flutter_secure_storage/issues/1266)) ([34170b2](https://github.com/juliansteenbakker/flutter_secure_storage/commit/34170b2caf52c642efa5b6584fa4cc5072f6c697))
+* **darwin:** find keychain items across accessibility levels ([#1269](https://github.com/juliansteenbakker/flutter_secure_storage/issues/1269)) ([9ae0e42](https://github.com/juliansteenbakker/flutter_secure_storage/commit/9ae0e422d6ad6376ddf7960186d42342b0370baf))
+* don't report pending namespace recovery as data loss in checkUpgradeStatus ([f795d52](https://github.com/juliansteenbakker/flutter_secure_storage/commit/f795d52488450d6ef04ee580c895d98c59b737f3))
+
+## [11.1.1](https://github.com/juliansteenbakker/flutter_secure_storage/compare/flutter_secure_storage-v11.1.0...flutter_secure_storage-v11.1.1) (2026-09-11)
+
+
+### Bug Fixes
+
+* **android:** read saved key-cipher marker instead of toString() on a KeyCipher ([#1256](https://github.com/juliansteenbakker/flutter_secure_storage/issues/1256)) ([73f0ef5](https://github.com/juliansteenbakker/flutter_secure_storage/commit/73f0ef5b0666a25912ae07694211414dfcabcf23))
+
+## [11.1.0](https://github.com/juliansteenbakker/flutter_secure_storage/compare/flutter_secure_storage-v11.0.0...flutter_secure_storage-v11.1.0) (2026-09-10)
+
+
+### Features
+
+* add checkUpgradeStatus() to report data lost on a direct major upgrade ([#1243](https://github.com/juliansteenbakker/flutter_secure_storage/issues/1243)) ([fc716ea](https://github.com/juliansteenbakker/flutter_secure_storage/commit/fc716ea7b3973db985d953776107b44b5984f591))
+
+
+### Bug Fixes
+
+* **android:** move wrapped key when switching between sharedPreferencesName and storageNamespace ([2482e34](https://github.com/juliansteenbakker/flutter_secure_storage/commit/2482e34e377cae7e6e082c0c0c867c2d5857a531))
+* **android:** use flutter.compileSdkVersion (36) instead of pinning compileSdk (37) ([#1236](https://github.com/juliansteenbakker/flutter_secure_storage/issues/1236)) ([0530fe7](https://github.com/juliansteenbakker/flutter_secure_storage/commit/0530fe74174743b234adc14c5305d13cbdac7764)), closes [#1224](https://github.com/juliansteenbakker/flutter_secure_storage/issues/1224)
+* require flutter_secure_storage_platform_interface ^2.1.0 for checkUpgradeStatus ([#1247](https://github.com/juliansteenbakker/flutter_secure_storage/issues/1247)) ([0d3d6f2](https://github.com/juliansteenbakker/flutter_secure_storage/commit/0d3d6f21201cb844ef085b2cb0a3999e45f125e1))
+
+## [11.0.0](https://github.com/juliansteenbakker/flutter_secure_storage/compare/flutter_secure_storage-v10.3.1...flutter_secure_storage-v11.0.0) (2026-08-06)
+
+**Breaking changes**
+
+items deprecated in v10 have been removed.
+Any data saved using deprecated algorithms or features will be unusable after this upgrade. If you used a version prior to v10, upgrade to v10 first so existing data is migrated.
+
+### Android
+
+- Removed `KeyCipherAlgorithm.RSA_ECB_PKCS1Padding`. Upgrade to v10 first so existing data is migrated to `RSA_ECB_OAEPwithSHA_256andMGF1Padding` before upgrading to v11.
+- Removed `StorageCipherAlgorithm.AES_CBC_PKCS7Padding`. Upgrade to v10 first so existing data is migrated to `AES_GCM_NoPadding` before upgrading to v11.
+- Removed `encryptedSharedPreferences` parameter from `AndroidOptions` and `AndroidOptions.biometric`. The Jetpack Security (EncryptedSharedPreferences) backend is no longer supported; any remaining data was automatically migrated to custom cipher storage in v10.
+- Removed `sharedPreferencesName` from `AndroidOptions`. Use `storageNamespace` instead for full namespace isolation.
+- Raised `minSdk` to 24 and `compileSdk` to 37. Flutter 3.35 raised its own Android minimum to API 24, making API 23 support unverifiable with any supported Flutter version. The legacy AES-CBC cipher path that supported API 21-22 has been removed.
+
+### Features
+
+* **android:** add requireBiometricConfirmation option to AndroidOptions ([7f5f7de](https://github.com/juliansteenbakker/flutter_secure_storage/commit/7f5f7de0ea98a6482c02e768faf7c82c2e5b959b))
+
+
+### Bug Fixes
+
+* **android:** catch Throwable on worker thread so keystore Errors don't crash the app ([d5802ff](https://github.com/juliansteenbakker/flutter_secure_storage/commit/d5802ff6b422a391501145d1113ca9da4c39f1f0))
+* **android:** don't swallow VM errors, catch Throwable on biometric thread too ([d413d3f](https://github.com/juliansteenbakker/flutter_secure_storage/commit/d413d3fb2e8c0faaf78f986be9300e5f1ca6105c))
+* **linux:** handle missing default keyring ([b39c7c1](https://github.com/juliansteenbakker/flutter_secure_storage/commit/b39c7c1db6c1fe651367031c9d0033d590784de0))
+* **linux:** fail closed on orphaned keyring data ([2e720ff](https://github.com/juliansteenbakker/flutter_secure_storage/commit/2e720ff7e6b956a5d1197a5077bb8be39a5d5632))
+* remove redundant ./ prefix from part directives ([cc7018d](https://github.com/juliansteenbakker/flutter_secure_storage/commit/cc7018d15eae56b389348d73f788ae1a03c606c6))
+
+## 10.3.1
+
+### Android
+- Fixed `AEADBadTagException` when biometric authentication is cancelled on first launch: a stale IV is now cleared and the cipher re-initialised in encrypt mode so the next authentication attempt succeeds.
+- Fixed `NullPointerException` when retrying an operation after a cancelled biometric prompt: `preferences` is now only assigned once cipher initialisation completes successfully, allowing a clean retry.
+
+## 10.3.0
+
+### Android
+- Added `AndroidBiometricType` enum and `biometricType` option to `AndroidOptions` to control which authentication methods are accepted during biometric prompts (requires `KeyCipherAlgorithm.AES_GCM_NoPadding`).
+  - `AndroidBiometricType.biometricOrDeviceCredential` (default) accepts Class 3 biometrics or device credentials (PIN/pattern/password), preserving previous behaviour.
+  - `AndroidBiometricType.strongBiometricOnly` restricts authentication to Class 3 (strong) biometrics only; device credentials are explicitly rejected.
+- Fully enforced on Android 11+ (API 30+) via `setAllowedAuthenticators` on `BiometricPrompt` and `setUserAuthenticationParameters` on the KeyStore key. On earlier API levels the system may still permit device credentials.
+- Added `biometricPromptNegativeButton` option to `AndroidOptions` to customise the dismiss button label on the biometric prompt. Required when using `strongBiometricOnly` or on Android 10 and lower.
+
+### iOS / macOS
+- Fixed `secStoreAvailabilitySink` not being called when protected data availability changes.
+- Fixed `kSecUseDataProtectionKeychain` being added to Keychain queries unconditionally; it is now only set when `useDataProtectionKeychain` is explicitly enabled.
+
+### Windows
+- Fixed `deleteAll` and `containsKey` not acquiring the mutex lock, which could cause data races under concurrent access.
+  If you are on Dart >=3.10.0, this fix is applied automatically. Otherwise, pin `flutter_secure_storage_windows: ^4.2.2` in your `pubspec.yaml` to opt in and make sure your constraint is set for minimum of Dart >=3.10.0.
+
+### Linux
+- Fixed `deleteKeyring` storing the string `"null"` instead of an empty JSON object `{}`.
+- Fixed non-UTF-8 error messages from libsecret causing a `FormatException` on the Dart side; messages are now sanitised before being sent through the method channel.
+- Fixed locked or unavailable keyring now surfacing as a catchable `PlatformException` with code `KeyringLocked`.
+- Fixed JSON parse errors and other C++ exceptions now surfacing as a `PlatformException` with code `StorageError` instead of sending malformed bytes through the channel.
+## 10.2.0
+
+### Android
+- Deprecated `KeyCipherAlgorithm.RSA_ECB_PKCS1Padding`. Existing data is automatically migrated to the default `RSA_ECB_OAEPwithSHA_256andMGF1Padding` when `migrateOnAlgorithmChange` is true.
+- Deprecated `StorageCipherAlgorithm.AES_CBC_PKCS7Padding`. Existing data is automatically migrated to the default `AES_GCM_NoPadding` when `migrateOnAlgorithmChange` is true.
+- Fixed Gradle space-assignment warnings in `build.gradle`.
+
+### iOS / macOS
+- Fixed iOS build by updating availability annotation for Secure Enclave methods from `iOS 11.3` to `iOS 13.0`.
+
+### Windows
+- Fixed compatibility with `win32` 6.0.0 in `flutter_secure_storage_windows 4.2.0`.
+  If you are on Dart >=3.10.0, this fix is applied automatically. Otherwise, pin `flutter_secure_storage_windows: ^4.2.0` in your `pubspec.yaml` to opt in and make sure your constraint is set for minimum of Dart >=3.10.0.
+
+## 10.1.0
+
+### Windows
+- Updated `flutter_secure_storage_windows` to 4.2.0 with compatibility fixes for `win32` 6.0.0.
+
+### Android
+- Added `storageNamespace` option to `AndroidOptions` for full namespace isolation across storage instances (SharedPreferences, KeyStore aliases, config/key storage). Use this instead of `sharedPreferencesName` when running multiple `FlutterSecureStorage` instances with different cipher configurations.
+- Deprecated `sharedPreferencesName` in favor of `storageNamespace`, which provides complete isolation rather than data-only isolation.
+- Added `migrateWithBackup` option to `AndroidOptions` for crash-resistant migration. When enabled, backup copies of encrypted data are created before migration starts, allowing recovery if migration fails or the app crashes mid-migration. Works in conjunction with `migrateOnAlgorithmChange`.
+- Made `KeyCipherAlgorithm` and `StorageCipherAlgorithm` public enums.
+
+**Fixes:**
+- Fixed crash on biometric failure (not error).
+- Fixed null safety issue in `MethodRunner` that could cause a crash on Android.
+- Fixed config being overwritten on initialization.
+- Fixed default Android key cipher not aligning with the Flutter default.
+
+### iOS / macOS
+- Added `useSecureEnclave` option to `IOSOptions` and `MacOsOptions` to store keys in the device's Secure Enclave for hardware-backed security.
+
+**Fixes:**
+- Fixed `kSecAttrSynchronizable` being silently dropped when no access control flags are set.
+- Fixed `readAll` not returning Secure Enclave items correctly.
+
+## 10.0.0
+This major release brings significant security improvements, platform updates, and modernization across all supported platforms.
+
+### Android
+Due to the deprecation of Jetpack Security library, the Android implementation has been largely rewritten with custom secure ciphers, enhanced biometrics support, and migration tools.
+
+**Breaking Changes:**
+- `AndroidOptions().encryptedSharedPreferences` is now deprecated due to Jetpack Crypto package deprecation
+  - Migration will automatically happen due to `migrateOnAlgorithmChange: true`, which can also be set to false if not wanted.
+- ResetOnError will now automatically be true, because most errors are unrecoverable due to key storage problems. It can still be disabled with `resetOnError: false`
+- Default key cipher changed to `RSA_ECB_OAEPwithSHA_256andMGF1Padding`
+- Default storage cipher changed to `AES_GCM_NoPadding`
+- Minimum Android SDK changed from 19 to 23
+- Target SDK updated to 36
+- Migrated from deprecated Jetpack Crypto library to custom cipher implementation (Tink doesn't support biometrics)
+- Migrated to Java Version 17
+
+**New Features:**
+- New named constructors: `AndroidOptions()`, `AndroidOptions.biometric()`
+- `AndroidOptions().migrateOnAlgorithmChange` automatically migrates data to new ciphers when enabled
+- Improved biometric authentication with graceful degradation when device has no security setup
+- Migration tools for transitioning from deprecated encryptedSharedPreferences
+- Enhanced error handling with proper exception messages for biometric unavailability
+
+**Fixes:**
+- Fixed biometric authentication on devices without security (PIN/pattern/password) - now gracefully degrades when `enforceBiometrics=false`
+- Fixed storage cipher and key cipher pairing validation
+- Fixed migration checks for encrypted shared preferences
+- Fixed biometric permission handling
+- Fixed exception when reading data after boot
+
+**Other Changes:**
+- Updated Gradle, Kotlin, and Tink dependencies
+- Refactored custom cipher implementations for better maintainability
+- Added delete key functions for proper reset handling
+- Migrated to new analyzer and code cleanup
+
+### iOS / macOS (darwin)
+- Merged iOS and macOS implementations into unified `flutter_secure_storage_darwin` package
+- Added support for Swift Package Manager
+- Remove keys regardless of synchronizable state or accessibility constraints
+- Change minimum iOS version from 9 to 12
+- Change minimum macOS version to 10.14
+- Use serial queue for execution of keychain operations
+- Added privacy manifest
+- Refactored code and added missing options to IOSOptions and MacOSOptions
+- Fixed warnings with Privacy Manifest
+- Fixed delete and deleteAll when synchronizable is set
+- Fixed migration when value is saved while key already exists with different accessibility option
+- Use accessibility option for all operations
+- Migrated to new analyzer and code cleanup
+
+### Web
+- Web is now compatible with WASM
+- Updated code style and migrated to very_good_analysis
+- Add check for secure context (operations only allowed with secure context)
+- Remove dart:io to support WASM build
+- Migrated away from `html` to `web` package
+- Removed `js` in favor of using js-interop
+- Added `useSessionStorage` parameter to WebOptions for saving in session storage instead of local storage
+- Updated web dependency support to <2.0.0
+- Migrated to new analyzer and code cleanup
+
+### Windows
+- Upgrades deprecated member usage of win32
+- Migrated to `win32` version 5.5.4 to support Dart 3.4 / Flutter 3.22.0
+- Migrated to new analyzer and code cleanup
+- Write encrypted data to files instead of the Windows credential system
+
+### Linux
+- Fixed whitespace deprecation warning
+- Reverted json.dump with indentations due to problems
+- Fixed search with schemas fails in cold keyrings
+- Fixed erase called on null
+- Fixed memory management issue
+- Remove and replace libjsoncpp1 dependency
+- Migrated to new analyzer and code cleanup
+
+### Platform Interface
+- Remove dart:io to support WASM build of web
+- Migrated to new analyzer and code cleanup
+
+### General Improvements
+- Listener functionality via `FlutterSecureStorage().registerListener()`
+- All platforms updated to support Dart SDK <4.0.0
+- Comprehensive test coverage improvements
+- Documentation updates across all platforms
+
+## 10.0.0-beta.5
+Due to security issues regarding the handling of biometrics in v10.0.0-beta.4, together with the deprecation
+of Jetpack Security library, it took me some time to find a secure alternative. My apologies for the delay.
+
+The Android part has been largely rewritten, reintroducing the customer cipher construction from before,
+but with secure ciphers, biometrics support, updated default ciphers and migration tools.
+
+**Breaking Changes:**
+- `AndroidOptions().encryptedSharedPreferences` is now deprecated due to Jetpack Crypto package being deprecated
+  For now you can still use deprecated encryptedSharedPreferences by setting `encryptedSharedPreferences: true`
+  and `migrateOnAlgorithmChange: false`. If `encryptedSharedPreferences` is `true` and `migrateOnAlgorithmChange`
+  is `true`, data will be automatically migrated to the new cipher, and encryptedSharedPreferences
+  cannot be used anymore.
+- Google recommends using Tink library, but Tink does not support biometrics, so custom ciphers have been reintroduced
+- Default key cipher changed to `RSA_ECB_OAEPwithSHA_256andMGF1Padding`
+- Default storage cipher changed to `AES_GCM_NoPadding`
+
+**New Features:**
+- New named constructors: `AndroidOptions()`, `AndroidOptions.biometric()`
+- `AndroidOptions().migrateOnAlgorithmChange` automatically migrates data to new ciphers when enabled
+- Improved biometric authentication with graceful degradation when device has no security setup
+- Migration tools for transitioning from deprecated encryptedSharedPreferences
+- Enhanced error handling with proper exception messages for biometric unavailability
+
+**Key Fixes:**
+- Fixed biometric authentication on devices without security (PIN/pattern/password) - now gracefully degrades when `enforceBiometrics=false`
+- Fixed storage cipher and key cipher pairing validation
+- Fixed migration checks for encrypted shared preferences
+- Fixed biometric permission handling
+- Fixed default `resetOnError` behavior (now defaults to `true`)
+
+**Other Changes:**
+- Target SDK 36
+- Updated Gradle, Kotlin, and Tink dependencies
+- Updated minimum SDK according to Flutter requirements
+- Refactored custom cipher implementations for better maintainability
+- Added delete key functions for proper reset handling
+
+## 10.0.0-beta.4
+* [Apple] Merged ios and macos implementation into a new package flutter_secure_storage_darwin
+* [Apple] Refactored code and added missing options
+* [Apple] Added support for swift package manager
+* [Web] Update flutter_secure_storage_platform_interface to be compatible with WASM.
+
+## 10.0.0-beta.3
+* [iOS] Fix delete and deleteAll when synchronizable is set.
+* [iOS] Update migration when value is saved while key already exists with different accessibility option.
+* [Android] Fix deprecation warning.
+
+## 10.0.0-beta.2
+* [Web] Update flutter_secure_storage_platform_interface to be compatible with WASM.
+
+## 10.0.0-beta.1
+This new major release has some big changes. This plugin requires a minimum dart sdk of 3.3.0 or higher
+and a minimum flutter version of 3.19.0.
+
+[Android]
+- By default, encryptedSharedPreferences will be enabled, and cannot be disabled. If there is still
+  data saved by previous versions using encryptedSharedPreferences = false, it will be automatically
+  transferred to encryptedSharedPreferences.
+- Migrated from deprecated Jetpack Crypto library to Google Tink Crypto library.
+- Migrated to Android SDK 35
+- Migrated to Java Version 17
+- Minimum Android SDK is changed from 19 to 23.
+- Migrated to new analyzer and clean-up code.
+- Lots of minor code improvements
+
+[iOS]
+- Change minimum iOS version from 9 to 12
+- Use serial queue for execution of iOS keychain operations
+- Migrated to new analyzer and clean-up code.
+
+[Web]
+- Web is now migrated to be compatible with WASM.
+- The parameter useSessionStorage is added to WebOptions, which you can use to save in session storage
+  instead of local storage.
+- Migrated to new analyzer and clean-up code.
+
+[Windows]
+- Migrates to `win32` version 5.5.4 to support Dart 3.4 / Flutter 3.22.0.
+- Migrated to new analyzer and clean-up code.
+
+[Platform Interface]
+- Migrated to new analyzer and clean-up code.
+
+## 9.2.4
+* [Android] Fix errors when building for release by upgrading Tink to 1.9.0.
+* [iOS] Fix delete and deleteAll when synchronizable is set.
+* [iOS] Update migration when value is saved while key already exists with different accessibility option.
+
+## 9.2.3
+* [iOS] Fix for issue #711: The specified item already exists in the keychain.
+* [Linux] Fix json.dump with indentations.
+* [Web] Update web dependency support to support <2.0.0 instead of <1.0.0.
+* [Web] Add wrapKey and wrapKeyIv parameters to webOptions. See readme for more information.
+* [macOS] Added useDataProtectionKeyChain parameter.
+
+## 9.2.2
+[iOS, macOS] Fixed an issue which caused the readAll and deleteAll to not work properly.
+
+## 9.2.1
+* Fix async race condition bug in storage operations.
+* [macOS] Return nil on macOS if key is not found
+
+## 9.2.0
+New Features:
+* [iOS, macOS] Reintroduced isProtectedDataAvailable.
+* Listener functionality via `FlutterSecureStorage().registerListener()`
+
+Bugs Fixed:
+* [iOS] Return nil on iOS read if key is not found
+* [macOS] Also set kSecUseDataProtectionKeychain on read for macos.
+
+## 9.1.1
+Reverts new feature because of breaking changes.
+* [iOS, macOS] Added isProtectedDataAvailable, A boolean value that indicates whether content protection is active.
+
+## 9.1.0
+New Features:
+* [iOS, macOS] Added isProtectedDataAvailable, A boolean value that indicates whether content protection is active.
+
+Improvements:
+* [iOS, macOS] Use accessibility option for all operations
+* [iOS, macOS] Added privacy manifest
+* [iOS] Fixes error when no item exists
+* [Linux] Fixed search with schemas fails in cold keyrings
+* [Linux] Fixed erase called on null
+* [Android] Fixed native Android stacktraces in PlatformExceptions
+* [Android] Fixed exception when reading data after boot
+
+## 9.0.0
+Breaking changes:
+* [Windows] Migrated to FFI with win32 package.
+
+## 8.1.0
+* [Android] Upgraded to Gradle 8.
+* [Android] Fixed resetOnError not working.
+* [Windows] Changed PathNotFoundException to FileSystemException to be backwards compatible with Flutter SDK 2.12.0.
+* [Windows] Applied lint suggestions.
+* [Linux] Remove and replace libjsoncpp1 dependency.
+* [Linux, macOS, Windows, Web] Update Dart SDK Constraint to support <4.0.0 instead of <3.0.0.
+
+## 8.0.0
+Breaking changes:
+* [macOS] The minimum macOS version supported is now 10.14.
+
+Other changes:
+* [Android] Fixed an issue when Encrypted Shared Preferences failed, the fallback would not handle the data correctly.
+* [Windows] Write encrypted data to files instead of the windows credential system.
+* [Linux] Fixed an issue with memory management.
+
+## 7.0.2
+[macOS] Fix issue with plugin name.
+
+## 7.0.1
+[Android] Reverted double initialization of the SharedPreferences because this will break mixed usage of secureSharedPreference on Android.
+
+## 7.0.0
+Breaking changes:
+* [macOS] The minimum macOS version supported is now 10.13.
+
+Other changes:
+* [Android] Fixed double initialization of the SharedPreferences which caused containsKey and other functions to not work properly.
+* [macOS] Upgraded codebase to swift which fixed containsKey always returning true.
+
+## 6.1.0
+* [iOS] (From 6.1.0-beta.1) Migrated from objective C to Swift. This also fixes issues with containsKey and possibly other issues.
+* [Android] Upgrade security-crypto from 1.1.0-alpha03 to 1.1.0-alpha04
+* [Android] Fix deprecation warnings.
+* [All] Migrated from flutter_lints to lint and applied suggestions.
+
+## 6.1.0-beta.1
+* [iOS] Migrated from objective C to Swift. This also fixes issues with containsKey and possibly other issues.
+
+## 6.0.0
+* [Android] Upgrade to Android SDK 33.
+
+## 5.1.2
+This version reverts some breaking changes of update 5.1.0.
+These changes will become available in version 6.0.0
+* [Android] Revert upgrade to Android SDK 33.
+
+## 5.1.1
+* Example app dependencies updated
+* Updated homepage
+
+## 5.1.0
+* [Android] You can now select your own key prefix or database name.
+* [Android] Upgraded to Android SDK 33.
+* [Android] You can now select the keyCipherAlgorithm and storageCipherAlgorithm.
+* [Linux] Fixed an issue where no error was being reported if there was something wrong accessing the secret service.
+* [macOS] Fixed an memory-leak.
+* [macOS] You can now select the same options as for iOS.
+
+## 5.0.2
+* [Android] Fixed bug where sharedPreference object was not yet initialized.
+
+## 5.0.1
+* [Android] Added java 8 requirement for gradle build.
+
+## 5.0.0
+First stable release of flutter_secure_storage for multi-platform!
+Please see all beta release notes for changes.
+
+This first release also fixes several stability issues on Android regarding encrypted shared
+preferences.
+
+## [5.0.0-beta.5]
+* [Linux, iOS & macOS] Add containsKey function.
+* [Linux] Fix for use of undeclared identifier 'flutter_secure_storage_linux_plugin_register_with_registrar'
+
+## [5.0.0-beta.4]
+* [Windows] Fixed application crashing when key doesn't exists.
+* [Web] Added prefix to local storage key when deleting, fixing items that wouldn't delete.
+
+## [5.0.0-beta.3]
+* [Android] Add possibility to reset data when an error occurs.
+* [Windows] Add readAll, deleteAll and containsKey functions.
+* [All] Refactor option defaults.
+
+## [5.0.0-beta.2]
+* [Android] Improved EncryptedSharedPreferences by not loading unused Cipher.
+* [Android] Removed deprecated classes
+* [Web] Improved containsKey function
+
+## [5.0.0-beta.1]
+Initial BETA support for macOS, web & Windows. Development is still ongoing so expect some functions to not work correctly!
+Please read the readme.md for information about every platform.
+
+* Migrated to a federated project structure. [#254](https://github.com/mogol/flutter_secure_storage/pull/257). Thanks [jhancock4d](https://github.com/jhancock4d)
+* Added support for encrypted shared preferences on Android. [#259](https://github.com/mogol/flutter_secure_storage/pull/259)
+
+## [4.2.1]
+* Added kSecAttrSynchronizable support by setting IOSOptions.synchronizable  [#51](https://github.com/mogol/flutter_secure_storage/issues/51)
+* Changed deprecated jcenter to mavenCentral [#246](https://github.com/mogol/flutter_secure_storage/pull/246)
+
+## [4.2.0]
+* Remove Strongbox for Android [225](https://github.com/mogol/flutter_secure_storage/pull/225). Thanks [JordyLangen](https://github.com/JordyLangen).
+
+## [4.1.0]
+* Add support for Linux [185](https://github.com/mogol/flutter_secure_storage/pull/185). Thanks [talhabalaj](https://github.com/talhabalaj)
+* Improve first-time read speed on Android by not creating cipher when key is not present. Thanks [PieterAelse](https://github.com/PieterAelse)
+* Make it possible to customize iOS account name(kSecAttrService). Thanks [klyver](https://github.com/klyver)
+
+## [4.0.0]
+* Introduce null-safety. Thanks [Steve Alexander](https://github.com/SteveAlexander)
+
+## [3.3.5]
+* Fix thread safety issues in android code to close [161](https://github.com/mogol/flutter_secure_storage/issues/161). Thanks [koskimas](https://github.com/koskimas)
+
+## [3.3.4]
+* Fix Android hanging UI on StorageCipher initialization [#116](https://github.com/mogol/flutter_secure_storage/issues/116) by [morrica](https://github.com/morrica)
+* Fix crash only observed for v2 apps [#124](https://github.com/mogol/flutter_secure_storage/pull/124) by [lidongze91](https://github.com/lidongze91)
+* Fix crash when generating keys in android with RTL locales [#132](https://github.com/mogol/flutter_secure_storage/pull/132) by [iassal](https://github.com/iassal)
+* Fix returning the error as String rather than Exception [#134](https://github.com/mogol/flutter_secure_storage/issues/134) by [wytesk133](https://github.com/wytesk133)s
+* Fix Android crash onDetachedFromEngine when init fails [#144](https://github.com/mogol/flutter_secure_storage/issues/144) by [iassal](https://github.com/iassal)
+* Handle null value at write function [#95](https://github.com/mogol/flutter_secure_storage/issues/95) by [ewertonrp](https://github.com/ewertonrp)
+*  Add support for containsKey [#139](https://github.com/mogol/flutter_secure_storage/issues/139) by [iassal](https://github.com/iassal)
+
+## [3.3.3]
+* Fix compatibility with non-AndroidX project. [AndroidX Migration](https://flutter.dev/docs/development/androidx-migration) is recommended.
+
+## [3.3.2]
+* Migrate to Android v2 embedder.
+* Adds support for specifying [iOS Keychain Item Accessibility](https://developer.apple.com/documentation/security/keychain_services/keychain_items/restricting_keychain_item_accessibility?language=objc).
+
+## [3.3.1+2]
+* Fix iOS build warning [Issue 30](https://github.com/mogol/flutter_secure_storage/issues/30)
+
+## [3.3.1+1]
+* Fix Android Manifest error [Issue 77](https://github.com/mogol/flutter_secure_storage/issues/77) and [Issue 79](https://github.com/mogol/flutter_secure_storage/issues/79). Thanks [nate-eisner](https://github.com/nate-eisner).
+
+## [3.3.1]
+* Fix crash without [iOSOptions](https://github.com/mogol/flutter_secure_storage/issues/73).
+
+## [3.3.0]
+* Added groupId for iOS keychain sharing. Thanks [Maleandr](https://github.com/Maleandr).
+* Fix Gradle version in `gradle-wrapper.properties`. Thanks [blasten](https://github.com/blasten).
+* Added minimum sdk requirement on AndroidManifest. Thanks [lidongze91](https://github.com/lidongze91).
+
+## [3.2.1]
+* Fix Android 9.0 Pie [KeyStore exception](https://github.com/mogol/flutter_secure_storage/issues/46).
+
+## [3.2.0]
+* **Breaking change**. Migrate from the deprecated original Android Support Library to AndroidX. This shouldn't result in any functional changes, but it requires any Android apps using this plugin to [also migrate](https://developer.android.com/jetpack/androidx/migrate) if they're using the original support library. Thanks [I-am-original](https://github.com/I-am-original).
+* Enable StrongBox on Android devices that support it. Thanks [bbedward](https://github.com/bbedward).
+
+## [3.1.3]
+* Fix Android 9.0 Pie KeyStore exception. Thanks [hacker1024](https://github.com/hacker1024)
+
+## [3.1.2]
+* Added recreating secretKey if its decoding failed. Fix for [unwrap key](https://github.com/mogol/flutter_secure_storage/issues/13). Thanks [hnvn](https://github.com/hnvn).
+
+## [3.1.1]
+* Suppress warning about unchecked operations when compiling for Android.
+
+## [3.1.0]
+* Added `readAll` and `deleteAll`.
+
+## [3.0.0]
+* **Breaking change**. Changed payloads encryption for Android from RSA to AES, AES secret key is encrypted with RSA.
+
+## [2.0.0]````
+* **Breaking change**. Changed key alias to fix Android 4.4.2 issue. The plugin isn't able to get previous stored data.
+
+## [1.0.0]
+* Bump version
+
+## [0.0.1]
+
+* Initial release

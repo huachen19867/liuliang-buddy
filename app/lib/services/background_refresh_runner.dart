@@ -131,8 +131,8 @@ Future<Map<String, Object?>?> _runScheduledRefresh() async {
         result = const _HeadlessResult(
           CarrierSnapshot(
             carrier: Carrier.unicom,
-            status: QueryStatus.authExpired,
-            message: '联通 App 会话不可用，请打开应用重新连接',
+            status: QueryStatus.error,
+            message: '联通本地会话暂时无法读取，请打开应用检查或重试',
           ),
         );
       }
@@ -173,18 +173,17 @@ Future<Map<String, Object?>?> _runScheduledRefresh() async {
         if (appResult != null &&
             jsonEncode(appResult.session.toJson()) != appSessionRaw) {
           try {
-            await _secureStorage.write(
-              key: UnicomAppSession.storageKey(account.id),
-              value: jsonEncode(appResult.session.toJson()),
-            );
+            await _secureStorage
+                .write(
+                  key: UnicomAppSession.storageKey(account.id),
+                  value: jsonEncode(appResult.session.toJson()),
+                )
+                .timeout(const Duration(seconds: 3));
           } catch (_) {
-            // A failed renewal save must not block the following accounts.
-            result = const _HeadlessResult(
-              CarrierSnapshot(
-                carrier: Carrier.unicom,
-                status: QueryStatus.authExpired,
-                message: '联通新会话暂未保存，请打开应用重新连接',
-              ),
+            // Local persistence is not a server authentication failure. The
+            // native completion queue still owns any pending write.
+            result = _HeadlessResult(
+              result.snapshot.copyWith(message: '查询已结束，登录资料保存尚未完成；下次可能需要重新连接'),
             );
           }
           if (!await _isTaskCurrent()) return null;
@@ -196,11 +195,16 @@ Future<Map<String, Object?>?> _runScheduledRefresh() async {
       snapshots[account.id] = result.snapshot;
       await prefs.setBool('background_auth_required_${account.id}', false);
       if (carrier == Carrier.broadnet) {
-        await _saveBroadnetSession(
+        final savedSession = await _saveBroadnetSession(
           account,
           result.session,
           expected: result.initialSession,
         );
+        if (!savedSession) {
+          snapshots[account.id] = result.snapshot.copyWith(
+            message: '流量已更新，登录资料保存尚未完成；下次可能需要重新连接',
+          );
+        }
       }
     } else {
       snapshots[account.id] = previous.copyWith(
@@ -633,27 +637,28 @@ Future<Map<String, dynamic>?> _readBroadnetSession(
 bool _validBroadnetSession(Map<String, dynamic> session) =>
     normalizeBroadnetSession(session) != null;
 
-Future<void> _saveBroadnetSession(
+Future<bool> _saveBroadnetSession(
   CarrierAccount account,
   Map<String, dynamic>? session, {
   required Map<String, dynamic>? expected,
 }) async {
-  if (session == null || !_validBroadnetSession(session)) return;
+  if (session == null || !_validBroadnetSession(session)) return false;
   try {
     final captured = captureBroadnetSession(
       session,
       capturedAt: DateTime.now(),
     );
-    if (captured == null) return;
+    if (captured == null) return false;
     if (!sameBroadnetSession(await _readBroadnetSession(account), expected) ||
         !await _isTaskCurrent()) {
-      return;
+      return false;
     }
-    await _secureStorage.write(
-      key: account.broadnetSessionKey,
-      value: jsonEncode(captured),
-    );
+    await _secureStorage
+        .write(key: account.broadnetSessionKey, value: jsonEncode(captured))
+        .timeout(const Duration(seconds: 3));
+    return true;
   } catch (_) {
     // The balance remains useful; the next refresh may need foreground login.
+    return false;
   }
 }

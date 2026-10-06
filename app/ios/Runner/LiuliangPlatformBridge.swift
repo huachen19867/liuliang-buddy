@@ -113,6 +113,9 @@ final class LiuliangPlatformBridge: NSObject, UNUserNotificationCenterDelegate {
     private func handleNotification(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         let center = UNUserNotificationCenter.current()
         switch call.method {
+        case "getAppVersion":
+            result(["name": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
+                    "code": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""])
         case "requestPermission":
             center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
                 DispatchQueue.main.async { result(granted) }

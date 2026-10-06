@@ -30,6 +30,9 @@ import 'services/telecom_page_probe.dart';
 import 'services/response_policy.dart';
 import 'services/refresh_throttle.dart';
 import 'services/query_state.dart';
+import 'services/query_round.dart';
+import 'services/query_health.dart';
+import 'ui/query_health_screen.dart';
 import 'services/widget_bridge.dart';
 import 'services/ios_account_profiles.dart';
 import 'ui/dashboard_screen.dart';
@@ -115,6 +118,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   final Map<String, InAppWebViewController> _controllers = {};
   final Set<String> _connected = {};
   final Map<String, Timer> _timeouts = {};
+  final QueryRoundRegistry _webRounds = QueryRoundRegistry();
+  final Map<String, String> _webCommitEpochs = {};
+  final Map<String, DateTime> _lastQueryAttempts = {};
+  final Set<String> _storagePendingAccounts = {};
   final Map<String, MobileQueryAssembly> _mobileQueries = {};
   final RefreshThrottle _refreshThrottle = RefreshThrottle();
   final Map<String, bool> _warnedLow = {};
@@ -145,6 +152,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   bool _clearing = false;
   bool _profileClearPending = false;
   bool _widgetPinPending = false;
+  bool _widgetSyncPending = false;
   Future<void> _storageTasks = Future<void>.value();
 
   bool _current(int generation) =>
@@ -246,6 +254,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   }
 
   void _settleInterruptedQueries() {
+    _webRounds.clear();
+    _webCommitEpochs.clear();
     for (final carrier in Carrier.values) {
       _snapshots[carrier] = settleInterruptedQuery(_snapshots[carrier]!);
     }
@@ -373,13 +383,20 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     final generation = _generation;
     await _store(() async {
       if (_current(generation)) {
-        await _widgetBridge.update(
-          _snapshots.values,
-          _thresholdGb,
-          selection: _selection,
-          accounts: _accounts,
-          accountSnapshots: _accountSnapshots,
-        );
+        try {
+          await _widgetBridge
+              .update(
+                _snapshots.values,
+                _thresholdGb,
+                selection: _selection,
+                accounts: _accounts,
+                accountSnapshots: _accountSnapshots,
+              )
+              .timeout(const Duration(seconds: 3));
+          _widgetSyncPending = false;
+        } on Exception {
+          _widgetSyncPending = true;
+        }
       }
     });
   }
@@ -768,6 +785,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     }
     _appQueryTickets.remove(accountId);
     _inFlight.remove(accountId);
+    _webRounds.cancel(accountId);
+    _webCommitEpochs.remove(accountId);
     if (!_unicomAppAccounts.contains(accountId)) {
       _connectOfficialAccount(accountId);
       return;
@@ -775,7 +794,9 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     try {
       await _store(() async {
         if (!_current(generation)) return;
-        await _secure.delete(key: UnicomAppSession.storageKey(accountId));
+        await _secure
+            .delete(key: UnicomAppSession.storageKey(accountId))
+            .timeout(const Duration(seconds: 3));
         await _prefs?.remove('unicom_query_method_$accountId');
         await _prefs?.setBool('background_auth_required_$accountId', false);
       });
@@ -892,10 +913,12 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         // A verified renewal can rotate the token even if a later query fails.
         // Preserve that session; an unauthenticated failed import never replaces it.
         if (accepted) {
-          await _secure.write(
-            key: UnicomAppSession.storageKey(id),
-            value: jsonEncode(result.session.toJson()),
-          );
+          await _secure
+              .write(
+                key: UnicomAppSession.storageKey(id),
+                value: jsonEncode(result.session.toJson()),
+              )
+              .timeout(const Duration(seconds: 3));
         }
         if (!current()) return;
         if (accepted) {
@@ -998,41 +1021,43 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     InAppWebViewController controller,
     int generation,
   ) async {
+    final epoch =
+        _webRounds.current(account.id) ??
+        _armOfficialTimeout(account, generation, openingLogin: true);
     try {
-      await controller.loadUrl(
-        urlRequest: URLRequest(url: WebUri(_loginUrl(account.carrier))),
-      );
+      await _installQueryEpoch(controller, epoch);
+      if (!_ownsWebRound(account.id, epoch, generation)) return;
+      await controller
+          .loadUrl(
+            urlRequest: URLRequest(url: WebUri(_loginUrl(account.carrier))),
+          )
+          .timeout(const Duration(seconds: 15));
     } on Exception {
-      if (!_current(generation)) return;
-      _openingLogin.remove(account.id);
-      _awaitingLoginReturn.remove(account.id);
-      _timeouts[account.id]?.cancel();
-      setState(
-        () => _putSnapshot(
-          account,
-          _snapshot(
-            account,
-          ).copyWith(status: QueryStatus.error, message: '官方登录页暂时无法打开，请重试'),
-        ),
-      );
-      unawaited(_publishWidget());
+      _failWebRound(account, epoch, generation, '官方登录页暂时无法打开，请重试');
     }
   }
 
-  void _armOfficialTimeout(
+  String _armOfficialTimeout(
     CarrierAccount account,
     int generation, {
     bool openingLogin = false,
   }) {
     final accountId = account.id;
+    final epoch = _webRounds.begin(accountId);
+    _webCommitEpochs.remove(accountId);
+    _lastQueryAttempts[accountId] = DateTime.now();
     _timeouts[accountId]?.cancel();
     _mobileQueries.remove(accountId)?.cancel();
     _timeouts[accountId] = Timer(const Duration(seconds: 35), () {
-      if (!_current(generation)) return;
+      if (!_ownsWebRound(accountId, epoch, generation)) return;
       final pending = openingLogin
           ? _openingLogin.remove(accountId)
           : _inFlight.remove(accountId);
       if (!pending) return;
+      _webRounds.finish(accountId, epoch);
+      _webCommitEpochs[accountId] = epoch;
+      _refreshThrottle.loginOrLoadFailed(accountId);
+      _mobileQueries.remove(accountId)?.cancel();
       if (openingLogin) _awaitingLoginReturn.remove(accountId);
       final failed = _snapshot(account).copyWith(
         status: QueryStatus.error,
@@ -1048,7 +1073,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       });
       unawaited(
         _store(() async {
-          if (_current(generation)) {
+          if (_current(generation) && _webCommitEpochs[accountId] == epoch) {
             await _prefs?.setString(
               account.snapshotKey,
               jsonEncode(failed.toJson()),
@@ -1058,6 +1083,58 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       );
       unawaited(_publishWidget());
     });
+    return epoch;
+  }
+
+  bool _ownsWebRound(String id, String epoch, int generation) =>
+      _current(generation) && _webRounds.isCurrent(id, epoch);
+
+  Future<void> _installQueryEpoch(
+    InAppWebViewController controller,
+    String epoch, {
+    bool currentDocument = false,
+  }) async {
+    final script = 'window.__liuliangQueryEpoch = ${jsonEncode(epoch)};';
+    await controller
+        .removeUserScriptsByGroupName(groupName: 'queryEpoch')
+        .timeout(const Duration(seconds: 2));
+    await controller
+        .addUserScript(
+          userScript: UserScript(
+            groupName: 'queryEpoch',
+            source: script,
+            injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+          ),
+        )
+        .timeout(const Duration(seconds: 2));
+    // Full navigations keep the old document's epoch untouched. Only an
+    // explicit authenticated SPA rescan adopts a new epoch in the same DOM.
+    if (currentDocument) {
+      await controller
+          .evaluateJavascript(source: script)
+          .timeout(const Duration(seconds: 2));
+    }
+  }
+
+  void _failWebRound(
+    CarrierAccount account,
+    String epoch,
+    int generation,
+    String message,
+  ) {
+    if (!_ownsWebRound(account.id, epoch, generation)) return;
+    _webRounds.finish(account.id, epoch);
+    _timeouts[account.id]?.cancel();
+    _mobileQueries.remove(account.id)?.cancel();
+    _inFlight.remove(account.id);
+    _openingLogin.remove(account.id);
+    _awaitingLoginReturn.remove(account.id);
+    _refreshThrottle.loginOrLoadFailed(account.id);
+    final failed = _snapshot(
+      account,
+    ).copyWith(status: QueryStatus.error, message: message);
+    setState(() => _putSnapshot(account, failed));
+    unawaited(_publishWidget());
   }
 
   Future<void> _resumeTelecomRenderedReturn(
@@ -1082,8 +1159,14 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _armOfficialTimeout(account, generation);
       unawaited(_publishWidget());
     }
+    final epoch = _webRounds.current(id);
+    if (epoch == null) return;
     try {
-      await controller.evaluateJavascript(source: telecomRenderedCaptureScript);
+      await _installQueryEpoch(controller, epoch, currentDocument: true);
+      if (!_ownsWebRound(id, epoch, generation)) return;
+      await controller
+          .evaluateJavascript(source: telecomRenderedCaptureScript)
+          .timeout(const Duration(seconds: 2));
     } on Exception {
       // The active 35-second deadline settles an unavailable rendered page.
     }
@@ -1150,26 +1233,15 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       ),
     );
     unawaited(_publishWidget());
-    _armOfficialTimeout(account, generation);
+    final epoch = _armOfficialTimeout(account, generation);
     try {
-      await controller.loadUrl(
-        urlRequest: URLRequest(url: WebUri(_queryUrl(carrier))),
-      );
+      await _installQueryEpoch(controller, epoch);
+      if (!_ownsWebRound(accountId, epoch, generation)) return;
+      await controller
+          .loadUrl(urlRequest: URLRequest(url: WebUri(_queryUrl(carrier))))
+          .timeout(const Duration(seconds: 15));
     } catch (_) {
-      _timeouts[accountId]?.cancel();
-      _inFlight.remove(accountId);
-      _refreshThrottle.loginOrLoadFailed(accountId);
-      if (_current(generation)) {
-        setState(
-          () => _putSnapshot(
-            account,
-            _snapshot(
-              account,
-            ).copyWith(status: QueryStatus.error, message: '官方查询页暂时无法打开'),
-          ),
-        );
-        unawaited(_publishWidget());
-      }
+      _failWebRound(account, epoch, generation, '官方查询页暂时无法打开，请重试');
     }
   }
 
@@ -1193,6 +1265,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         ? payload['stage'] as String
         : null;
     if (!isCarrierResponseAllowed(carrier, url, page, stage)) return;
+    final epoch = payload['queryEpoch'];
+    if (epoch is! String || !_ownsWebRound(accountId, epoch, generation)) {
+      return;
+    }
     if (!_inFlight.contains(accountId) &&
         !_awaitingLoginReturn.contains(accountId)) {
       return;
@@ -1201,9 +1277,11 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     final controller = _controllers[accountId];
     if (controller == null) return;
     try {
-      final currentUrl = await controller.getUrl();
-      if (!_current(generation) ||
-          !_selection.allows(carrier) ||
+      final currentUrl = await controller.getUrl().timeout(
+        const Duration(seconds: 2),
+      );
+      if (!_ownsWebRound(accountId, epoch, generation)) return;
+      if (!_selection.allows(carrier) ||
           currentUrl == null ||
           page == null ||
           !isCarrierResponsePageCurrent(
@@ -1211,9 +1289,11 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
             page,
             Uri.tryParse(currentUrl.toString()) ?? Uri(),
           )) {
+        _failWebRound(account, epoch, generation, '查询页面已变化，请重新查询');
         return;
       }
     } on Exception {
+      _failWebRound(account, epoch, generation, '查询页面校验未完成，请重试');
       return;
     }
     final raw = payload['body'];
@@ -1272,6 +1352,12 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       // A confirmed allowance response has met the original query deadline.
       // Only the short independent money wait remains.
       _timeouts[accountId]?.cancel();
+      // Keep a terminal deadline even if a plugin/page validation fails after
+      // the allowance response. Cancelling the original timer alone stranded
+      // loading accounts forever.
+      _timeouts[accountId] = Timer(const Duration(seconds: 9), () {
+        _failWebRound(account, epoch, generation, '本次查询未完成，请重试');
+      });
       try {
         await controller
             .evaluateJavascript(source: mobileBalanceCaptureScript)
@@ -1280,21 +1366,26 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         // Missing money must not discard a successful allowance response.
       }
       snapshot = await mobileQuery.assemble(snapshot);
-      if (!_current(generation) ||
+      if (!_ownsWebRound(accountId, epoch, generation) ||
           !identical(_mobileQueries[accountId], mobileQuery)) {
         return;
       }
       try {
-        final latestUrl = await controller.getUrl();
+        final latestUrl = await controller.getUrl().timeout(
+          const Duration(seconds: 2),
+        );
+        if (!_ownsWebRound(accountId, epoch, generation)) return;
         if (latestUrl == null ||
             !isCarrierResponsePageCurrent(
               carrier,
               page,
               Uri.tryParse(latestUrl.toString()) ?? Uri(),
             )) {
+          _failWebRound(account, epoch, generation, '查询页面已变化，请重新查询');
           return;
         }
       } on Exception {
+        _failWebRound(account, epoch, generation, '查询页面校验未完成，请重试');
         return;
       }
     }
@@ -1309,7 +1400,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       // plaintext raw success if that event was not observed.
       return;
     }
-    if (!_current(generation) ||
+    if (!_ownsWebRound(accountId, epoch, generation) ||
         (mobileQuery != null &&
             !identical(_mobileQueries[accountId], mobileQuery)) ||
         (!_inFlight.contains(accountId) &&
@@ -1317,6 +1408,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       return;
     }
     final hadPreviousQuery = _snapshot(account).queriedAt != null;
+    _webRounds.finish(accountId, epoch);
+    _webCommitEpochs[accountId] = epoch;
     _timeouts[accountId]?.cancel();
     _inFlight.remove(accountId);
     _awaitingLoginReturn.remove(accountId);
@@ -1328,9 +1421,9 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           ).copyWith(status: snapshot.status, message: snapshot.message);
     setState(() => _putSnapshot(account, displayed));
     await _publishWidget();
-    if (!_current(generation)) return;
+    if (!_current(generation) || _webCommitEpochs[accountId] != epoch) return;
     await _store(() async {
-      if (_current(generation)) {
+      if (_current(generation) && _webCommitEpochs[accountId] == epoch) {
         await _prefs?.setString(
           account.snapshotKey,
           jsonEncode(displayed.toJson()),
@@ -1345,10 +1438,15 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         }
       }
     });
-    if (!_current(generation)) return;
+    if (!_current(generation) || _webCommitEpochs[accountId] != epoch) return;
     if (snapshot.status == QueryStatus.success) {
       if (carrier == Carrier.broadnet) {
-        await _saveVerifiedBroadnetSession(account, controller, generation);
+        await _saveVerifiedBroadnetSession(
+          account,
+          controller,
+          generation,
+          epoch,
+        );
       }
       if (!_current(generation)) return;
       if (!hadPreviousQuery) await _syncBackgroundSchedule();
@@ -1389,44 +1487,58 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     CarrierAccount account,
     InAppWebViewController controller,
     int generation,
+    String epoch,
   ) async {
-    if (!_current(generation)) return;
+    if (!_current(generation) || _webCommitEpochs[account.id] != epoch) return;
     try {
       final result = await controller
           .evaluateJavascript(source: broadnetSessionCaptureScript)
           .timeout(const Duration(seconds: 2));
-      if (!_current(generation)) return;
+      if (!_current(generation) || _webCommitEpochs[account.id] != epoch) {
+        return;
+      }
       final session = captureBroadnetSession(
         result,
         capturedAt: DateTime.now(),
       );
       if (session == null) return;
       await _store(() async {
-        if (_current(generation)) {
-          await _secure.write(
-            key: account.broadnetSessionKey,
-            value: jsonEncode(session),
-          );
+        if (_current(generation) && _webCommitEpochs[account.id] == epoch) {
+          await _secure
+              .write(
+                key: account.broadnetSessionKey,
+                value: jsonEncode(session),
+              )
+              .timeout(const Duration(seconds: 3));
         }
       });
-      if (!_current(generation)) return;
+      if (!_current(generation) || _webCommitEpochs[account.id] != epoch) {
+        return;
+      }
+      _storagePendingAccounts.remove(account.id);
       _broadnetSessions[account.id] = session;
       // Document-start scripts retain their original source. Replace the
       // backup after an official rotation rather than restoring old keys on
       // a later reload with empty sessionStorage.
-      await controller.removeUserScriptsByGroupName(
-        groupName: 'broadnetRestore',
-      );
-      if (!_current(generation)) return;
-      await controller.addUserScript(
-        userScript: UserScript(
-          groupName: 'broadnetRestore',
-          source: broadnetSessionRestoreScript(session),
-          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-        ),
-      );
+      await controller
+          .removeUserScriptsByGroupName(groupName: 'broadnetRestore')
+          .timeout(const Duration(seconds: 2));
+      if (!_current(generation) || _webCommitEpochs[account.id] != epoch) {
+        return;
+      }
+      await controller
+          .addUserScript(
+            userScript: UserScript(
+              groupName: 'broadnetRestore',
+              source: broadnetSessionRestoreScript(session),
+              injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+            ),
+          )
+          .timeout(const Duration(seconds: 2));
     } catch (_) {
-      /* Official login remains usable for this WebView session. */
+      if (_current(generation) && _webCommitEpochs[account.id] == epoch) {
+        _storagePendingAccounts.add(account.id);
+      }
     }
   }
 
@@ -1489,6 +1601,13 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               profileName: _ios ? account.profileName : null,
             ),
             initialUserScripts: UnmodifiableListView([
+              if (_webRounds.current(accountId) != null)
+                UserScript(
+                  groupName: 'queryEpoch',
+                  source:
+                      'window.__liuliangQueryEpoch = ${jsonEncode(_webRounds.current(accountId))};',
+                  injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+                ),
               UserScript(
                 source: responseCaptureScript,
                 injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
@@ -1599,6 +1718,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               if (!_current(generation) || url == null) return;
               final uri = Uri.tryParse(url.toString());
               if (uri != null && isCarrierLoginPage(uri)) {
+                _webRounds.cancel(accountId);
+                _webCommitEpochs.remove(accountId);
                 _timeouts[accountId]?.cancel();
                 _openingLogin.remove(accountId);
                 _inFlight.remove(accountId);
@@ -1640,24 +1761,28 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   !_allowedUrl(carrier, url)) {
                 return;
               }
-              final finishedOpeningLogin = _openingLogin.remove(accountId);
-              if (finishedOpeningLogin) _timeouts[accountId]?.cancel();
               if (isCarrierLoginPage(Uri.parse(url.toString()))) {
+                final observedEpoch = _webRounds.current(accountId);
+                try {
+                  final currentUrl = await controller.getUrl().timeout(
+                    const Duration(seconds: 2),
+                  );
+                  if (!_current(generation) ||
+                      _webRounds.current(accountId) != observedEpoch ||
+                      currentUrl == null ||
+                      !isCarrierLoginPage(Uri.parse(currentUrl.toString()))) {
+                    return;
+                  }
+                } catch (_) {
+                  // Keep the current round's deadline if page checking fails.
+                  return;
+                }
+                _webRounds.cancel(accountId);
+                _webCommitEpochs.remove(accountId);
                 _mobileQueries.remove(accountId)?.cancel();
                 _awaitingLoginReturn.add(accountId);
-                if (carrier == Carrier.broadnet) {
-                  _broadnetSessions.remove(accountId);
-                  await controller.removeUserScriptsByGroupName(
-                    groupName: 'broadnetRestore',
-                  );
-                  await _store(() async {
-                    if (_current(generation)) {
-                      await _secure.delete(key: account.broadnetSessionKey);
-                    }
-                  });
-                }
-                if (!_current(generation)) return;
                 _timeouts[accountId]?.cancel();
+                _openingLogin.remove(accountId);
                 _inFlight.remove(accountId);
                 _refreshThrottle.loginOrLoadFailed(accountId);
                 setState(
@@ -1670,7 +1795,33 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                   ),
                 );
                 unawaited(_publishWidget());
+                if (carrier == Carrier.broadnet) {
+                  _broadnetSessions.remove(accountId);
+                  bool stillAtLogin() =>
+                      _current(generation) &&
+                      _webRounds.current(accountId) == null &&
+                      _snapshot(account).status == QueryStatus.authExpired;
+                  try {
+                    await controller
+                        .removeUserScriptsByGroupName(
+                          groupName: 'broadnetRestore',
+                        )
+                        .timeout(const Duration(seconds: 2));
+                    await _store(() async {
+                      if (stillAtLogin()) {
+                        await _secure
+                            .delete(key: account.broadnetSessionKey)
+                            .timeout(const Duration(seconds: 3));
+                      }
+                    });
+                  } catch (_) {
+                    if (stillAtLogin()) _storagePendingAccounts.add(accountId);
+                  }
+                }
+                return;
               }
+              final finishedOpeningLogin = _openingLogin.remove(accountId);
+              if (finishedOpeningLogin) _timeouts[accountId]?.cancel();
               if (_current(generation) &&
                   !isCarrierLoginPage(Uri.parse(url.toString())) &&
                   (_awaitingLoginReturn.remove(accountId) ||
@@ -1705,20 +1856,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
               if (request.isForMainFrame != true || !_current(generation)) {
                 return;
               }
-              _timeouts[accountId]?.cancel();
-              _openingLogin.remove(accountId);
-              _inFlight.remove(accountId);
-              _refreshThrottle.loginOrLoadFailed(accountId);
-              setState(() {
-                _webMessage = '官方页面暂时无法打开，请检查网络后重试';
-                _putSnapshot(
-                  account,
-                  _snapshot(
-                    account,
-                  ).copyWith(status: QueryStatus.error, message: _webMessage),
-                );
-              });
-              unawaited(_publishWidget());
+              // This native callback carries no document/round identity. A
+              // late error from an old navigation must not terminate a newer
+              // query. Round-aware load failures and deadlines settle queries.
+              setState(() => _webMessage = '官方页面暂时无法打开，请检查网络后重试');
             },
           ),
         ),
@@ -1763,7 +1904,9 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       }
       if (account.carrier == Carrier.broadnet) {
         try {
-          final secureRaw = await _secure.read(key: account.broadnetSessionKey);
+          final secureRaw = await _secure
+              .read(key: account.broadnetSessionKey)
+              .timeout(const Duration(seconds: 3));
           if (secureRaw == null) continue;
           final session = normalizeBroadnetSession(jsonDecode(secureRaw));
           if (session != null) {
@@ -1806,6 +1949,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         query.cancel();
       }
       _mobileQueries.clear();
+      _webRounds.clear();
+      _webCommitEpochs.clear();
       _inFlight.clear();
       _awaitingLoginReturn.clear();
       _openingLogin.clear();
@@ -1919,6 +2064,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         );
         final phoneChanged = account.phoneNumber != next.find(id)?.phoneNumber;
         if (phoneChanged) {
+          _webRounds.cancel(id);
+          _webCommitEpochs.remove(id);
           _mobileQueries.remove(id)?.cancel();
           _awaitingLoginReturn.remove(id);
           final classifications = _trafficClassifications.withoutAccount(id);
@@ -1984,6 +2131,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         query.cancel();
       }
       _mobileQueries.clear();
+      _webRounds.clear();
+      _webCommitEpochs.clear();
       _inFlight.clear();
       _awaitingLoginReturn.clear();
       _openingLogin.clear();
@@ -2012,6 +2161,135 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         _showInfo('卡片暂未保存', '请稍后再试。');
       }
     }
+  }
+
+  Future<void> _queryHealth() async {
+    final generation = _generation;
+    String version = demoMode ? '界面演示' : '版本信息暂不可用';
+    if (_nativeMobile && !demoMode) {
+      try {
+        final info = await _notifications
+            .invokeMapMethod<String, Object?>('getAppVersion')
+            .timeout(const Duration(seconds: 2));
+        if (info?['name'] is String && info?['code'] is String) {
+          version = '${info!['name']}+${info['code']}';
+        }
+      } on Exception {
+        /* Keep an honest unavailable version. */
+      }
+    }
+    final background = _android
+        ? await BackgroundRefreshScheduler.status()
+              .timeout(
+                const Duration(seconds: 2),
+                onTimeout: () =>
+                    const BackgroundRefreshStatus(outcome: 'never'),
+              )
+              .catchError(
+                (Object _) => const BackgroundRefreshStatus(outcome: 'never'),
+              )
+        : const BackgroundRefreshStatus(outcome: 'unsupported_platform');
+    if (!_current(generation)) return;
+    final report = QueryHealthReport(
+      version: version,
+      refreshInterval: _backgroundRefresh.label,
+      backgroundSummary:
+          '${background.label}${_widgetSyncPending ? '；桌面数据同步尚未完成，返回首页后重试' : ''}',
+      backgroundFinishedAt: background.finishedAt,
+      accounts: [
+        for (final account in _visibleAccounts)
+          diagnoseQuery(
+            accountId: account.id,
+            label: account.label,
+            carrier: account.carrier,
+            snapshot: _snapshot(account),
+            checking:
+                _inFlight.contains(account.id) ||
+                _appQueryTickets.containsKey(account.id),
+            cleanupPending: _profileClearPending,
+            authenticationPaused:
+                _prefs?.getBool('background_auth_required_${account.id}') ==
+                true,
+            foregroundOnly: _ios || account.carrier == Carrier.telecom,
+            storagePending: _storagePendingAccounts.contains(account.id),
+            lastAttemptAt: _lastQueryAttempts[account.id],
+          ),
+      ],
+    );
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => QueryHealthScreen(
+          report: report,
+          onAction: (id, action) async {
+            Navigator.of(context).pop();
+            if (!_current(generation)) return;
+            switch (action) {
+              case QueryHealthAction.reconnect:
+                _connectAccount(id);
+              case QueryHealthAction.retry:
+                await _refreshAccount(id);
+              case QueryHealthAction.inspectFields:
+                await _fieldHealth(id);
+              case QueryHealthAction.backgroundSettings:
+                await _settings();
+              case QueryHealthAction.none:
+                break;
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _fieldHealth(String id) async {
+    final account = _account(id);
+    if (account == null) return;
+    final snapshot = _snapshot(account);
+    final missing = snapshot.buckets
+        .where((row) => row.remainingBytes == null && !row.isUnlimited)
+        .toList();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FractionallySizedBox(
+        heightFactor: .65,
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Text(
+                '${account.label} · 待确认字段',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (snapshot.balanceYuan == null)
+                const ListTile(
+                  title: Text('话费余额'),
+                  subtitle: Text('本轮尚未读到可确认的元金额，已读流量继续保留'),
+                ),
+              for (final bucket in missing.take(5))
+                ListTile(
+                  title: Text(bucket.name.isEmpty ? '未命名套餐' : bucket.name),
+                  subtitle: const Text('余量或单位尚未确认，请对照官方页面'),
+                ),
+              if (missing.length > 5)
+                Text('还有 ${missing.length - 5} 项待确认，完整套餐保留在首页明细'),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _connectAccount(id);
+                },
+                child: const Text('打开官方验证入口'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _settings() async {
@@ -2079,6 +2357,16 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                           unawaited(_chooseUnicomConnection(account.id));
                         },
                       ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('连接与刷新检查'),
+                      subtitle: const Text('查看每个号码的有效数据、暂停原因和恢复操作'),
+                      trailing: const Icon(Icons.health_and_safety_outlined),
+                      onTap: () {
+                        Navigator.pop(context);
+                        unawaited(_queryHealth());
+                      },
+                    ),
                     for (final account in _visibleAccounts.where(
                       (a) => !a.isPrimary,
                     ))
@@ -2254,16 +2542,22 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     );
     if (confirm != true) return;
     if (!mounted) return;
+    setState(() {
+      _profileClearPending = true;
+      _settleInterruptedQueries();
+      _webRounds.clear();
+      _webCommitEpochs.clear();
+      _inFlight.clear();
+      _appQueryTickets.clear();
+    });
     try {
       final prefs = _prefs;
       if (prefs == null) throw StateError('Preferences unavailable');
-      await _store(() async {
-        final saved = await prefs.setBool(
-          'account_profiles_cleanup_pending',
-          true,
-        );
-        if (!saved) throw StateError('Pending profile cleanup was not saved');
-      });
+      // This safety marker must not wait behind a stalled credential write.
+      final saved = await prefs
+          .setBool('account_profiles_cleanup_pending', true)
+          .timeout(const Duration(seconds: 2));
+      if (!saved) throw StateError('Pending profile cleanup was not saved');
     } catch (_) {
       _showInfo('暂时无法清除', '无法保存网页会话清理状态，请稍后重试。');
       return;
@@ -2283,6 +2577,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         query.cancel();
       }
       _mobileQueries.clear();
+      _webRounds.clear();
+      _webCommitEpochs.clear();
       _inFlight.clear();
       _awaitingLoginReturn.clear();
       _openingLogin.clear();
@@ -2291,41 +2587,51 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       try {
         await BackgroundRefreshScheduler.configure(
           BackgroundRefreshInterval.off,
-        );
+        ).timeout(const Duration(seconds: 3));
       } on PlatformException {
         // Continue clearing local credentials even if WorkManager is unavailable.
       } on MissingPluginException {
         // Older installs may not expose the scheduler channel.
+      } on TimeoutException {
+        // The persisted cleanup marker still prevents new background queries.
       }
     }
     for (final timer in _timeouts.values) {
       timer.cancel();
     }
+    var viewsStopped = true;
     await Future.wait(
       oldControllers.map((controller) async {
         try {
-          await controller.stopLoading();
+          await controller.stopLoading().timeout(const Duration(seconds: 2));
         } on Exception {
-          /* View is already disposed. */
+          viewsStopped = false;
         }
       }),
     );
     await WidgetsBinding.instance.endOfFrame;
-    await _storageTasks;
     var profilesCleared = !_nativeMobile || demoMode;
-    var otherDataCleared = true;
+    var otherDataCleared = viewsStopped;
+    try {
+      await _storageTasks.timeout(const Duration(seconds: 5));
+    } catch (_) {
+      otherDataCleared = false;
+    }
     if (_nativeMobile) {
       try {
-        await CookieManager.instance().deleteAllCookies();
-        await WebStorageManager.instance().deleteAllData();
+        await CookieManager.instance().deleteAllCookies().timeout(
+          const Duration(seconds: 3),
+        );
+        await WebStorageManager.instance().deleteAllData().timeout(
+          const Duration(seconds: 3),
+        );
       } catch (_) {
         otherDataCleared = false;
       }
       try {
         if (_android) {
           profilesCleared =
-              await android_webview
-                  .AndroidInAppWebViewController.deleteAccountProfiles(
+              await android_webview.AndroidInAppWebViewController.deleteAccountProfiles(
                 profilesMayExist:
                     (_prefs?.getBool('account_profiles_may_exist') ?? false) ||
                     _accounts.accounts.any((account) => !account.isPrimary) ||
@@ -2342,22 +2648,26 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                                 false),
                       ),
                     ),
-              );
+              ).timeout(const Duration(seconds: 5));
         } else if (_ios) {
-          await IOSAccountProfiles.clearAll();
+          await IOSAccountProfiles.clearAll().timeout(
+            const Duration(seconds: 5),
+          );
           profilesCleared = true;
         }
       } catch (_) {
         profilesCleared = false;
       }
       try {
-        await _widgetBridge.clear();
+        await _widgetBridge.clear().timeout(const Duration(seconds: 3));
       } catch (_) {
         otherDataCleared = false;
       }
       try {
-        await _notifications.invokeMethod('cancelAll');
-      } on PlatformException {
+        await _notifications
+            .invokeMethod('cancelAll')
+            .timeout(const Duration(seconds: 2));
+      } on Exception {
         /* No active notifications. */
       }
     }
@@ -2368,14 +2678,18 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       ]) {
         try {
           if (carrier == Carrier.broadnet) {
-            await _secure.delete(
-              key: id == carrier.name
-                  ? 'broadnet_session'
-                  : 'broadnet_session_$id',
-            );
+            await _secure
+                .delete(
+                  key: id == carrier.name
+                      ? 'broadnet_session'
+                      : 'broadnet_session_$id',
+                )
+                .timeout(const Duration(seconds: 3));
           }
           if (carrier == Carrier.unicom) {
-            await _secure.delete(key: UnicomAppSession.storageKey(id));
+            await _secure
+                .delete(key: UnicomAppSession.storageKey(id))
+                .timeout(const Duration(seconds: 3));
             await _prefs?.remove('unicom_query_method_$id');
           }
           for (final key in [
@@ -2548,6 +2862,8 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _webRounds.clear();
+    _webCommitEpochs.clear();
     if (_nativeMobile && !demoMode) _widgetBridge.onOpen(null);
     WidgetsBinding.instance.removeObserver(this);
     _foregroundTimer?.cancel();

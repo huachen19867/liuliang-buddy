@@ -8,7 +8,8 @@ const source = fs.readFileSync(path.join(__dirname,
 const script = source.match(/const mobileBalanceCaptureScript = r'''([\s\S]*?)''';/)[1];
 
 function setup({tiles = [['话费余额', '12.34 元']], pathname = '/website/spa/main/newHome',
-  origin = 'https://wx.10086.cn', hash = '', subframe = false, ready = true} = {}) {
+  origin = 'https://wx.10086.cn', hash = '', subframe = false, ready = true,
+  queryEpoch} = {}) {
   const messages = [];
   const timers = new Map();
   const listeners = new Map();
@@ -54,6 +55,7 @@ function setup({tiles = [['话费余额', '12.34 元']], pathname = '/website/sp
     flutter_inappwebview: ready ? bridge : undefined,
   };
   context.window = context;
+  if (queryEpoch !== undefined) context.__liuliangQueryEpoch = queryEpoch;
   context.top = subframe ? {} : context;
   const run = () => vm.runInNewContext(script, context);
   run();
@@ -76,6 +78,7 @@ for (const [label, value, expected] of [
   assert.deepEqual(JSON.parse(fixture.messages[0].payload.body),
     {source: 'officialRendered', balanceText: expected});
   assert.equal(fixture.messages[0].payload.url, fixture.context.location.href);
+  assert.equal(Object.hasOwn(fixture.messages[0].payload, 'queryEpoch'), false);
 }
 for (const tiles of [
   [['本月费用', '12.34元']], [['实时费用', '12.34元']], [['可用余额', '12.34元']],
@@ -120,4 +123,12 @@ changing.mutation();
 changing.tick(300);
 assert.equal(changing.messages.length, 0, 'login navigation blocks a late balance');
 assert.equal(changing.timers.size, 0);
+const epochFixture = setup({queryEpoch: 'round-dom'});
+assert.equal(epochFixture.messages[0].payload.queryEpoch, 'round-dom');
+epochFixture.context.__liuliangQueryEpoch = 'round-rescan';
+epochFixture.run();
+assert.equal(epochFixture.messages[0].payload.queryEpoch, 'round-dom',
+  'delivered payload retains its scan epoch');
+assert.equal(epochFixture.messages[1].payload.queryEpoch, 'round-rescan',
+  'explicit scan uses current document epoch');
 console.log('PASS: mobile balance yuan/zero/debt, strict labels, page/frame/visibility guards, bounded current-DOM scans');

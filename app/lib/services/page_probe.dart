@@ -51,6 +51,7 @@ const mobileBalanceCaptureScript = r'''
   const scan = () => {
     if (!onHome()) { stop(); return; }
     if (Date.now() > deadline) { stop(); return; }
+    const queryEpoch = window.__liuliangQueryEpoch;
     const values = new Set();
     const nodes = document.querySelectorAll('body *');
     // Bound work on unexpectedly large pages rather than scanning forever.
@@ -75,11 +76,14 @@ const mobileBalanceCaptureScript = r'''
     const bridge = window.flutter_inappwebview;
     if (!bridge || typeof bridge.callHandler !== 'function') return;
     try {
-      Promise.resolve(bridge.callHandler('trafficResponse', {
+      const payload = {
         url: location.href, pageUrl: location.href, status: 200,
         stage: 'mobileBalanceRendered',
         body: JSON.stringify({source: 'officialRendered', balanceText: text})
-      })).catch(() => {});
+      };
+      if (typeof queryEpoch === 'string' && queryEpoch.length)
+        payload.queryEpoch = queryEpoch;
+      Promise.resolve(bridge.callHandler('trafficResponse', payload)).catch(() => {});
       lastSent = text;
     } catch (_) {}
   };
@@ -151,6 +155,10 @@ const responseCaptureScript = r'''
   if (window.top !== window || !allowed.includes(location.origin)) return;
   if (window.__liuliangResponseProbe) return;
   window.__liuliangResponseProbe = true;
+  const captureEpoch = () => {
+    const value = window.__liuliangQueryEpoch;
+    return typeof value === 'string' && value.length ? value : undefined;
+  };
   const selected = (raw) => {
     try {
       const url = new URL(raw, location.href);
@@ -182,7 +190,7 @@ const responseCaptureScript = r'''
     }
   };
   window.addEventListener('flutterInAppWebViewPlatformReady', flush);
-  const send = (url, body, status, stage = 'raw') => {
+  const send = (url, body, status, stage = 'raw', queryEpoch) => {
     try {
       if (!selected(url) || typeof body !== 'string' ||
           body.length > 2097152) return;
@@ -203,6 +211,7 @@ const responseCaptureScript = r'''
       const payload = {url: responseUrl.href,
         body, status, stage, pageUrl: stage === 'unicomSession'
           ? location.origin + location.pathname : location.href};
+      if (queryEpoch !== undefined) payload.queryEpoch = queryEpoch;
       flush();
       if (!deliver(payload)) {
         // Keep a small, bounded queue for document-start responses before the
@@ -218,6 +227,7 @@ const responseCaptureScript = r'''
   if (location.origin === 'https://www.10099.com.cn') {
     const attached = new WeakSet();
     const wrappedJsonp = new WeakSet();
+    const requestEpochs = new WeakMap();
     let attempts = 0;
     const attach = jq => {
       if (typeof jq !== 'function' || !jq.fn || !jq.fn.on) return false;
@@ -228,8 +238,13 @@ const responseCaptureScript = r'''
             if (!settings || !selected(settings.url)) return;
             const value = xhr.responseJSON === undefined ? data : xhr.responseJSON;
             if (!value || typeof value !== 'object' || Array.isArray(value)) return;
-            send(settings.url, JSON.stringify(value), xhr.status, 'officialDecoded');
+            send(settings.url, JSON.stringify(value), xhr.status, 'officialDecoded',
+              requestEpochs.get(settings));
           } catch (_) {}
+        });
+        jq(document).on('ajaxSend.liuliang', (event, xhr, settings) => {
+          if (settings && typeof settings === 'object')
+            requestEpochs.set(settings, captureEpoch());
         });
         attached.add(jq);
         return true;
@@ -283,14 +298,15 @@ const responseCaptureScript = r'''
   const xhrSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.send = function() {
     const requestUrl = urls.get(this);
+    const queryEpoch = captureEpoch();
     if (selected(requestUrl)) {
       this.addEventListener('load', () => {
         try {
           const url = this.responseURL || requestUrl;
           if (this.responseType === '' || this.responseType === 'text') {
-            send(url, this.responseText, this.status);
+            send(url, this.responseText, this.status, 'raw', queryEpoch);
           } else if (this.responseType === 'json') {
-            send(url, JSON.stringify(this.response), this.status);
+            send(url, JSON.stringify(this.response), this.status, 'raw', queryEpoch);
           }
         } catch (_) {}
       }, { once: true });
@@ -300,12 +316,13 @@ const responseCaptureScript = r'''
   const originalFetch = window.fetch;
   if (typeof originalFetch === 'function') {
     window.fetch = function() {
+      const queryEpoch = captureEpoch();
       const pending = originalFetch.apply(this, arguments);
       pending.then(response => {
         try {
           if (selected(response.url)) {
             response.clone().text().then(body => {
-              send(response.url, body, response.status);
+              send(response.url, body, response.status, 'raw', queryEpoch);
             }).catch(() => {});
           }
         } catch (_) {}

@@ -14,6 +14,7 @@ import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugin.common.MethodChannel
+import com.it_nomads.fluttersecurestorage.FlutterSecureStoragePlugin
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -104,6 +105,8 @@ class BackgroundRefreshWorker(
                 loader.ensureInitializationComplete(applicationContext, null)
                 if (!current()) return@post
                 val engine = FlutterEngine(applicationContext)
+                (engine.plugins.get(FlutterSecureStoragePlugin::class.java) as? FlutterSecureStoragePlugin)
+                    ?.setOwnerCurrentGuard { current() }
                 engineRef.set(engine)
                 val channel = MethodChannel(engine.dartExecutor.binaryMessenger, CHANNEL)
                 channel.setMethodCallHandler { call, result ->

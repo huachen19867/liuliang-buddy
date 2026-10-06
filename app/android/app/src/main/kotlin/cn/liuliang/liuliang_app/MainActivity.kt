@@ -101,6 +101,11 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "cn.liuliang/notifications")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "getAppVersion" -> {
+                        val info = packageManager.getPackageInfo(packageName, 0)
+                        val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+                        result.success(mapOf("name" to info.versionName, "code" to code.toString()))
+                    }
                     "requestPermission" -> {
                         if (Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
                             result.success(true)

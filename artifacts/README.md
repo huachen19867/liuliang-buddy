@@ -112,3 +112,11 @@ widget-three-preview.png、widget-four-preview.png 读取当前 traffic_widget_c
 ## 1.10.10 输出
 
 1.10.10/code27主包28,170,068字节（28.17MB），SHA256 `34bb1a0db48e2758c08b4d4ad37c666389958f70f328f473e6e3e130dd247de2`。Release96.6秒，v2正式证书33b11555/API24-36/16KB ZIP对齐通过，Flutter298项/29秒和analyze通过。使用既有插件Chrome/Safari打开精确官方号码认证协议，完善移动官网本机登录指引，包含会话恢复修复；广电原生一键登录尚未在本应用接通。未新增真实SIM/三日登录/原生协议浏览器真机验收，公开回执另补。
+
+1.10.10公开回执：[正式版](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.10)，target 5620613f22861d1423dd1029139ccd1512f9e9ae，唯一APK uploaded且远端hash与上文一致。
+
+## 1.11.0 输出
+
+`query-health-preview.png`：实际 Flutter 查询检查页渲染，合成四家故障状态，显式“界面演示”，不是实际运营商或真机结果。截图字体加载复用 `app/test/support/preview_fonts.dart`，原始运营商logo预缓存后渲染，完整数值/时间不含真实用户信息。正式APK/哈希回执后补，详见 `docs/RELEASE_1.11.0.md`。
+
+本机正式主包为1.11.0/code28，28,171,100字节，SHA256 `7426c9114802b43bb84ef8fbae3c492227de371fe34cb3e3c348470fe25283a5`。Release62秒、正式v2证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐通过；Flutter328/analyze/原生app35/队列3项通过。公开回执另补；真实账号和长期后台未新增验证。

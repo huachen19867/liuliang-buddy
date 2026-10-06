@@ -63,3 +63,5 @@ unicom-solutions-20261002/ 保存 Newxin394/unicom-monitor 的 App 登录/续期
 2026-10-02 电信名称分类按用户明确产品规则实现，复用 dlife-public Account 名称来源和 FlowLite 分组研究。没有复制外部业务代码，名字容量不作为余量来源，官方单位/额度与同名实例仍按原校验保留。
 2026-10-05 one-click-login-20261005/保存移动/电信号码认证公开门户、广电官方App公开H5隐私政策与首页脚本。index.json记录来源和hash；只匿名读取，不注册平台、不生成/搬运凭证、不复制认证代码。移动既有allowances/mobile-10.js显示官网自动取号/协议授权；广电App本机功能由用户截图证实，新H5显示CBN原生桥接与普通浏览器验证码分支，不能由旧PC网页推断整个运营商无本机登录。见docs/ONE_CLICK_LOGIN_RESEARCH.md。
 2026-10-05 broadnet-auth-open-20261005/补存腾讯云FAQ/开通及阿里云H5/方案管理官方正文，索引含源地址和hash；明确其各自产品不支持广电及号码认证与营业厅授权的差别。broadnet-native-auth-20261005/只读研究公开广电2.3.0包分发元数据、Manifest与DEX描述符，不运行应用、不复制内部认证代码。SDK辨认结果见docs/BROADNET_AUTH_NATIVE_RESEARCH.md，外部开通条件见docs/BROADNET_AUTH_OPEN_RESEARCH.md。
+
+2026-10-06 产品稳定性改造复用既有运营商官网、WorkManager/AppWidget归档与本机 flutter_secure_storage 11.2.0（上游 mogol/flutter_secure_storage，BSD-3-Clause）。必要源码已置 app/vendor/flutter_secure_storage，仅修改Android跨引擎完成回调调度，原许可证和密码实现保留；没有重复下载或引入运营商私有认证代码。见 docs/VENDOR_SECURE_STORAGE.md。

@@ -19,17 +19,21 @@ const telecomRenderedCaptureScript = r'''
     const bridge = window.flutter_inappwebview;
     if (!pending || !bridge || typeof bridge.callHandler !== 'function') return;
     try {
-      const body = pending;
-      Promise.resolve(bridge.callHandler('trafficResponse', {
+      const {body, queryEpoch} = pending;
+      const payload = {
         url: location.href, pageUrl: location.href, stage: 'telecomRendered',
         body, status: 200
-      })).catch(() => {});
+      };
+      if (typeof queryEpoch === 'string' && queryEpoch.length)
+        payload.queryEpoch = queryEpoch;
+      Promise.resolve(bridge.callHandler('trafficResponse', payload)).catch(() => {});
       previous = body; pending = null;
     } catch (_) {}
   };
   const scan = () => {
     timer = null;
     if (!['', '#/'].includes(location.hash)) { pending = null; return; }
+    const queryEpoch = window.__liuliangQueryEpoch;
     const elements = document.querySelectorAll('#balanceModal .bill-list > .list');
     // Do not turn a truncated package list into a total.
     if (!elements.length || elements.length > 200) { pending = null; return; }
@@ -67,7 +71,9 @@ const telecomRenderedCaptureScript = r'''
     const payload = {source: 'officialRendered', rows, allowanceRows};
     if (balanceText !== null) payload.balanceText = balanceText;
     const body = JSON.stringify(payload);
-    if (body !== previous) { pending = body; flush(); }
+    if (body !== previous && (!pending || pending.body !== body)) {
+      pending = {body, queryEpoch}; flush();
+    }
   };
   const schedule = () => {
     // Continuous unrelated page mutations must not postpone scanning forever.
@@ -78,7 +84,11 @@ const telecomRenderedCaptureScript = r'''
     previous = ''; pending = null;
     scan();
   };
-  window.addEventListener('flutterInAppWebViewPlatformReady', () => { scan(); flush(); });
+  window.addEventListener('flutterInAppWebViewPlatformReady', () => {
+    // Revalidate the current component first. An unchanged pending body keeps
+    // its original capture epoch; a removed component clears queued balances.
+    scan(); flush();
+  });
   window.addEventListener('hashchange', schedule);
   const start = () => {
     if (!document.body) return;

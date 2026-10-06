@@ -5,6 +5,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const delayedBridge = process.argv.includes('--delayed-bridge');
+const queryEpochTest = process.argv.includes('--query-epoch');
 (async () => {
   const source = await fs.readFile(path.join(__dirname,
     '../app/lib/services/page_probe.dart'), 'utf8');
@@ -44,8 +45,16 @@ const delayedBridge = process.argv.includes('--delayed-bridge');
     }));
     const synthetic = {status:'000000', data:{respCode:'000000',
       intfResultBean:{userResList:[{busiType:'5',discntName:'测试通用流量', highFee:'1048576', balance:'524288'}]}}};
-    await page.route('**/contact-web/api/busi/qryUserRes', route => route.fulfill({
-      status:200, contentType:'application/json', body:JSON.stringify(synthetic)}));
+    if (queryEpochTest) await page.evaluate(() => {
+      window.__liuliangQueryEpoch = 'round-browser-request';
+    });
+    await page.route('**/contact-web/api/busi/qryUserRes', async route => {
+      if (queryEpochTest) await page.evaluate(() => {
+        window.__liuliangQueryEpoch = 'round-browser-response';
+      });
+      return route.fulfill({
+        status:200, contentType:'application/json', body:JSON.stringify(synthetic)});
+    });
     const ajaxResult = await page.evaluate(() => new Promise(resolve => {
       window.reviewBusinessJQuery.ajax({url:'/contact-web/api/busi/qryUserRes', type:'GET', dataType:'json'})
         .done((data, status, xhr) => resolve({data, responseJSON:xhr.responseJSON}))
@@ -55,6 +64,8 @@ const delayedBridge = process.argv.includes('--delayed-bridge');
     if (delayedBridge) {
       assert.equal(messages.length, 0, 'bridge absent before readiness');
       await page.evaluate(() => {
+        if (window.__liuliangQueryEpoch)
+          window.__liuliangQueryEpoch = 'round-browser-ready';
         window.flutter_inappwebview = {callHandler: (...args) => window.reviewCapture(...args)};
         window.dispatchEvent(new Event('flutterInAppWebViewPlatformReady'));
       });
@@ -65,7 +76,18 @@ const delayedBridge = process.argv.includes('--delayed-bridge');
     const decoded = messages.filter(message => message.stage === 'officialDecoded');
     assert.equal(decoded.length, 1, 'business instance captured exactly once');
     assert.deepEqual(JSON.parse(decoded[0].body), synthetic.data);
+    if (queryEpochTest) {
+      assert.equal(decoded[0].queryEpoch, 'round-browser-request',
+        'real private jQuery result and queue retain request-start epoch');
+      const raw = messages.filter(message => message.stage === 'raw');
+      assert.equal(raw.length, 1);
+      assert.equal(raw[0].queryEpoch, 'round-browser-request',
+        'real XHR retains send epoch through intercepted late response');
+    } else {
+      assert.equal(Object.hasOwn(decoded[0], 'queryEpoch'), false);
+    }
     console.log(JSON.stringify({syntheticOnly: true, delayedBridge, passed: true,
+      queryEpochTest,
       globalJQuery: metadata.version, businessJQuery: metadata.businessVersion,
       decodedEvents: decoded.length}));
   } finally {await browser.close();}

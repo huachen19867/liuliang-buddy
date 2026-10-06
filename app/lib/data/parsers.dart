@@ -398,6 +398,9 @@ CarrierSnapshot parseMobile(
                 _isUnlimitedValue(raw['sumNum'])));
     // 01/02 are voice/SMS. Unknown units must never become GB by default.
     if (!unlimited && (remaining == null || unit == null)) return;
+    final amounts = unlimited
+        ? (null, null)
+        : _finiteTrafficBytes(remaining, raw['sumNum'], unit);
     buckets.add(
       TrafficBucket(
         name: name,
@@ -405,8 +408,8 @@ CarrierSnapshot parseMobile(
         rawRemaining: _text(remaining),
         rawUnit: unit,
         isUnlimited: unlimited,
-        remainingBytes: unlimited ? null : _toBytes(remaining, unit),
-        totalBytes: unlimited ? null : _toBytes(raw['sumNum'], unit),
+        remainingBytes: amounts.$1,
+        totalBytes: amounts.$2,
       ),
     );
   }
@@ -502,6 +505,9 @@ CarrierSnapshot parseBroadnet(
     final unlimited =
         (unit == null || _toBytes('1', unit) != null) &&
         _isUnlimitedValue(entry['balance']);
+    final amounts = unlimited
+        ? (null, null)
+        : _finiteTrafficBytes(entry['balance'], entry['highFee'], unit);
     buckets.add(
       TrafficBucket(
         name: name,
@@ -509,8 +515,8 @@ CarrierSnapshot parseBroadnet(
         rawRemaining: rawRemaining,
         rawUnit: unit,
         isUnlimited: unlimited,
-        remainingBytes: unlimited ? null : _toBytes(entry['balance'], unit),
-        totalBytes: unlimited ? null : _toBytes(entry['highFee'], unit),
+        remainingBytes: amounts.$1,
+        totalBytes: amounts.$2,
       ),
     );
   }
@@ -620,18 +626,16 @@ CarrierSnapshot parseBroadnetH5(
     final named = name != null && name.isNotEmpty;
     final rawRemaining = _text(entry['balance']);
     final unlimited = named && _isUnlimitedValue(entry['balance']);
-    final remainingBytes = named && !unlimited
-        ? _toBytes(entry['balance'], 'KB')
-        : null;
+    final amounts = named && !unlimited
+        ? _finiteTrafficBytes(entry['balance'], entry['highFee'], 'KB')
+        : (null, null);
     buckets.add(
       TrafficBucket(
         name: named ? name : '未命名流量套餐',
         kind: named ? _broadnetKind(name) : BucketKind.unknown,
-        remainingBytes: remainingBytes,
+        remainingBytes: amounts.$1,
         isUnlimited: unlimited,
-        totalBytes: named && !unlimited
-            ? _toBytes(entry['highFee'], 'KB')
-            : null,
+        totalBytes: amounts.$2,
         rawUnit: 'KB',
         rawRemaining: rawRemaining,
       ),
@@ -721,4 +725,19 @@ int? _toBytes(Object? rawValue, String? rawUnit) {
   final bytes = (numerator + denominator ~/ BigInt.two) ~/ denominator;
   if (bytes > BigInt.parse('9223372036854775807')) return null;
   return bytes.toInt();
+}
+
+// Use the same row-level validity rule as cached TrafficBucket restoration.
+// A missing total does not invalidate an independently confirmed remaining
+// amount, but two confirmed values cannot claim more remaining than total.
+(int?, int?) _finiteTrafficBytes(
+  Object? rawRemaining,
+  Object? rawTotal,
+  String? unit,
+) {
+  final remaining = _toBytes(rawRemaining, unit);
+  final total = _toBytes(rawTotal, unit);
+  return remaining != null && total != null && remaining > total
+      ? (null, null)
+      : (remaining, total);
 }
