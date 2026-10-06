@@ -1,17 +1,17 @@
 # 流量小伙伴
 
-**安卓下载：**[下载正式版（28.17 MB）](https://github.com/huachen19867/liuliang-buddy/releases/download/v1.10.10/liuliang-buddy-release.apk)。适用 Android 7.0 及以上 ARM64 手机。iPhone 暂无可安装的签名包。
+**安卓下载：**[下载正式版（28.17 MB）](https://github.com/huachen19867/liuliang-buddy/releases/download/v1.11.0/liuliang-buddy-release.apk)。适用 Android 7.0 及以上 ARM64 手机。iPhone 暂无可安装的签名包。
 
 一个可自行选择运营商的流量查询应用。首次选择移动、联通、电信、广电，至少一家；每家直接选择一至四个号码，合计最多四张，各自在官网登录。额外号码需要系统 WebView 支持独立 Profile，不支持时明确阻止添加。设置可调整数量或收起卡片，保留备注、登录资料和历史本地记录。联通读取官网套餐余量，电信按官网已用/总量显示值估算并标「约」，均不混入已确认通用额度或提醒。首页采用奶油背景、圆润卡片与水滴插画，展示每个账号的余量、时间、状态和明细；官网明确标记不限量时结束加载并显示不限量，不生成零或无限 GB。
 
-当前公开正式版为 [1.10.10+27](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.10.10)，包含登录资料恢复、访问拒绝误报修复，以及移动官网本机登录指引和协议阅读。只提供独立正式证书签名的 Release ARM64 主包，见[安卓分发说明](docs/ANDROID_RELEASE.md)。广电官方 App 确有本机认证，本应用原生接入仍未完成，官网真正到期仍需验证。详见[本机登录研究](docs/ONE_CLICK_LOGIN_RESEARCH.md)。
+当前公开正式版为 [1.11.0+28](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.11.0)，修复查询迟到回包、无限等待和本地故障误判，新增连接与刷新检查，并保留会话恢复及移动官网本机登录指引。只提供独立正式证书签名的 Release ARM64 主包，见[安卓分发说明](docs/ANDROID_RELEASE.md)。广电官方 App 确有本机认证，本应用原生接入仍未完成，官网真正到期仍需验证。详见[本机登录研究](docs/ONE_CLICK_LOGIN_RESEARCH.md)。
 
-1.11.0 正在本机最终验收：旧查询回包隔离、有界页面/存储等待，以及“设置→连接与刷新检查”。检查页显示真实安装版本、上次有效数据时间和对应恢复入口，不输出原始凭证或完整号码。状态和验证边界见[本版说明](docs/RELEASE_1.11.0.md)。
+1.11.0 已正式公开：旧查询回包隔离、有界页面/存储等待，以及“设置→连接与刷新检查”。检查页显示真实安装版本、上次有效数据时间和对应恢复入口，不输出原始凭证或完整号码。状态和验证边界见[本版说明](docs/RELEASE_1.11.0.md)。
 没有 Mac 也可通过 [GitHub Actions](https://github.com/huachen19867/liuliang-buddy/actions/workflows/ios.yml)执行 macOS 编译、模拟器启动与截图。操作和签名说明见 [iOS 构建说明](docs/IOS_BUILD.md)，实现边界见 [会话隔离](docs/IOS_SESSIONS.md)与 [iOS 小组件](docs/IOS_WIDGET.md)。模拟器应用不适用于 iPhone；iOS 初版前台查询，组件展示最近结果，点击打开应用更新，设置不提供安卓后台周期选项。
 
 [此前 iOS 云端验收](https://github.com/huachen19867/liuliang-buddy/actions/runs/36965455032)已通过 Flutter/Swift 检查、应用与组件编译、独立冷启动和界面流程。四张真实模拟器空账号截图见输出索引，不代表真实运营商余额或真机小组件验收，不代表当前 Android 修复已经在 iPhone 真机验证。
 
-主安装包路径为 artifacts/liuliang-buddy-release.apk，适用 Android 7.0 及以上 ARM64 手机。构建、测试、签名和哈希结果见 [1.10.10 版本说明](docs/RELEASE_1.10.10.md)。1.8.1 启动热修曾在荣耀真机通过；本轮尚未连接真机，官网余额、多账号 Profile 会话、S25 Ultra / One UI 添加弹窗及长期后台调度仍待设备验证，完整边界见 [后台刷新说明](docs/WIDGET_BACKGROUND_REFRESH.md)。
+主安装包路径为 artifacts/liuliang-buddy-release.apk，适用 Android 7.0 及以上 ARM64 手机。构建、测试、签名和哈希结果见 [1.11.0 版本说明](docs/RELEASE_1.11.0.md)。1.8.1 启动热修曾在荣耀真机通过；本轮尚未连接真机，官网余额、多账号 Profile 会话、S25 Ultra / One UI 添加弹窗及长期后台调度仍待设备验证，完整边界见 [后台刷新说明](docs/WIDGET_BACKGROUND_REFRESH.md)。
 
 联通依据公开官网 E5 查询页自然发出的 userinfoE5query 响应，套餐余量单位 MB；不限量已用字段不当成剩余。电信当前天翼账号首页返回加密账务结果，应用读取首页已渲染的指定账务明细（含隐藏的官网明细弹窗），不复制其加解密代码、不自动点击或发送登录请求。每项按已用/总量的 MB/GB 显示值换算后估算差值；缺项、无单位、超额或无限哨兵不算合计。它有官网显示值舍入误差，共享/重叠额度以套餐规则为准。
 
@@ -30,9 +30,6 @@
 三、四张卡演示：[数量选择](artifacts/carrier-count-four-demo.png)、[首页](artifacts/dashboard-four-accounts-demo.png)、[桌面四卡](artifacts/widget-four-preview.png)、[桌面三卡](artifacts/widget-three-preview.png)。首页是 Flutter 实际界面样本，桌面是读取原生 XML 的合成预览，均非真实账号或手机实拍。
 
 此前正式版 1.10.7：移动话费余额读取及 Android 桌面同步，并包含此前未公开的电信分类/合并修改。详见 [1.10.7 说明](docs/RELEASE_1.10.7.md)。
-
-
-
 
 ## 文件索引
 

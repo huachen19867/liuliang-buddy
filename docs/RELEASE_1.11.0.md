@@ -10,8 +10,10 @@
 
 [检查页演示截图](../artifacts/query-health-preview.png)来自实际 Flutter 渲染，合成账号和时间，显式标为界面演示。不是用户真号或真机截图。源码和截图验证记录见 [技术日志](TECH_LOG.md)、[数据规则](PRODUCT_DATA_HARDENING.md)、[查询轮次](PRODUCT_QUERY_ROUNDS.md)和[存储复用](VENDOR_SECURE_STORAGE.md)。
 
-本机最终 Flutter 328 项/15秒、静态分析、Android app 35 项及队列 3 项通过。Node 和本地拦截网络 Chrome 合成回归通过。正式包信息待补。只向 public 仓库发布一个正式签名 ARM64 APK，Android 7.0 及以上，后台周期仍为关闭/1小时/2小时/1天，由系统尽力调度。iOS 源码同步诊断安装版本桥接，本轮 macOS/iPhone 尚未验收，没有 iPhone 签名包。
+本机最终 Flutter 328 项/15秒、静态分析、Android app 35 项及队列 3 项通过。Node 和本地拦截网络 Chrome 合成回归通过。正式包信息如下。只向 public 仓库发布一个正式签名 ARM64 APK，Android 7.0 及以上，后台周期仍为关闭/1小时/2小时/1天，由系统尽力调度。iOS 源码同步诊断安装版本桥接，本轮 macOS/iPhone 尚未验收，没有 iPhone 签名包。
 
 本版没有实现广电原生一键登录，也不延长服务器会话有效期。没有重新连接 USB 或取得四家真实账号，真实省份/套餐、跨日登录和持续后台/桌面更新仍未完成验证，不能称“完美成品”。
 
-正式构建：Release 62.0秒，版本1.11.0/code28，28,171,100字节（28.17MB）。SHA256 `7426c9114802b43bb84ef8fbae3c492227de371fe34cb3e3c348470fe25283a5`。v2正式发布证书SHA256 `33b115558027fdfa667a3f14a9351fbdb29901948c085daf739e16a9055a497e`，非debuggable、ARM64/API24-36、16KB ZIP对齐通过。GitHub公开回执待补。
+正式构建：Release 62.0秒，版本1.11.0/code28，28,171,100字节（28.17MB）。SHA256 `7426c9114802b43bb84ef8fbae3c492227de371fe34cb3e3c348470fe25283a5`。v2正式发布证书SHA256 `33b115558027fdfa667a3f14a9351fbdb29901948c085daf739e16a9055a497e`，非debuggable、ARM64/API24-36、16KB ZIP对齐通过。GitHub正式公开回执如下。
+
+2026-10-06 公开回执：[v1.11.0](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.11.0) 已正式发布，非草稿、非预发布，公开仓库。target/tag 均为 `3d97592cd1e743858d91edb94a262285894419cc`。Assets 仅一个 `liuliang-buddy-release.apk`，uploaded、28,171,100字节，远端SHA256 `7426c9114802b43bb84ef8fbae3c492227de371fe34cb3e3c348470fe25283a5` 与本机一致。只推送 public，未推 origin。iOS CI run37426861821尚在运行，不称本版macOS/iPhone已验收。

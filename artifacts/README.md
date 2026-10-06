@@ -120,3 +120,5 @@ widget-three-preview.png、widget-four-preview.png 读取当前 traffic_widget_c
 `query-health-preview.png`：实际 Flutter 查询检查页渲染，合成四家故障状态，显式“界面演示”，不是实际运营商或真机结果。截图字体加载复用 `app/test/support/preview_fonts.dart`，原始运营商logo预缓存后渲染，完整数值/时间不含真实用户信息。正式APK/哈希回执后补，详见 `docs/RELEASE_1.11.0.md`。
 
 本机正式主包为1.11.0/code28，28,171,100字节，SHA256 `7426c9114802b43bb84ef8fbae3c492227de371fe34cb3e3c348470fe25283a5`。Release62秒、正式v2证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐通过；Flutter328/analyze/原生app35/队列3项通过。公开回执另补；真实账号和长期后台未新增验证。
+
+2026-10-06 公开回执：[v1.11.0](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.11.0) 已正式发布，非草稿、非预发布，公开仓库。target/tag 均为 `3d97592cd1e743858d91edb94a262285894419cc`。Assets 仅一个 `liuliang-buddy-release.apk`，uploaded、28,171,100字节，远端SHA256 `7426c9114802b43bb84ef8fbae3c492227de371fe34cb3e3c348470fe25283a5` 与本机一致。只推送 public，未推 origin。iOS CI run37426861821尚在运行，不称本版macOS/iPhone已验收。

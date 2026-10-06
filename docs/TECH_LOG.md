@@ -505,3 +505,5 @@ Android vendor 只改调度层，所有引擎共享 FIFO 并由真实原生回�
 
 最终Flutter328项/15秒通过，analyze无问题；真实后台入口两项验证联通read抛异常和连续两次三秒挂起均保持error/旧数字/旧时间、不写永久认证门禁，故障后的迟到read也不恢复凭证。真实FlowHome七项、诊断路线两项和UI六项均包含在全量结果。清理额外验证stopLoading不返回仍有限退出并保留pending；首轮该测试停在未mock的Profile原生方法，补真实通道明确返回后保留原断言通过。截图已复用字体和原logo预缓存、按钮继承主题，目视核对。原生app35/queue3项通过，生产脚本Node/本地Chrome回归此前已通过且未再改JS；没有USB/真号/跨日验收。正式1.11.0+28构建中。全量测试生成的无关选择页演示图恢复本轮前版本，不删除用户文件。
 正式Release62.0秒成功，1.11.0/code28，APK28,171,100字节/SHA256 7426c9114802b43bb84ef8fbae3c492227de371fe34cb3e3c348470fe25283a5。v2正式证书33b11555、ARM64、API24-36、非debuggable及16KB ZIP对齐通过，wrapper官方配置无diff。新增忽略本轮生成的app/android/.kotlin缓存，不删除文件。只准备public main和唯一正式APK发布；macOS/iPhone本版尚无回执，真实四家账号/长期后台仍待设备。
+
+2026-10-06 公开回执：[v1.11.0](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.11.0) 已正式发布，非草稿、非预发布，公开仓库。target/tag 均为 `3d97592cd1e743858d91edb94a262285894419cc`。Assets 仅一个 `liuliang-buddy-release.apk`，uploaded、28,171,100字节，远端SHA256 `7426c9114802b43bb84ef8fbae3c492227de371fe34cb3e3c348470fe25283a5` 与本机一致。只推送 public，未推 origin。iOS CI run37426861821尚在运行，不称本版macOS/iPhone已验收。
