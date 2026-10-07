@@ -44,6 +44,9 @@
 | artifacts/query-health-preview.png | 实际 Flutter 检查页合成截图 |
 | app/test/support/preview_fonts.dart | 跨平台截图字体加载复用 |
 | docs/RELEASE_1.10.10.md | 移动官网本机登录指引与协议阅读 |
+| docs/BROADNET_NATIVE_LOGIN_CONTRACT_20261007.md | 官方新SSO链路及SDK/查询授权缺口 |
+| docs/BROADNET_NATIVE_LOGIN_ENTRY_20261007.md | 双版本官方App账号入口和外部回调核验 |
+| docs/BROADNET_NATIVE_LOGIN_PUBLIC_20261007.md | 公开广电项目是否提供原生本机认证实现 |
 | docs/BROADNET_AUTH_OPEN_RESEARCH.md | 广电专项开放能力及第三方SDK支持范围复核 |
 | docs/BROADNET_AUTH_NATIVE_RESEARCH.md | 广电公开安装包元数据与原生认证识别边界 |
 | docs/BROADNET_AUTH_INTEGRATION_BRIEF.md | 未发送的正式技术接入材料 |

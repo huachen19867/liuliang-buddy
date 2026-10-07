@@ -507,3 +507,17 @@ Android vendor 只改调度层，所有引擎共享 FIFO 并由真实原生回�
 正式Release62.0秒成功，1.11.0/code28，APK28,171,100字节/SHA256 7426c9114802b43bb84ef8fbae3c492227de371fe34cb3e3c348470fe25283a5。v2正式证书33b11555、ARM64、API24-36、非debuggable及16KB ZIP对齐通过，wrapper官方配置无diff。新增忽略本轮生成的app/android/.kotlin缓存，不删除文件。只准备public main和唯一正式APK发布；macOS/iPhone本版尚无回执，真实四家账号/长期后台仍待设备。
 
 2026-10-06 公开回执：[v1.11.0](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.11.0) 已正式发布，非草稿、非预发布，公开仓库。target/tag 均为 `3d97592cd1e743858d91edb94a262285894419cc`。Assets 仅一个 `liuliang-buddy-release.apk`，uploaded、28,171,100字节，远端SHA256 `7426c9114802b43bb84ef8fbae3c492227de371fe34cb3e3c348470fe25283a5` 与本机一致。只推送 public，未推 origin。iOS CI run37426861821尚在运行，不称本版macOS/iPhone已验收。
+
+## 2026-10-07：广电原生一键登录继续实施核查
+
+老板要求“快去做”，根先读本日志和已有三份认证报告，按其明确分工 Astra中等查真实SDK及官方契约、GPT6.1 SOL高查双版本原生组件/外部入口、GPT6 Luna极高查公开源码。复用既有2.3.0 APK和官网H5，不重下旧参考；新参考分别放references/broadnet-native-login-20261007/{contract,native,public,device}，不向外部发申请、不注册购买、不复制官方App私有配置。
+
+取得此前未归档的官方m.10099.com.cn/ssoserver/login.html及h5wap/busiClient/login/autoLogin.html正常引用源码，确认短信/图形码→SSO ticket→sid→COMMON_H5WAP_TOKEN及回跳地址校验。这里仍没有SIM本机认证→ticket契约，且与现有phoneInfo/sessionId不同，不自行互换。页面自己使用的公共协议读取响应成功，其中第三方电子渠道指广电在微信/支付宝上的官方服务，不能解释为任意第三方SDK授权。
+
+老板授权连接手机，根识别BKQ-AN00/Android16和官方App2.0.9/code209，只从安装路径pull base.apk，未访问userdata。首轮ADB39/41冲突导致文件未完整，未拿截断文件分析；重试完整81,715,648字节/SHA256 01fe5206378c40a6b159ac821c7a289e7941c617a0e9265bc0a7958e85f2c303，签名与既有2.3.0相同（784c31c29f5888975442cfda784a95a5933e9c443807bb351183ff6757829a23）。离线双版本核验仍为加固业务DEX34类型、相同三处账号UI布局、登录Activity无公开外部Intent回传，不含可用SDK许可/精确账号协议URL。没有绕过加固或读取真实凭证。
+
+连接冲突来自荣耀助手后台39服务，SDK工具41会相互替换。复用已安装的HonorSuite hwtransport可读系统版本，但连接不稳定；用户按提示退出助手后，调试会话仍未重新上线。随后老板明确“不连手机了，太麻烦”，根立即停止所有手机操作，不再拉起App/抓日志或要求继续连接。实际只验证安装包和版本，不算原生本机取号/登录完成。公开实现及正式技术咨询渠道继续离线核查，生产代码/安装包尚未变更。
+
+公开代码线新增下载keiraee/broadnet-panel固定4ac86e3f必要6文件，明确图形码/短信登录；无许可证，仅研究，不复制进生产。复用FlowKeeper首短信会话恢复和MIT 10099-Tracker小程序cURL查询，均不构成192 SIM认证。公开SDK候选和华为云市场四网搜索进一步排除三要素核验误认。官方通用联系渠道只核实10099/官网，未发现明确SDK自助下载/专属技术受理；既有BROADNET_AUTH_INTEGRATION_BRIEF已补可审阅的具体询证正文，未对外发送、注册或购买。三份本轮报告已加入README索引，公开文档上游源码链接指向作者仓库固定版本或真实来源，不链接忽略的本地源码作为已公开文件。
+
+本轮根串行递归检查四子目录索引，41条具有本地文件路径与SHA256的记录散列/字节数全部一致；原生专项独立离线比对双版本资源/组件，公开源码专项归档14文件亦已验证。diff检查通过。没有生产改动，因此未重复Flutter/Gradle或生成新APK；原生一键登录仍未实现。已备好真实包名/正式证书/只读业务范围和SIM认证→官网查询授权询证正文。现有证据下实施依赖官方或其明确授权供应方回应可用SDK/本应用申请方式，公共SSO代码与通用10099不能替代这项接入。准备仅public发布报告、索引和询证材料，不上传参考APK/无许可证业务源码/设备或账号数据，也不替换v1.11.0资产。

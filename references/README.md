@@ -65,3 +65,5 @@ unicom-solutions-20261002/ 保存 Newxin394/unicom-monitor 的 App 登录/续期
 2026-10-05 broadnet-auth-open-20261005/补存腾讯云FAQ/开通及阿里云H5/方案管理官方正文，索引含源地址和hash；明确其各自产品不支持广电及号码认证与营业厅授权的差别。broadnet-native-auth-20261005/只读研究公开广电2.3.0包分发元数据、Manifest与DEX描述符，不运行应用、不复制内部认证代码。SDK辨认结果见docs/BROADNET_AUTH_NATIVE_RESEARCH.md，外部开通条件见docs/BROADNET_AUTH_OPEN_RESEARCH.md。
 
 2026-10-06 产品稳定性改造复用既有运营商官网、WorkManager/AppWidget归档与本机 flutter_secure_storage 11.2.0（上游 mogol/flutter_secure_storage，BSD-3-Clause）。必要源码已置 app/vendor/flutter_secure_storage，仅修改Android跨引擎完成回调调度，原许可证和密码实现保留；没有重复下载或引入运营商私有认证代码。见 docs/VENDOR_SECURE_STORAGE.md。
+
+2026-10-07 broadnet-native-login-20261007/：contract归档官方SSO页、正常引用脚本及公共协议响应，明确短信ticket兑换sid与原生SIM认证分离；native复用商店2.3.0和老板授权手机安装的2.0.9，仅解析公开组件/资源元数据；device保留完整base.apk与来源摘要，不含userdata或调试凭证；public只归档实际相关开源候选的必要文件/许可证边界，不复制私有配置或执行未知代码。各子目录独立index记录来源和hash。生产App尚未取得广电第三方原生SDK/授权兑换契约，不能以资料归档或官网autoLogin名称冒称功能已接通。用户随后取消连接手机，已停止所有设备操作。
