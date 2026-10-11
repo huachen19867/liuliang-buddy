@@ -42,7 +42,8 @@ try {
 } finally { Pop-Location }
 $taskProperties = [regex]::Replace($taskProperties, '(?m)^flutter\.versionName=.*$', "flutter.versionName=$($taskVersion.Groups[1].Value)")
 $taskProperties = [regex]::Replace($taskProperties, '(?m)^flutter\.versionCode=.*$', "flutter.versionCode=$($taskVersion.Groups[2].Value)")
-Set-Content -LiteralPath $taskPropertiesPath -Value $taskProperties -Encoding utf8
+# Windows PowerShell 5.1 utf8 adds a BOM that breaks Gradle's first property.
+[System.IO.File]::WriteAllText($taskPropertiesPath, $taskProperties, (New-Object System.Text.UTF8Encoding($false)))
 if ($Mode -eq 'Release') {
     # Flutter must generate release plugin registration without dev plugins.
     # Calling assembleRelease directly after pub get can retain integration_test.

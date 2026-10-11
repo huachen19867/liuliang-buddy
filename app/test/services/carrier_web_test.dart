@@ -350,5 +350,87 @@ void main() {
       mobileLoginHelpMessage,
       contains('https://www.10086.cn/cmccclient/'),
     );
+    expect(mobileLoginHelp, contains(mobileLoginHelpMessage));
+    expect(mobileLoginHelp, contains('不会替您勾选协议'));
+  });
+
+  test('Broadnet login help keeps the official one-key boundary honest', () {
+    expect(broadnetLoginHelpMessage, contains('未向第三方应用开放'));
+    expect(broadnetLoginHelpMessage, contains('不提供免验证码按钮'));
+    expect(broadnetLoginHelpMessage, contains('短信验证码'));
+    expect(broadnetLoginGuide, contains('短信验证'));
+    expect(broadnetLoginGuide, contains('「查询流量」'));
+  });
+
+  test('one-key mask comparison reveals only prefix and suffix digits', () {
+    expect(
+      compareMobileOneKeyMask('13812341234', '138****1234'),
+      MobileOneKeyMatch.match,
+    );
+    expect(
+      compareMobileOneKeyMask('+13812341234', '138****1234'),
+      MobileOneKeyMatch.match,
+    );
+    expect(
+      compareMobileOneKeyMask(' 13812341234 ', '138****1234'),
+      MobileOneKeyMatch.match,
+    );
+    expect(
+      compareMobileOneKeyMask('19256781234', '138****1234'),
+      MobileOneKeyMatch.mismatch,
+    );
+    expect(
+      compareMobileOneKeyMask('13812345678', '138****1234'),
+      MobileOneKeyMatch.mismatch,
+      reason: 'same prefix must not hide a different suffix',
+    );
+    expect(
+      compareMobileOneKeyMask('13812341234', '13812341234'),
+      MobileOneKeyMatch.match,
+      reason: 'an unmasked number still allows an exact comparison',
+    );
+    for (final pair in [
+      (null, '138****1234'),
+      ('', '138****1234'),
+      ('13812341234', ''),
+      ('13812341234', '****'),
+      ('13812341234', '正在取号'),
+      ('13812341234', '*1*2*3*4*'),
+    ]) {
+      expect(
+        compareMobileOneKeyMask(pair.$1, pair.$2),
+        MobileOneKeyMatch.unknown,
+        reason: '${pair.$1} vs ${pair.$2}',
+      );
+    }
+    expect(
+      compareMobileOneKeyMask('1381234', '138****1234'),
+      MobileOneKeyMatch.mismatch,
+      reason: 'a mask longer than the stored number cannot belong to it',
+    );
+  });
+
+  test('one-key guidance stays user-driven for every comparison outcome', () {
+    for (final masked in ['138****1234']) {
+      final match = mobileOneKeyGuidance(
+        MobileOneKeyMatch.match,
+        masked,
+      );
+      expect(match, contains(masked));
+      expect(match, contains('自行勾选协议'));
+      expect(match, isNot(contains('已完成登录')));
+      final mismatch = mobileOneKeyGuidance(
+        MobileOneKeyMatch.mismatch,
+        masked,
+      );
+      expect(mismatch, contains('「暂不使用」'));
+      expect(mismatch, contains('短信验证'));
+      final unknown = mobileOneKeyGuidance(
+        MobileOneKeyMatch.unknown,
+        masked,
+      );
+      expect(unknown, contains('核对'));
+      expect(unknown, contains(masked));
+    }
   });
 }

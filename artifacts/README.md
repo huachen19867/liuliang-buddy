@@ -122,3 +122,9 @@ widget-three-preview.png、widget-four-preview.png 读取当前 traffic_widget_c
 本机正式主包为1.11.0/code28，28,171,100字节，SHA256 `7426c9114802b43bb84ef8fbae3c492227de371fe34cb3e3c348470fe25283a5`。Release62秒、正式v2证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐通过；Flutter328/analyze/原生app35/队列3项通过。公开回执另补；真实账号和长期后台未新增验证。
 
 2026-10-06 公开回执：[v1.11.0](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.11.0) 已正式发布，非草稿、非预发布，公开仓库。target/tag 均为 `3d97592cd1e743858d91edb94a262285894419cc`。Assets 仅一个 `liuliang-buddy-release.apk`，uploaded、28,171,100字节，远端SHA256 `7426c9114802b43bb84ef8fbae3c492227de371fe34cb3e3c348470fe25283a5` 与本机一致。只推送 public，未推 origin。iOS CI run37426861821尚在运行，不称本版macOS/iPhone已验收。
+
+## 1.11.1 输出
+
+本机正式主包为1.11.1/code29，28,236,636字节（28.24MB，约26.93MiB），SHA256 `f5821bc066ec9e06d9e2b16abc59c33116739a01b5ca4ebb74970564433d3b14`。Release128.6秒，v2正式证书33b11555、ARM64/API24-36、16KB ZIP对齐通过；Flutter331项/analyze与全部Node探针回归通过。新增移动官网一键授权框只读观察与账号掩码核对提示、广电登录帮助，详见 `docs/ONE_KEY_PROMPT_PROGRESS.md`。踩坑修复：Windows PowerShell 5.1曾向local.properties写入BOM致Gradle读不到flutter.sdk，构建脚本已改用无BOM UTF8重写。未公开回执；真实设备取号兼容性未验证。
+
+1.11.1发布阶段从当前源码重建11.2秒，SHA256保持f5821bc...33d3b14，再次验证正式v2签名/版本/非debuggable/ARM64/API24-36/16KB ZIP对齐通过。**功能验收未通过**：原331回归通过，新增10项3通过7失败，发布说明和缺陷见 `docs/RELEASE_1.11.1.md`，不将签名/构建成功写成全量测试通过。GitHub公开回执后补。

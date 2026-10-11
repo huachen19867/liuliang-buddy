@@ -35,6 +35,12 @@
 
 | 位置 | 内容 |
 | --- | --- |
+| docs/RELEASE_1.11.1.md | 发布范围、7个失败验收用例对应缺陷与分发回执 |
+| docs/ACCEPTANCE_1.11.1.md | 当前候选未通过验收的问题、实测结果和复验范围 |
+| app/test/one_key_prompt_acceptance_test.dart | 保留失败断言的登录提示验收回归 |
+| app/dart_test.yaml | 声明acceptance测试标签，默认不跳过 |
+| docs/ONE_KEY_PROMPT_PROGRESS.md | 移动一键授权框号码核对与广电登录帮助边界 |
+| app/test/services/mobile_one_key_probe_js_test.cjs | 一键授权框只读观察脚本的可见性与守卫回归 |
 | docs/RELEASE_1.11.0.md | 查询稳定性、诊断入口与正式交付边界 |
 | docs/PRODUCT_READINESS_REVIEW.md | 全链路问题证据与实施复核 |
 | docs/PRODUCT_QUERY_ROUNDS.md | 每账号查询轮次与迟到回包隔离 |

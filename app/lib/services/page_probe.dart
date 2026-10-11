@@ -118,6 +118,58 @@ const mobileBalanceCaptureScript = r'''
 })();
 ''';
 
+/// Observes the official one-key authorization popup on the Mobile login page.
+/// It only reads the masked number the official page itself displays and
+/// reports it once per appearance; clicks, agreement checkboxes and form
+/// submission stay entirely with the user on the official page.
+const mobileOneKeyProbeScript = r'''
+(() => {
+  'use strict';
+  const onLoginPage = () => window.top === window &&
+    location.origin === 'https://wx.10086.cn' &&
+    location.pathname === '/website/bind/bindAccount/new';
+  if (!onLoginPage()) return;
+  if (window.__liuliangOneKeyProbe) return;
+  window.__liuliangOneKeyProbe = true;
+  let reported = null;
+  let timer;
+  const maskedNumber = () => {
+    const node = document.querySelector('#onekeyLoginPhone');
+    const text = String((node && node.textContent) || '').replace(/\s+/g, '');
+    return /\d/.test(text) && text.length <= 32 ? text : '';
+  };
+  const deliver = value => {
+    try {
+      const bridge = window.flutter_inappwebview;
+      if (!bridge || typeof bridge.callHandler !== 'function') return false;
+      Promise.resolve(bridge.callHandler('oneKeyPrompt', {
+        pageUrl: location.href, maskedPhone: value
+      })).catch(() => {});
+      return true;
+    } catch (_) { return false; }
+  };
+  const scan = () => {
+    // Leaving the official login route ends the poll for this document.
+    if (!onLoginPage()) { clearInterval(timer); timer = null; return; }
+    const pop = document.querySelector('.onekeyLoginPop');
+    if (!pop) { reported = null; return; }
+    const style = getComputedStyle(pop);
+    const visible = style.display !== 'none' &&
+      style.visibility !== 'hidden' && style.visibility !== 'collapse' &&
+      style.opacity !== '0' && pop.getClientRects().length > 0;
+    if (!visible) { reported = null; return; }
+    const value = maskedNumber();
+    if (!value || value === reported) return;
+    if (deliver(value)) reported = value;
+  };
+  // Two fixed official selectors per tick; the read-only poll stops once the
+  // page navigates away from the login route. Nothing is clicked or written.
+  timer = setInterval(scan, 300);
+  scan();
+  window.addEventListener('flutterInAppWebViewPlatformReady', scan);
+})();
+''';
+
 /// Decodes transport JSON only; the carrier parser validates business fields.
 Map<String, dynamic>? decodeMobileResponse(String raw) {
   var text = raw.trim();

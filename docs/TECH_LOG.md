@@ -522,3 +522,29 @@ Android vendor 只改调度层，所有引擎共享 FIFO 并由真实原生回�
 
 本轮根串行递归检查四子目录索引，41条具有本地文件路径与SHA256的记录散列/字节数全部一致；原生专项独立离线比对双版本资源/组件，公开源码专项归档14文件亦已验证。diff检查通过。没有生产改动，因此未重复Flutter/Gradle或生成新APK；原生一键登录仍未实现。已备好真实包名/正式证书/只读业务范围和SIM认证→官网查询授权询证正文。现有证据下实施依赖官方或其明确授权供应方回应可用SDK/本应用申请方式，公共SSO代码与通用10099不能替代这项接入。准备仅public发布报告、索引和询证材料，不上传参考APK/无许可证业务源码/设备或账号数据，也不替换v1.11.0资产。
 本轮报告/询证材料已公开，源码提交4eb1402ae611b55c6960ad4acbc7c1a10cbfc1a5仅push public main成功。没有新APK、没有外部联系、没有取得本应用原生认证授权，v1.11.0仍为现有正式分发版本。手机验证依老板要求终止，不把已读安装包视为真实本机取号验收。
+
+## 2026-10-11：移动一键授权框号码核对与广电登录帮助
+
+老板要求优化移动广电的本机一键登录。广电原生一键已多轮核实缺正式SDK与兑换契约，本轮不接入新SDK、不造假按钮，改为把官网自带的一键流程用可靠：新增mobileOneKeyProbeScript仅注入移动登录页，300ms只读轮询.onekeyLoginPop与#onekeyLoginPhone（选择器来自references/allowances/mobile-2.html官方归档），弹出且含数字时经独立oneKeyPrompt桥上报掩码号，变化重报、隐藏重置、离开登录路由停止；不点击、不勾选、不提交、不读短信表单、不带queryEpoch，不进_receive响应门禁。
+
+_receiveOneKeyPrompt仅接受当前可见账号的事件，用compareMobileOneKeyMask按登记号码与官网掩码做前缀/后缀数字比对：一致提示自行勾选协议后点一键登录；不一致明确提示点「暂不使用」改短信验证并弹一次对话框（多账号错连的关键防线）；无登记号码给中性核对提示。_loginHints按账号缓存并在重连、重载登录页、SPA回登录页、查询提交、清除资料/改选/移除账号时清空，旧提示不带入新一轮。广电新增登录帮助与默认提示，如实说明官方App「本机登录」未向第三方开放、备份不延长官网有效期；移动帮助补充掩码核对说明并引用官网「请勿连接热点登录」原文。
+
+版本1.11.1+29。Flutter331项/analyze通过，新增mobile_one_key_probe_js_test.cjs及掩码比对、指引、广电边界三组断言，全部既有Node探针回归通过。踩坑：Windows PowerShell 5.1 Set-Content -Encoding utf8给local.properties写BOM，Gradle报flutter.sdk not set；改用UTF8Encoding(false)重写并在构建脚本修复。正式Release构建与真机取号兼容性另记；发布回执以实际公开为准。
+
+## 2026-10-11：其他 agent 1.11.1 改动验收
+
+老板要求验收工作区已有改动。先读本日志和ONE_KEY_PROMPT_PROGRESS，复用既有移动官方归档/FlowHome fake，不重下已存项目；按老板约定分工Astra中等只读桥接生命周期、SOL高新增真实状态验收测试、Luna极高只读文案/交付，根串行SDK。未改被验收的生产Dart/JS/构建脚本，没有连接手机（取消授权继续适用），没有提交、推送或发布当前候选。
+
+原331项Flutter回归27秒通过，追加10项acceptance回归3通过7失败：编辑号码后旧闭包仍报一致、当前查询页收到旧登录payload仍弹框、WebView重建后旧handler污染、离开登录页/开始查询未清旧提示、内部公开数字/隐藏长度错误match。正向确认官网页/错号对话框可关闭、当前隐藏页面不会弹提示；夹具回调finally恢复debug平台变量/路由先首帧再计时，未用fixture失败充当产品bug。首轮analyze仅新增测试unused import，移除后复查结果另补；生产无该警告。新增标签只为区分baseline/验收，默认不skip不排除。Node新探针既有用例通过，但不验证Dart生命周期。
+
+独立核对现有APK1.11.1/code29，28,236,636字节/hash f5821bc066ec9e06d9e2b16abc59c33116739a01b5ca4ebb74970564433d3b14，apksigner正式证书33b11555、ARM64/API24-36、非debuggable、16KB ZIP对齐通过。本轮未重建，不假称证明整个未提交源码与该文件字节对应；旧日志不是新构建回执。文案“广电未向第三方开放”缺官方证据，只能说本应用未取得资料/授权。未接通新的广电原生链路。
+
+验收结论不通过，具体复现/行号/复验范围写docs/ACCEPTANCE_1.11.1.md，新增app/test/one_key_prompt_acceptance_test.dart和dart_test.yaml。测试生成的无关选择图恢复本轮前版本，未删除用户资料；完整日志保留ignored .tools/acceptance-1.11.1-{analyze,baseline,regressions}.txt。待原实现修正后重跑保留断言。
+复查静态分析15.1秒通过，新增验收夹具unused import已删除；签名/版本/哈希验证与331基线和3通过7失败回执已写验收报告。生产三文件最后写入均早于候选APK，但本轮仍未重建或声称字节级源码关联证明。新增acceptance标签已在dart_test.yaml声明，不跳过默认全量。验收结束，当前改动保持未提交和未发布，待修问题断言保留。
+
+## 2026-10-11：按用户要求发布1.11.1并公开缺陷
+
+老板明确“发布然后说明缺陷”，授权公开当前未通过功能验收的1.11.1。先读日志/验收报告，确认工作区与候选f5821bc...一致、public最新仍v1.11.0；复用既有Flutter正式构建/签名流程及已下载参考，不另做SDK研究、不重复下载。保持被验收生产代码和7个失败断言，既有331回归/静态分析/Node通过不能说成全量验收通过。准备正式非预发布且唯一ARM64 APK，发布说明首段公开验收未通过，并列旧账号、旧页面回调、提示未清、掩码误判和广电文案/原生尚未接通；只push public。
+
+为确认源码与发布安装包关系，根重新执行正式Release构建（不改生产修复），本轮精确日志保存在ignored .tools/release-1.11.1-publish-build.txt。docs/RELEASE_1.11.1.md写真实范围、已知缺陷和多卡/改号的人工核对与短信回退方法；不移动旧tag/替换1.11.0资产、不造假绿测试，不操作手机。
+重建Release11.2秒成功，1.11.1/code29/28,236,636字节/SHA256 f5821bc066ec9e06d9e2b16abc59c33116739a01b5ca4ebb74970564433d3b14，与原候选一致；正式v2证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐通过，local.properties无BOM，wrapper无diff。新签名/元数据日志保存ignored .tools/release-1.11.1-publish-{signature,metadata}.txt。重建和签名通过不修复7项验收失败；默认全量保留真实失败，无新SDK/真机操作。

@@ -148,6 +148,9 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
   bool _reminders = false;
   int _generation = 0;
   String? _webMessage;
+  // Per-account guidance while the official one-key authorization popup is
+  // visible. Cleared on every fresh login round so stale popups never persist.
+  final Map<String, String> _loginHints = {};
   Timer? _foregroundTimer;
   bool _clearing = false;
   bool _profileClearPending = false;
@@ -990,6 +993,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     setState(() {
       _visibleAccountId = accountId;
       _webMessage = null;
+      _loginHints.remove(accountId);
       _connected.add(accountId);
       _openingLogin.add(accountId);
       _putSnapshot(
@@ -1021,6 +1025,9 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     InAppWebViewController controller,
     int generation,
   ) async {
+    // A fresh official login page must not inherit popup guidance from an
+    // earlier visit.
+    _loginHints.remove(account.id);
     final epoch =
         _webRounds.current(account.id) ??
         _armOfficialTimeout(account, generation, openingLogin: true);
@@ -1419,7 +1426,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         : _snapshot(
             account,
           ).copyWith(status: snapshot.status, message: snapshot.message);
-    setState(() => _putSnapshot(account, displayed));
+    setState(() {
+      _loginHints.remove(accountId);
+      _putSnapshot(account, displayed);
+    });
     await _publishWidget();
     if (!_current(generation) || _webCommitEpochs[accountId] != epoch) return;
     await _store(() async {
@@ -1556,6 +1566,33 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
     }
   }
 
+  /// Reads the official one-key popup observation. The masked number comes
+  /// from the official page's own popup; nothing is clicked or submitted.
+  void _receiveOneKeyPrompt(CarrierAccount account, List<dynamic> args) {
+    if (account.carrier != Carrier.mobile || !_current(_generation)) return;
+    // Only the account whose official page is on screen may show guidance,
+    // so a hidden page cannot raise dialogs for an account the user left.
+    if (_visibleAccountId != account.id) return;
+    if (args.isEmpty || args.first is! Map) return;
+    final payload = Map<String, dynamic>.from(args.first as Map);
+    final page = Uri.tryParse(payload['pageUrl'] as String? ?? '');
+    if (page == null ||
+        page.scheme != 'https' ||
+        page.host != 'wx.10086.cn' ||
+        !isCarrierLoginPage(page)) {
+      return;
+    }
+    final masked = payload['maskedPhone'];
+    if (masked is! String || masked.isEmpty || masked.length > 32) return;
+    final match = compareMobileOneKeyMask(account.phoneNumber, masked);
+    final message = mobileOneKeyGuidance(match, masked);
+    if (_loginHints[account.id] == message) return;
+    setState(() => _loginHints[account.id] = message);
+    if (match == MobileOneKeyMatch.mismatch) {
+      _showInfo('请核对官网授权框号码', message);
+    }
+  }
+
   Widget _webView(CarrierAccount account) {
     final carrier = account.carrier;
     final accountId = account.id;
@@ -1566,13 +1603,16 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
         offstage: _visibleAccountId != accountId,
         child: CarrierBrowserShell(
           title: '${account.label}官方页面',
-          message:
-              _webMessage ??
-              (carrier == Carrier.mobile
-                  ? mobileLoginGuide
-                  : carrier == Carrier.unicom
-                  ? '在官网选择「随机密码登录」获取短信密码。表单可双指缩放、左右移动；登录后点击「查询流量」。'
-                  : '在官网完成验证后点击上方「查询流量」。关闭此页可回到首页。'),
+          message: _webMessage ??
+              _loginHints[accountId] ??
+              switch (carrier) {
+                Carrier.mobile => mobileLoginGuide,
+                Carrier.broadnet => broadnetLoginGuide,
+                Carrier.unicom =>
+                  '在官网选择「随机密码登录」获取短信密码。表单可双指缩放、左右移动；登录后点击「查询流量」。',
+                Carrier.telecom =>
+                  '在官网完成验证后点击上方「查询流量」。关闭此页可回到首页。',
+              },
           onClose: () => unawaited(_closeOfficialPage()),
           onQuery: () => unawaited(_refreshAccount(accountId)),
           onReload: () {
@@ -1582,17 +1622,21 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
           onDismissKeyboard: () =>
               unawaited(_dismissOfficialKeyboard(accountId)),
           keyboardVisible: MediaQuery.viewInsetsOf(context).bottom > 0,
-          onHelp: carrier == Carrier.mobile
-              ? () => _showInfo(
-                  '移动网页登录帮助',
-                  '输入完整手机号后，请在官网阅读并自行勾选协议，再点击「获取验证码」。如果按钮没有反应，可先收起键盘，查看官网是否显示协议或错误提示。\n\n$mobileLoginHelpMessage',
-                )
-              : carrier == Carrier.unicom
-              ? () => _showInfo(
-                  '联通网页登录帮助',
-                  '在联通官网选择「随机密码登录」，自行输入手机号、按官网要求勾选协议并获取短信密码。登录框来自联通官网，可以双指放大或缩小、左右移动；Android 也可使用网页缩放按钮。\n\n完成官网登录后点击本页「查询流量」，等待官网套餐页面加载。若官网仍要求验证或报错，请按官网提示处理。',
-                )
-              : null,
+          onHelp: switch (carrier) {
+            Carrier.mobile => () => _showInfo(
+                '移动网页登录帮助',
+                '输入完整手机号后，请在官网阅读并自行勾选协议，再点击「获取验证码」。如果按钮没有反应，可先收起键盘，查看官网是否显示协议或错误提示。\n\n$mobileLoginHelp',
+              ),
+            Carrier.broadnet => () => _showInfo(
+                '广电网页登录帮助',
+                broadnetLoginHelpMessage,
+              ),
+            Carrier.unicom => () => _showInfo(
+                '联通网页登录帮助',
+                '在联通官网选择「随机密码登录」，自行输入手机号、按官网要求勾选协议并获取短信密码。登录框来自联通官网，可以双指放大或缩小、左右移动；Android 也可使用网页缩放按钮。\n\n完成官网登录后点击本页「查询流量」，等待官网套餐页面加载。若官网仍要求验证或报错，请按官网提示处理。',
+              ),
+            Carrier.telecom => null,
+          },
           child: InAppWebView(
             key: ValueKey('${account.id}_$_generation'),
             // Every account is loaded only after its WebView profile is set.
@@ -1612,11 +1656,16 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                 source: responseCaptureScript,
                 injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
               ),
-              if (carrier == Carrier.mobile)
+              if (carrier == Carrier.mobile) ...[
                 UserScript(
                   source: mobileBalanceCaptureScript,
                   injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
                 ),
+                UserScript(
+                  source: mobileOneKeyProbeScript,
+                  injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+                ),
+              ],
               if (carrier == Carrier.telecom)
                 UserScript(
                   source: telecomRenderedCaptureScript,
@@ -1694,6 +1743,10 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                 handlerName: 'trafficResponse',
                 callback: (args) => _receive(account, args, generation),
               );
+              controller.addJavaScriptHandler(
+                handlerName: 'oneKeyPrompt',
+                callback: (args) => _receiveOneKeyPrompt(account, args),
+              );
               if (_openingLogin.contains(accountId) ||
                   _snapshot(account).status == QueryStatus.notConnected) {
                 await _loadOfficialLogin(account, controller, generation);
@@ -1726,15 +1779,16 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
                 _refreshThrottle.loginOrLoadFailed(accountId);
                 _mobileQueries.remove(accountId)?.cancel();
                 _awaitingLoginReturn.add(accountId);
-                setState(
-                  () => _putSnapshot(
+                setState(() {
+                  _loginHints.remove(accountId);
+                  _putSnapshot(
                     account,
                     _snapshot(account).copyWith(
                       status: QueryStatus.authExpired,
                       message: '请在官方页面验证号码，完成后查询流量',
                     ),
-                  ),
-                );
+                  );
+                });
                 unawaited(_publishWidget());
               } else if (carrier == Carrier.telecom &&
                   uri != null &&
@@ -1934,6 +1988,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       }
       _controllers.clear();
       _visibleAccountId = null;
+      _loginHints.clear();
       _refreshThrottle.clear();
       _appQueryTickets.clear();
       _unicomAppAccounts.addAll(
@@ -2127,6 +2182,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _accounts = _accounts.removeSecond(id);
       _controllers.clear();
       _visibleAccountId = null;
+      _loginHints.clear();
       for (final query in _mobileQueries.values) {
         query.cancel();
       }
@@ -2573,6 +2629,7 @@ class _FlowHomeState extends State<FlowHome> with WidgetsBindingObserver {
       _broadnetSessions.clear();
       _unicomAppAccounts.clear();
       _appQueryTickets.clear();
+      _loginHints.clear();
       for (final query in _mobileQueries.values) {
         query.cancel();
       }
