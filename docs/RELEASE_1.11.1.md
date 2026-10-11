@@ -13,3 +13,5 @@
 静态分析及既有Node探针测试通过，但默认全量测试仍包含上述7个失败用例，不跳过或修改断言。原生认证、四家真实账号和持续后台/桌面更新没有新增真机验证；iPhone仍无签名安装包。Android公开下载只提供一个正式发布证书签名的ARM64 APK，适用Android 7.0及以上。
 
 本轮从当前发布源码重新构建正式包成功（11.2秒），版本1.11.1/code29，28,236,636字节（28.24MB）。SHA256 `f5821bc066ec9e06d9e2b16abc59c33116739a01b5ca4ebb74970564433d3b14`，与验收时安装包一致。v2正式证书SHA256 `33b115558027fdfa667a3f14a9351fbdb29901948c085daf739e16a9055a497e`，ARM64/API24-36、非debuggable及16KB ZIP对齐通过；local.properties无UTF8 BOM，wrapper官方配置已恢复。公开回执待实际GitHub上传和文件校验后补入。
+
+2026-10-11公开回执：[v1.11.1](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.11.1)已正式发布，非草稿/非预发布。target/tag均`95036f8375ed40d17f7d46a40af0111ad691556b`，唯一`liuliang-buddy-release.apk`为uploaded、28,236,636字节，远端SHA256 `f5821bc066ec9e06d9e2b16abc59c33116739a01b5ca4ebb74970564433d3b14`与本机一致。回读正文确认明确公开“未通过功能验收”、7项验收失败和广电原生一键仍未接通。源码只push public；已知缺陷保留，不以发布替代修复/验收，不宣称新iOS或真机通过。

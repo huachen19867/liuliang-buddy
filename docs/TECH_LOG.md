@@ -548,3 +548,5 @@ _receiveOneKeyPrompt仅接受当前可见账号的事件，用compareMobileOneKe
 
 为确认源码与发布安装包关系，根重新执行正式Release构建（不改生产修复），本轮精确日志保存在ignored .tools/release-1.11.1-publish-build.txt。docs/RELEASE_1.11.1.md写真实范围、已知缺陷和多卡/改号的人工核对与短信回退方法；不移动旧tag/替换1.11.0资产、不造假绿测试，不操作手机。
 重建Release11.2秒成功，1.11.1/code29/28,236,636字节/SHA256 f5821bc066ec9e06d9e2b16abc59c33116739a01b5ca4ebb74970564433d3b14，与原候选一致；正式v2证书33b11555、非debuggable、ARM64/API24-36、16KB ZIP对齐通过，local.properties无BOM，wrapper无diff。新签名/元数据日志保存ignored .tools/release-1.11.1-publish-{signature,metadata}.txt。重建和签名通过不修复7项验收失败；默认全量保留真实失败，无新SDK/真机操作。
+
+2026-10-11公开回执：[v1.11.1](https://github.com/huachen19867/liuliang-buddy/releases/tag/v1.11.1)已正式发布，非草稿/非预发布。target/tag均`95036f8375ed40d17f7d46a40af0111ad691556b`，唯一`liuliang-buddy-release.apk`为uploaded、28,236,636字节，远端SHA256 `f5821bc066ec9e06d9e2b16abc59c33116739a01b5ca4ebb74970564433d3b14`与本机一致。回读正文确认明确公开“未通过功能验收”、7项验收失败和广电原生一键仍未接通。源码只push public；已知缺陷保留，不以发布替代修复/验收，不宣称新iOS或真机通过。
